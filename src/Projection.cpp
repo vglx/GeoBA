@@ -1,31 +1,38 @@
 #include "Projection.h"
+#include <ceres/ceres.h>
 #include <algorithm>
 #include <cmath>
 #include <limits>
 
+template <typename T>
 Eigen::Vector2f Projection::projectPoint(
     const MeshModel::Vertex& vertex, 
     const Eigen::Matrix3f& intrinsics, 
-    const Eigen::Matrix3f& rotation, 
-    const Eigen::Vector3f& translation) {
-    // 顶点坐标转为 Eigen::Vector3f
-    Eigen::Vector3f point(vertex.x, vertex.y, vertex.z);
+    const Eigen::Matrix<T, 3, 3>& rotation, 
+    const Eigen::Matrix<T, 3, 1>& translation) {
 
-    // 世界坐标转相机坐标
-    Eigen::Vector3f cameraPoint = rotation * point + translation;
+    Eigen::Matrix<T, 3, 1> point(T(vertex.x), T(vertex.y), T(vertex.z));  
+    Eigen::Matrix<T, 3, 1> cameraPoint = rotation * point + translation;
+    Eigen::Matrix<double, 3, 3> intrinsics_double = intrinsics.cast<double>();  // 先转 double
+    Eigen::Matrix<T, 3, 3> intrinsicsT = intrinsics_double.template cast<T>();  // 再转 T
+    Eigen::Matrix<T, 3, 1> imagePoint = intrinsicsT * cameraPoint;
 
-    // 相机坐标投影到图像平面
-    Eigen::Vector3f imagePoint = intrinsics * cameraPoint;
-
-    // 归一化
-    return Eigen::Vector2f(imagePoint(0) / imagePoint(2), imagePoint(1) / imagePoint(2));
+    if constexpr (std::is_same<T, ceres::Jet<double, 4>>::value) {
+        return Eigen::Vector2f(static_cast<float>(imagePoint(0).a) / static_cast<float>(imagePoint(2).a),
+                               static_cast<float>(imagePoint(1).a) / static_cast<float>(imagePoint(2).a));
+    } 
+    else {
+        return Eigen::Vector2f(static_cast<float>(imagePoint(0)) / static_cast<float>(imagePoint(2)),
+                               static_cast<float>(imagePoint(1)) / static_cast<float>(imagePoint(2)));
+    }
 }
 
+template <typename T>
 std::vector<Eigen::Vector2f> Projection::projectPoints(
     const std::vector<MeshModel::Vertex>& vertices, 
     const Eigen::Matrix3f& intrinsics, 
-    const Eigen::Matrix3f& rotation, 
-    const Eigen::Vector3f& translation) {
+    const Eigen::Matrix<T, 3, 3>& rotation, 
+    const Eigen::Matrix<T, 3, 1>& translation) {
     std::vector<Eigen::Vector2f> projectedPoints;
     projectedPoints.reserve(vertices.size());
     for (const auto& vertex : vertices) {
@@ -34,28 +41,35 @@ std::vector<Eigen::Vector2f> Projection::projectPoints(
     return projectedPoints;
 }
 
+template <typename T>
 std::vector<float> Projection::computeVertexDepths(
     const std::vector<MeshModel::Vertex>& vertices, 
-    const Eigen::Matrix3f& cameraIntrinsics,
-    const Eigen::Matrix3f& rotation, 
-    const Eigen::Vector3f& translation) {
+    const Eigen::Matrix3f& intrinsics,
+    const Eigen::Matrix<T, 3, 3>& rotation, 
+    const Eigen::Matrix<T, 3, 1>& translation) {
     // 计算每个顶点的深度
     std::vector<float> depths;
     depths.reserve(vertices.size());
     for (const auto& vertex : vertices) {
-        Eigen::Vector3f point(vertex.x, vertex.y, vertex.z);
-        Eigen::Vector3f cameraPoint = rotation * point + translation;
-        depths.push_back(cameraPoint.z());
+        Eigen::Matrix<T, 3, 1> point(T(vertex.x), T(vertex.y), T(vertex.z));  // ✅ 统一 `T`
+        Eigen::Matrix<T, 3, 1> cameraPoint = rotation * point + translation;  // ✅ 类型匹配
+        if constexpr (std::is_same<T, ceres::Jet<double, 4>>::value) {
+            depths.push_back(static_cast<float>(cameraPoint.z().a));  // 提取 `a` 值
+        } 
+        else {
+            depths.push_back(static_cast<float>(cameraPoint.z()));  // 直接转换
+        }
     }
     return depths;
 }
 
+template <typename T>
 std::vector<bool> Projection::handleOcclusion(
     const std::vector<MeshModel::Vertex>& vertices, 
     const std::vector<MeshModel::Triangle>& triangles,
     const Eigen::Matrix3f& intrinsics,
-    const Eigen::Matrix3f& rotation,
-    const Eigen::Vector3f& translation,
+    const Eigen::Matrix<T, 3, 3>& rotation,
+    const Eigen::Matrix<T, 3, 1>& translation,
     int imageWidth,
     int imageHeight) {
 
@@ -76,12 +90,28 @@ std::vector<bool> Projection::handleOcclusion(
         Eigen::Vector2f p2 = projectPoint(v2, intrinsics, rotation, translation);
 
         // 计算顶点深度
-        float z0 = (rotation * Eigen::Vector3f(v0.x, v0.y, v0.z) + translation).z();
-        float z1 = (rotation * Eigen::Vector3f(v1.x, v1.y, v1.z) + translation).z();
-        float z2 = (rotation * Eigen::Vector3f(v2.x, v2.y, v2.z) + translation).z();
+        Eigen::Matrix<T, 3, 1> p0_world(T(v0.x), T(v0.y), T(v0.z));
+        Eigen::Matrix<T, 3, 1> p1_world(T(v1.x), T(v1.y), T(v1.z));
+        Eigen::Matrix<T, 3, 1> p2_world(T(v2.x), T(v2.y), T(v2.z));
 
+        T z0 = (rotation * p0_world + translation).z();  // ✅ `T` 统一
+        T z1 = (rotation * p1_world + translation).z();
+        T z2 = (rotation * p2_world + translation).z();
         // 光栅化三角形并更新深度缓冲区
-        rasterizeTriangle(p0, p1, p2, z0, z1, z2, depthBuffer, imageWidth, imageHeight);
+        if constexpr (std::is_same<T, ceres::Jet<double, 4>>::value) {
+            rasterizeTriangle(p0, p1, p2, 
+                static_cast<float>(z0.a), 
+                static_cast<float>(z1.a), 
+                static_cast<float>(z2.a), 
+                depthBuffer, imageWidth, imageHeight);
+        } 
+        else {
+            rasterizeTriangle(p0, p1, p2, 
+                static_cast<float>(z0), 
+                static_cast<float>(z1), 
+                static_cast<float>(z2), 
+                depthBuffer, imageWidth, imageHeight);
+        }
     }
 
     // 根据深度缓冲区确定顶点的可见性
@@ -91,8 +121,18 @@ std::vector<bool> Projection::handleOcclusion(
         int x = static_cast<int>(std::round(projected.x()));
         int y = static_cast<int>(std::round(projected.y()));
 
-        if (std::abs(depthBuffer[y][x] - (rotation * Eigen::Vector3f(vertices[i].x, vertices[i].y, vertices[i].z) + translation).z()) < 1e-6) {
-            visibleMask[i] = true;
+        Eigen::Matrix<T, 3, 1> point_world(T(vertices[i].x), T(vertices[i].y), T(vertices[i].z));
+        T point_depth = (rotation * point_world + translation).z();
+
+        if constexpr (std::is_same<T, ceres::Jet<double, 4>>::value) {
+            if (Eigen::numext::abs(depthBuffer[y][x] - point_depth.a) < 1e-6f) {
+                visibleMask[i] = true;
+            }
+        } 
+        else {
+            if (Eigen::numext::abs(depthBuffer[y][x] - point_depth) < T(1e-6)) {
+                visibleMask[i] = true;
+            }
         }
     }
 
@@ -130,7 +170,7 @@ void Projection::rasterizeTriangle(
 
             if ((w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0)) {
                 // 计算深度值（插值）
-                float area = std::abs(w0 + w1 + w2);
+                float area = std::abs(w0 + w1 + w2) + 1e-6f;
                 float alpha = w1 / area, beta = w2 / area, gamma = w0 / area;
                 float z = alpha * z0 + beta * z1 + gamma * z2;
 
@@ -142,3 +182,30 @@ void Projection::rasterizeTriangle(
         }
     }
 }
+
+template std::vector<bool> Projection::handleOcclusion<double>(
+    const std::vector<MeshModel::Vertex>&, const std::vector<MeshModel::Triangle>&,
+    const Eigen::Matrix3f&, const Eigen::Matrix<double, 3, 3>&,
+    const Eigen::Matrix<double, 3, 1>&, int, int);
+
+template std::vector<Eigen::Vector2f> Projection::projectPoints<double>(
+    const std::vector<MeshModel::Vertex>&, const Eigen::Matrix3f&,
+    const Eigen::Matrix<double, 3, 3>&, const Eigen::Matrix<double, 3, 1>&);
+
+template std::vector<float> Projection::computeVertexDepths<double>(
+    const std::vector<MeshModel::Vertex>&, const Eigen::Matrix3f&,
+    const Eigen::Matrix<double, 3, 3>&, const Eigen::Matrix<double, 3, 1>&);
+
+// 对 Ceres 的 Jet 类型也实例化：
+template std::vector<bool> Projection::handleOcclusion<ceres::Jet<double, 4>>(
+    const std::vector<MeshModel::Vertex>&, const std::vector<MeshModel::Triangle>&,
+    const Eigen::Matrix3f&, const Eigen::Matrix<ceres::Jet<double, 4>, 3, 3>&,
+    const Eigen::Matrix<ceres::Jet<double, 4>, 3, 1>&, int, int);
+
+template std::vector<Eigen::Vector2f> Projection::projectPoints<ceres::Jet<double, 4>>(
+    const std::vector<MeshModel::Vertex>&, const Eigen::Matrix3f&,
+    const Eigen::Matrix<ceres::Jet<double, 4>, 3, 3>&, const Eigen::Matrix<ceres::Jet<double, 4>, 3, 1>&);
+
+template std::vector<float> Projection::computeVertexDepths<ceres::Jet<double, 4>>(
+    const std::vector<MeshModel::Vertex>&, const Eigen::Matrix3f&,
+    const Eigen::Matrix<ceres::Jet<double, 4>, 3, 3>&, const Eigen::Matrix<ceres::Jet<double, 4>, 3, 1>&);

@@ -27,6 +27,7 @@ CombinedError::CombinedError(const std::vector<MeshModel::Vertex>& vertices,
 
 template <typename T>
 bool CombinedError::operator()(T const* const* poses, T* residual) const {
+
     size_t vertex_count = vertices_.size();
     size_t frame_count = depth_maps_.size();
 
@@ -46,14 +47,14 @@ bool CombinedError::operator()(T const* const* poses, T* residual) const {
         Eigen::Matrix<T, 3, 1> translation(poses[frame_idx][9], poses[frame_idx][10], poses[frame_idx][11]);
 
         visibility_masks[frame_idx] = Projection::handleOcclusion(
-            vertices_, triangles_, camera_intrinsics_, rotation.template cast<float>(), translation.template cast<float>(),
+            vertices_, triangles_, camera_intrinsics_, rotation, translation,
             depth_maps_[frame_idx].cols, depth_maps_[frame_idx].rows);
 
         projected_points[frame_idx] = Projection::projectPoints(
-            vertices_, camera_intrinsics_, rotation.template cast<float>(), translation.template cast<float>());
+            vertices_, camera_intrinsics_, rotation, translation);
 
         vertex_depths_per_frame[frame_idx] = Projection::computeVertexDepths(
-            vertices_, camera_intrinsics_, rotation.template cast<float>(), translation.template cast<float>());
+            vertices_, camera_intrinsics_, rotation, translation);
     }
 
     // **第二步：计算所有帧的误差**
@@ -76,7 +77,8 @@ bool CombinedError::operator()(T const* const* poses, T* residual) const {
             // **法向量误差**
                 Eigen::Matrix<T, 3, 1> mesh_normal = Eigen::Vector3f(
                     vertices_[vertex_idx].nx, vertices_[vertex_idx].ny, vertices_[vertex_idx].nz).template cast<T>();
-                Eigen::Matrix<T, 3, 1> transformed_normal = poses[frame_idx].block<3, 3>(0, 0).template cast<T>() * mesh_normal;
+                Eigen::Map<const Eigen::Matrix<T, 3, 3>> rotation(poses[frame_idx]);
+                Eigen::Matrix<T, 3, 1> transformed_normal = rotation * mesh_normal;
 
                 Eigen::Matrix<T, 3, 1> depth_normal(
                     T(depth_normals_[frame_idx](v, u * 3 + 0)),

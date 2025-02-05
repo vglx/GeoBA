@@ -8,7 +8,7 @@ int main() {
     std::cout << "GeoBA System Starting with Dataset...\n";
 
     // **1. 初始化数据集管理器**
-    DatasetManager dataset_manager("data/");
+    DatasetManager dataset_manager("../data/test/");
 
     std::vector<cv::Mat> rgb_images;
     std::vector<cv::Mat> depth_images;
@@ -23,7 +23,8 @@ int main() {
         std::cerr << "Failed to load global mesh model.\n";
         return -1;
     }
-    std::cout << "Loaded mesh with " << mesh_model.getVertices().size() << " vertices.\n";
+    std::cout << "Loaded mesh with " << mesh_model.getVertices().size() << " vertices and " 
+              << mesh_model.getTriangles().size() << " triangles.\n";
 
     // **3. 加载 RGB 和深度图像**
     if (!dataset_manager.loadAllRGBImages(rgb_images) || !dataset_manager.loadAllDepthImages(depth_images)) {
@@ -74,7 +75,8 @@ int main() {
     std::cout << "Computed vertex normals for mesh model.\n";
 
     // **9. 运行优化**
-    Optimizer optimizer(1.0, 1.0, 1.0, 1.0);  // 传入误差权重（可调节）
+    std::cout << "Start optimization.\n";
+    Optimizer optimizer(0, 1.0, 0, 0);  // 传入误差权重（可调节）
     optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), rgb_images, depth_images,
                        depth_normals, camera_intrinsics, camera_poses);
 

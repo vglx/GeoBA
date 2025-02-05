@@ -8,35 +8,39 @@
 class Projection {
 public:
     // 3D 点投影到 2D 图像平面
+    template <typename T>
     static Eigen::Vector2f projectPoint(
         const MeshModel::Vertex& vertex, 
         const Eigen::Matrix3f& intrinsics, 
-        const Eigen::Matrix3f& rotation, 
-        const Eigen::Vector3f& translation);
+        const Eigen::Matrix<T, 3, 3>& rotation, 
+        const Eigen::Matrix<T, 3, 1>& translation);
 
     // 批量投影 3D 点到 2D 图像平面
+    template <typename T>
     static std::vector<Eigen::Vector2f> projectPoints(
         const std::vector<MeshModel::Vertex>& vertices, 
         const Eigen::Matrix3f& intrinsics, 
-        const Eigen::Matrix3f& rotation, 
-        const Eigen::Vector3f& translation);
+        const Eigen::Matrix<T, 3, 3>& rotation, 
+        const Eigen::Matrix<T, 3, 1>& translation);
 
     // 遮挡处理：考虑面片遮挡
+    template <typename T>
     static std::vector<bool> handleOcclusion(
         const std::vector<MeshModel::Vertex>& vertices, 
         const std::vector<MeshModel::Triangle>& triangles,
         const Eigen::Matrix3f& intrinsics,
-        const Eigen::Matrix3f& rotation,
-        const Eigen::Vector3f& translation,
+        const Eigen::Matrix<T, 3, 3>& rotation,
+        const Eigen::Matrix<T, 3, 1>& translation,
         int imageWidth,
         int imageHeight);
 
     // 计算每个顶点的深度
+    template <typename T>
     static std::vector<float> computeVertexDepths(
         const std::vector<MeshModel::Vertex>& vertices, 
-        const Eigen::Matrix3f& cameraIntrinsics,
-        const Eigen::Matrix3f& rotation, 
-        const Eigen::Vector3f& translation);
+        const Eigen::Matrix3f& intrinsics,
+        const Eigen::Matrix<T, 3, 3>& rotation, 
+        const Eigen::Matrix<T, 3, 1>& translation);
 
     // 验证投影点是否在图像范围内
     static bool isPointInImage(

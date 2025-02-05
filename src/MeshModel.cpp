@@ -1,5 +1,6 @@
 #include "MeshModel.h"
 #include "tiny_obj_loader.h" // 使用 TinyObjLoader 解析 OBJ 文件
+#include <Eigen/Geometry>
 #include <iostream>
 
 MeshModel::MeshModel() {}
@@ -37,6 +38,15 @@ Eigen::Vector3f MeshModel::computeSurfaceNormal(const Triangle& triangle) const 
 }
 
 void MeshModel::computeVertexNormals() {
+    for (const auto& triangle : triangles_) {
+        if (triangle.v0 >= vertices_.size() || triangle.v1 >= vertices_.size() || triangle.v2 >= vertices_.size()) {
+            std::cerr << "Error: Triangle index out of bounds! v0: " << triangle.v0
+                    << " v1: " << triangle.v1 << " v2: " << triangle.v2 
+                    << " but vertices_ size is " << vertices_.size() << std::endl;
+            return;
+        }
+    }
+
     // 初始化每个顶点的法向量为零
     for (auto& vertex : vertices_) {
         vertex.nx = vertex.ny = vertex.nz = 0.0f;

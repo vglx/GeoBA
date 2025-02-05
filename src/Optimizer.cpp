@@ -11,7 +11,7 @@ Optimizer::Optimizer(double weight_global_depth, double weight_global_gradient,
     // 配置 Ceres Solver
     options_.linear_solver_type = ceres::SPARSE_SCHUR;
     options_.minimizer_progress_to_stdout = true;
-    options_.max_num_iterations = 100;
+    options_.max_num_iterations = 10;
 }
 
 void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
@@ -36,7 +36,7 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
 
     for (size_t i = 0; i < frame_count; ++i) {
         Eigen::Matrix3f R = camera_poses[i].block<3, 3>(0, 0);
-        Eigen::Vector3f t = camera_poses[i].col(3);
+        Eigen::Vector3f t = camera_poses[i].block<3, 1>(0, 3);
 
         for (int j = 0; j < 9; ++j) poses[i][j] = static_cast<double>(R(j / 3, j % 3));
         for (int j = 0; j < 3; ++j) poses[i][9 + j] = static_cast<double>(t(j));
@@ -44,7 +44,7 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
         pose_ptrs[i] = poses[i].data();
     }
 
-    problem.AddResidualBlock(cost_function, nullptr, pose_ptrs.data());
+    problem.AddResidualBlock(cost_function, nullptr, pose_ptrs);
 
     // **3. 配置 Ceres Solver**
     ceres::Solver::Summary summary;
@@ -61,8 +61,6 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
         for (int j = 0; j < 3; ++j) t(j) = static_cast<float>(poses[i][9 + j]);
 
         camera_poses[i].block<3, 3>(0, 0) = R;
-        camera_poses[i].col(3) = t;
+        camera_poses[i].block<3, 1>(0, 3) = t;
     }
-
-    std::cout << "Multi-frame optimization completed.\n";
 }
