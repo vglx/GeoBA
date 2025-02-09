@@ -29,7 +29,7 @@ public:
     bool loadCameraIntrinsics(Eigen::Matrix3f& intrinsics);
 
     // 加载 Ground Truth 位姿
-    bool loadPoses(std::vector<Eigen::Matrix4f>& poses, const std::string& fileName);
+    bool loadPoses(std::vector<Eigen::Matrix4d>& poses, const std::string& fileName);
 
 private:
     std::string dataset_path_;

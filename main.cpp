@@ -12,8 +12,8 @@ int main() {
 
     std::vector<cv::Mat> rgb_images;
     std::vector<cv::Mat> depth_images;
-    std::vector<Eigen::Matrix4f> gt_camera_poses;
-    std::vector<Eigen::Matrix4f> camera_poses;
+    std::vector<Eigen::Matrix4d> gt_camera_poses;
+    std::vector<Eigen::Matrix4d> camera_poses;
     Eigen::Matrix3f camera_intrinsics;
     MeshModel mesh_model;
     ImageProcessor image_processor;
@@ -77,8 +77,8 @@ int main() {
     // **9. 运行优化**
     std::cout << "Start optimization.\n";
     Optimizer optimizer(0, 1.0, 0, 0);  // 传入误差权重（可调节）
-    optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), rgb_images, depth_images,
-                       depth_normals, camera_intrinsics, camera_poses);
+    optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, rgb_images, depth_images,
+                       depth_normals, camera_poses);
 
     std::cout << "Optimization completed.\n";
     return 0;

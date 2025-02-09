@@ -17,7 +17,7 @@ Eigen::Vector2f Projection::projectPoint(
     Eigen::Matrix<T, 3, 3> intrinsicsT = intrinsics_double.template cast<T>();  // 再转 T
     Eigen::Matrix<T, 3, 1> imagePoint = intrinsicsT * cameraPoint;
 
-    if constexpr (std::is_same<T, ceres::Jet<double, 4>>::value) {
+    if constexpr (std::is_same<T, ceres::Jet<double, 6>>::value) {
         return Eigen::Vector2f(static_cast<float>(imagePoint(0).a) / static_cast<float>(imagePoint(2).a),
                                static_cast<float>(imagePoint(1).a) / static_cast<float>(imagePoint(2).a));
     } 
@@ -53,7 +53,7 @@ std::vector<float> Projection::computeVertexDepths(
     for (const auto& vertex : vertices) {
         Eigen::Matrix<T, 3, 1> point(T(vertex.x), T(vertex.y), T(vertex.z));  // ✅ 统一 `T`
         Eigen::Matrix<T, 3, 1> cameraPoint = rotation * point + translation;  // ✅ 类型匹配
-        if constexpr (std::is_same<T, ceres::Jet<double, 4>>::value) {
+        if constexpr (std::is_same<T, ceres::Jet<double, 6>>::value) {
             depths.push_back(static_cast<float>(cameraPoint.z().a));  // 提取 `a` 值
         } 
         else {
@@ -98,7 +98,7 @@ std::vector<bool> Projection::handleOcclusion(
         T z1 = (rotation * p1_world + translation).z();
         T z2 = (rotation * p2_world + translation).z();
         // 光栅化三角形并更新深度缓冲区
-        if constexpr (std::is_same<T, ceres::Jet<double, 4>>::value) {
+        if constexpr (std::is_same<T, ceres::Jet<double, 6>>::value) {
             rasterizeTriangle(p0, p1, p2, 
                 static_cast<float>(z0.a), 
                 static_cast<float>(z1.a), 
@@ -124,7 +124,7 @@ std::vector<bool> Projection::handleOcclusion(
         Eigen::Matrix<T, 3, 1> point_world(T(vertices[i].x), T(vertices[i].y), T(vertices[i].z));
         T point_depth = (rotation * point_world + translation).z();
 
-        if constexpr (std::is_same<T, ceres::Jet<double, 4>>::value) {
+        if constexpr (std::is_same<T, ceres::Jet<double, 6>>::value) {
             if (Eigen::numext::abs(depthBuffer[y][x] - point_depth.a) < 1e-6f) {
                 visibleMask[i] = true;
             }
@@ -183,6 +183,7 @@ void Projection::rasterizeTriangle(
     }
 }
 
+// 显式实例化模板（对于 double）
 template std::vector<bool> Projection::handleOcclusion<double>(
     const std::vector<MeshModel::Vertex>&, const std::vector<MeshModel::Triangle>&,
     const Eigen::Matrix3f&, const Eigen::Matrix<double, 3, 3>&,
@@ -196,16 +197,15 @@ template std::vector<float> Projection::computeVertexDepths<double>(
     const std::vector<MeshModel::Vertex>&, const Eigen::Matrix3f&,
     const Eigen::Matrix<double, 3, 3>&, const Eigen::Matrix<double, 3, 1>&);
 
-// 对 Ceres 的 Jet 类型也实例化：
-template std::vector<bool> Projection::handleOcclusion<ceres::Jet<double, 4>>(
+template std::vector<bool> Projection::handleOcclusion<ceres::Jet<double, 6>>(
     const std::vector<MeshModel::Vertex>&, const std::vector<MeshModel::Triangle>&,
-    const Eigen::Matrix3f&, const Eigen::Matrix<ceres::Jet<double, 4>, 3, 3>&,
-    const Eigen::Matrix<ceres::Jet<double, 4>, 3, 1>&, int, int);
+    const Eigen::Matrix3f&, const Eigen::Matrix<ceres::Jet<double, 6>, 3, 3>&,
+    const Eigen::Matrix<ceres::Jet<double, 6>, 3, 1>&, int, int);
 
-template std::vector<Eigen::Vector2f> Projection::projectPoints<ceres::Jet<double, 4>>(
+template std::vector<Eigen::Vector2f> Projection::projectPoints<ceres::Jet<double, 6>>(
     const std::vector<MeshModel::Vertex>&, const Eigen::Matrix3f&,
-    const Eigen::Matrix<ceres::Jet<double, 4>, 3, 3>&, const Eigen::Matrix<ceres::Jet<double, 4>, 3, 1>&);
+    const Eigen::Matrix<ceres::Jet<double, 6>, 3, 3>&, const Eigen::Matrix<ceres::Jet<double, 6>, 3, 1>&);
 
-template std::vector<float> Projection::computeVertexDepths<ceres::Jet<double, 4>>(
+template std::vector<float> Projection::computeVertexDepths<ceres::Jet<double, 6>>(
     const std::vector<MeshModel::Vertex>&, const Eigen::Matrix3f&,
-    const Eigen::Matrix<ceres::Jet<double, 4>, 3, 3>&, const Eigen::Matrix<ceres::Jet<double, 4>, 3, 1>&);
+    const Eigen::Matrix<ceres::Jet<double, 6>, 3, 3>&, const Eigen::Matrix<ceres::Jet<double, 6>, 3, 1>&);

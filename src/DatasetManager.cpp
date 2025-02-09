@@ -5,7 +5,8 @@
 #include <iostream>
 #include <sstream>
 #include <Eigen/Core>
-
+#include <Eigen/SVD>
+#include <Eigen/Geometry>
 
 namespace fs = std::filesystem;
 
@@ -159,7 +160,7 @@ bool DatasetManager::loadCameraIntrinsics(Eigen::Matrix3f& intrinsics) {
     return true;
 }
 
-bool DatasetManager::loadPoses(std::vector<Eigen::Matrix4f>& poses, const std::string& fileName) {
+bool DatasetManager::loadPoses(std::vector<Eigen::Matrix4d>& poses, const std::string& fileName) {
     std::string pose_file_path = dataset_path_ + fileName + ".txt";
     std::ifstream pose_file(pose_file_path);
 
@@ -172,16 +173,16 @@ bool DatasetManager::loadPoses(std::vector<Eigen::Matrix4f>& poses, const std::s
 
     std::string line;
     while (std::getline(pose_file, line)) {
-        std::vector<float> values;
+        std::vector<double> values;
         std::stringstream ss(line);
         std::string value_str;
 
         // **改为手动解析逗号**
         while (std::getline(ss, value_str, ',')) {
             try {
-                values.push_back(std::stof(value_str));  // 确保是 float
+                values.push_back(std::stod(value_str));  // 确保是 float
             } catch (const std::exception& e) {
-                std::cerr << "Error parsing float: " << value_str << " in line: " << line << "\n";
+                std::cerr << "Error parsing double: " << value_str << " in line: " << line << "\n";
                 return false;
             }
         }
@@ -192,13 +193,29 @@ bool DatasetManager::loadPoses(std::vector<Eigen::Matrix4f>& poses, const std::s
         }
 
         // **使用 Eigen::Map 直接映射 std::vector<float> 为 row-major 矩阵**
-        Eigen::Matrix4f pose = Eigen::Map<Eigen::Matrix<float, 4, 4, Eigen::ColMajor>>(values.data());
+        Eigen::Matrix4d pose = Eigen::Map<Eigen::Matrix<double, 4, 4, Eigen::ColMajor>>(values.data());
 
         // 检查矩阵的齐次特性（最后一行应该是 [0, 0, 0, 1]）
-        if (!pose.block<1, 4>(3, 0).isApprox(Eigen::RowVector4f(0, 0, 0, 1), 1e-6)) {
+        if (!pose.row(3).isApprox(Eigen::RowVector4d(0, 0, 0, 1), 1e-6)) {
             std::cerr << "Error: Invalid homogeneous transformation matrix.\n";
             return false;
         }
+
+        Eigen::Matrix3d R = pose.block<3, 3>(0, 0);
+        Eigen::JacobiSVD<Eigen::Matrix3d> svd(R, Eigen::ComputeFullU | Eigen::ComputeFullV);
+        Eigen::Matrix3d R_fixed = svd.matrixU() * svd.matrixV().transpose();
+
+        // **确保 det(R) = 1**
+        if (R_fixed.determinant() < 0) {
+            R_fixed.col(0) *= -1.0f;  // 反转一个轴，确保是正交的 SO(3) 旋转矩阵
+        }
+
+        // **对 R 进行归一化，确保正交**
+        Eigen::Quaterniond q(R_fixed);
+        q.normalize();
+        R_fixed = q.toRotationMatrix();
+
+        pose.block<3, 3>(0, 0) = R_fixed;
 
         poses.push_back(pose);
     }

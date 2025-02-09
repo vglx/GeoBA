@@ -28,11 +28,11 @@ public:
      */
     void optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
                   const std::vector<MeshModel::Triangle>& mesh_triangles,
+                  const Eigen::Matrix3f& camera_intrinsics,
                   const std::vector<cv::Mat>& observed_images,
                   const std::vector<cv::Mat>& observed_depth_maps,
                   const std::vector<Eigen::MatrixXf>& depth_normals,
-                  const Eigen::Matrix3f& camera_intrinsics,
-                  std::vector<Eigen::Matrix4f>& camera_poses);
+                  std::vector<Eigen::Matrix4d>& camera_poses);
 
 private:
     ceres::Solver::Options options_;  // Ceres 迭代优化参数
