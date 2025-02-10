@@ -337,7 +337,7 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o: /app/src/Projection.cpp \
  /opt/eigen/Eigen/src/Core/StlIterators.h \
  /opt/eigen/Eigen/src/Core/GlobalFunctions.h \
  /opt/eigen/Eigen/src/Core/util/ReenableStupidWarnings.h \
- /app/include/MeshModel.h /usr/local/include/ceres/ceres.h \
+ /usr/local/include/ceres/ceres.h \
  /usr/local/include/ceres/autodiff_cost_function.h \
  /usr/include/c++/11/memory \
  /usr/include/c++/11/bits/stl_raw_storage_iter.h \
@@ -477,4 +477,4 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o: /app/src/Projection.cpp \
  /usr/local/include/ceres/solver.h /usr/include/c++/11/unordered_set \
  /usr/include/c++/11/bits/unordered_set.h \
  /usr/local/include/ceres/sphere_manifold.h \
- /usr/local/include/ceres/version.h
+ /usr/local/include/ceres/version.h /app/include/MeshModel.h

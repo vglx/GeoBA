@@ -45,6 +45,7 @@ private:
 class TripletGlobalError {
     public:
         TripletGlobalError(const std::vector<MeshModel::Vertex>& vertices,
+                           const std::vector<MeshModel::Triangle>& triangles,
                            const Eigen::Matrix3f& camera_intrinsics,
                            const cv::Mat& depth_map_i,
                            const cv::Mat& depth_map_j,
@@ -59,6 +60,7 @@ class TripletGlobalError {
         bool operator()(const T* const pose_i, const T* const pose_j, const T* const pose_k, T* residual) const;
     
         static ceres::CostFunction* Create(const std::vector<MeshModel::Vertex>& vertices,
+                                           const std::vector<MeshModel::Triangle>& triangles,
                                            const Eigen::Matrix3f& camera_intrinsics,
                                            const cv::Mat& depth_map_i,
                                            const cv::Mat& depth_map_j,
@@ -71,6 +73,7 @@ class TripletGlobalError {
     
     private:
         const std::vector<MeshModel::Vertex>& vertices_;
+        const std::vector<MeshModel::Triangle>& triangles_;
         const Eigen::Matrix3f& camera_intrinsics_;
         const cv::Mat& depth_map_i_;
         const cv::Mat& depth_map_j_;

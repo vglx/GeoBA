@@ -1,0 +1,19 @@
+{
+    "name": "GeoBA Dev",
+    "dockerFile": "../Dockerfile",
+    "workspaceFolder": "/app",
+    "extensions": [
+        "ms-vscode.cmake-tools",
+        "ms-vscode.cpptools",
+        "ms-vscode.remote-containers"
+    ],
+    "settings": {
+        "cmake.configureOnOpen": true
+    },
+    "runArgs": [
+        "--cap-add=SYS_PTRACE",
+        "--security-opt",
+        "seccomp=unconfined"
+    ],
+    "remoteUser": "root"
+}

@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y \
     libsuitesparse-dev \
     libopencv-dev \
     nlohmann-json3-dev \
+    gdb \
     && rm -rf /var/lib/apt/lists/*
 
 # 安装 CMake 3.27.6

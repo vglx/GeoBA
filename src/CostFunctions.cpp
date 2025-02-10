@@ -19,6 +19,7 @@ LocalGeometricError::LocalGeometricError(const std::vector<MeshModel::Vertex>& v
 
 template <typename T>
 bool LocalGeometricError::operator()(const T* const se3, T* residual) const {
+    std::cout << "localgeo-------->" << std::endl;
     Eigen::Map<const Eigen::Matrix<T, 6, 1>> se3_vec(se3);
     Sophus::SE3<T> transform = Sophus::SE3<T>::exp(se3_vec);
     Eigen::Matrix<T, 3, 3> rotation = transform.rotationMatrix();
@@ -83,6 +84,7 @@ ceres::CostFunction* LocalGeometricError::Create(const std::vector<MeshModel::Ve
 }
 
 TripletGlobalError::TripletGlobalError(const std::vector<MeshModel::Vertex>& vertices,
+                                       const std::vector<MeshModel::Triangle>& triangles,
                                        const Eigen::Matrix3f& camera_intrinsics,
                                        const cv::Mat& depth_map_i,
                                        const cv::Mat& depth_map_j,
@@ -93,6 +95,7 @@ TripletGlobalError::TripletGlobalError(const std::vector<MeshModel::Vertex>& ver
                                        double weight_global_depth,
                                        double weight_global_gradient)
     : vertices_(vertices),
+      triangles_(triangles),
       camera_intrinsics_(camera_intrinsics),
       depth_map_i_(depth_map_i),
       depth_map_j_(depth_map_j),
@@ -110,34 +113,45 @@ bool TripletGlobalError::operator()(const T* const pose_i,
                                     T* residual) const {
     size_t vertex_count = vertices_.size();
 
-    // 累加每一帧梯度和深度的平方误差
+    // 1. 将优化变量转换为 SE(3) 变换
+    Sophus::SE3<T> T_i = Sophus::SE3<T>::exp(Eigen::Map<const Eigen::Matrix<T, 6, 1>>(pose_i));
+    Sophus::SE3<T> T_j = Sophus::SE3<T>::exp(Eigen::Map<const Eigen::Matrix<T, 6, 1>>(pose_j));
+    Sophus::SE3<T> T_k = Sophus::SE3<T>::exp(Eigen::Map<const Eigen::Matrix<T, 6, 1>>(pose_k));
+
+    Eigen::Matrix<T, 3, 3> rotation_i = T_i.rotationMatrix();
+    Eigen::Matrix<T, 3, 1> translation_i = T_i.translation();
+    Eigen::Matrix<T, 3, 3> rotation_j = T_j.rotationMatrix();
+    Eigen::Matrix<T, 3, 1> translation_j = T_j.translation();
+    Eigen::Matrix<T, 3, 3> rotation_k = T_k.rotationMatrix();
+    Eigen::Matrix<T, 3, 1> translation_k = T_k.translation();
+
+    // 2. 计算可见性 mask
+    std::vector<bool> visibility_mask_i = Projection::handleOcclusion(vertices_, triangles_, camera_intrinsics_, rotation_i, translation_i, depth_map_i_.cols, depth_map_i_.rows);
+    std::vector<bool> visibility_mask_j = Projection::handleOcclusion(vertices_, triangles_, camera_intrinsics_, rotation_j, translation_j, depth_map_j_.cols, depth_map_j_.rows);
+    std::vector<bool> visibility_mask_k = Projection::handleOcclusion(vertices_, triangles_, camera_intrinsics_, rotation_k, translation_k, depth_map_k_.cols, depth_map_k_.rows);
+
+    // 3. 计算所有顶点的投影
+    std::vector<Eigen::Vector2f> projected_i = Projection::projectPoints(vertices_, camera_intrinsics_, rotation_i, translation_i);
+    std::vector<Eigen::Vector2f> projected_j = Projection::projectPoints(vertices_, camera_intrinsics_, rotation_j, translation_j);
+    std::vector<Eigen::Vector2f> projected_k = Projection::projectPoints(vertices_, camera_intrinsics_, rotation_k, translation_k);
+
+    // 4. 计算误差
     T sum_grad_error_i = T(0);
     T sum_depth_error_i = T(0);
     T sum_grad_error_j = T(0);
     T sum_depth_error_j = T(0);
     T sum_grad_error_k = T(0);
     T sum_depth_error_k = T(0);
-    size_t valid_count = 0;  // 有效像素数量
-
-    // 将李代数参数转换为 SE(3) 变换
-    Sophus::SE3<T> T_i = Sophus::SE3<T>::exp(Eigen::Map<const Eigen::Matrix<T, 6, 1>>(pose_i));
-    Sophus::SE3<T> T_j = Sophus::SE3<T>::exp(Eigen::Map<const Eigen::Matrix<T, 6, 1>>(pose_j));
-    Sophus::SE3<T> T_k = Sophus::SE3<T>::exp(Eigen::Map<const Eigen::Matrix<T, 6, 1>>(pose_k));
+    size_t valid_count = 0;
 
     for (size_t vertex_idx = 0; vertex_idx < vertex_count; ++vertex_idx) {
-        Eigen::Vector3f world_point = vertices_[vertex_idx].position;
+        // 只计算三帧都可见的点
+        if (!visibility_mask_i[vertex_idx] || !visibility_mask_j[vertex_idx] || !visibility_mask_k[vertex_idx]) continue;
 
-        // 计算该 3D 点在三帧中的坐标
-        Eigen::Vector3<T> proj_i = T_i * world_point.cast<T>();
-        Eigen::Vector3<T> proj_j = T_j * world_point.cast<T>();
-        Eigen::Vector3<T> proj_k = T_k * world_point.cast<T>();
+        Eigen::Vector2f pixel_i = projected_i[vertex_idx];
+        Eigen::Vector2f pixel_j = projected_j[vertex_idx];
+        Eigen::Vector2f pixel_k = projected_k[vertex_idx];
 
-        // 投影到图像平面（Projection::projectPoint 返回 Eigen::Vector2f）
-        Eigen::Vector2f pixel_i = Projection::projectPoint(proj_i, camera_intrinsics_);
-        Eigen::Vector2f pixel_j = Projection::projectPoint(proj_j, camera_intrinsics_);
-        Eigen::Vector2f pixel_k = Projection::projectPoint(proj_k, camera_intrinsics_);
-
-        // 将投影结果转换为整数像素坐标
         int u_i = static_cast<int>(pixel_i.x());
         int v_i = static_cast<int>(pixel_i.y());
         int u_j = static_cast<int>(pixel_j.x());
@@ -145,28 +159,22 @@ bool TripletGlobalError::operator()(const T* const pose_i,
         int u_k = static_cast<int>(pixel_k.x());
         int v_k = static_cast<int>(pixel_k.y());
 
-        // 检查三个帧的像素是否都在有效范围内
         if (u_i >= 1 && u_i < depth_map_i_.cols - 1 && v_i >= 1 && v_i < depth_map_i_.rows - 1 &&
             u_j >= 1 && u_j < depth_map_j_.cols - 1 && v_j >= 1 && v_j < depth_map_j_.rows - 1 &&
             u_k >= 1 && u_k < depth_map_k_.cols - 1 && v_k >= 1 && v_k < depth_map_k_.rows - 1) {
 
-            // 对深度图直接使用最近邻取值
             T depth_i_val = T(depth_map_i_.at<float>(v_i, u_i));
             T depth_j_val = T(depth_map_j_.at<float>(v_j, u_j));
             T depth_k_val = T(depth_map_k_.at<float>(v_k, u_k));
 
-            // 使用 computeGradient 获取梯度值（整数像素位置）
             T gradient_i_val = T(ImageProcessor::computeGradient(image_i_, u_i, v_i));
             T gradient_j_val = T(ImageProcessor::computeGradient(image_j_, u_j, v_j));
             T gradient_k_val = T(ImageProcessor::computeGradient(image_k_, u_k, v_k));
 
-            // 仅保留深度大于 0.1 的有效像素
             if (depth_i_val > T(0.1) && depth_j_val > T(0.1) && depth_k_val > T(0.1)) {
-                // 计算当前像素在三帧中的平均梯度和平均深度
-                T grad_mean  = (gradient_i_val + gradient_j_val + gradient_k_val) / T(3.0);
+                T grad_mean = (gradient_i_val + gradient_j_val + gradient_k_val) / T(3.0);
                 T depth_mean = (depth_i_val + depth_j_val + depth_k_val) / T(3.0);
 
-                // 分别累加每一帧与均值之差的平方
                 sum_grad_error_i += (gradient_i_val - grad_mean) * (gradient_i_val - grad_mean);
                 sum_grad_error_j += (gradient_j_val - grad_mean) * (gradient_j_val - grad_mean);
                 sum_grad_error_k += (gradient_k_val - grad_mean) * (gradient_k_val - grad_mean);
@@ -180,15 +188,15 @@ bool TripletGlobalError::operator()(const T* const pose_i,
         }
     }
 
-    // 如果存在有效像素，则计算均方根误差 (RMSE) 作为残差输出，否则置为 0
+    // 5. 计算均方根误差 (RMSE)
     if (valid_count > 0) {
         T inv_count = T(1.0) / T(valid_count);
         residual[0] = weight_global_gradient_ * sqrt(sum_grad_error_i * inv_count);
-        residual[1] = weight_global_depth_    * sqrt(sum_depth_error_i * inv_count);
+        residual[1] = weight_global_depth_ * sqrt(sum_depth_error_i * inv_count);
         residual[2] = weight_global_gradient_ * sqrt(sum_grad_error_j * inv_count);
-        residual[3] = weight_global_depth_    * sqrt(sum_depth_error_j * inv_count);
+        residual[3] = weight_global_depth_ * sqrt(sum_depth_error_j * inv_count);
         residual[4] = weight_global_gradient_ * sqrt(sum_grad_error_k * inv_count);
-        residual[5] = weight_global_depth_    * sqrt(sum_depth_error_k * inv_count);
+        residual[5] = weight_global_depth_ * sqrt(sum_depth_error_k * inv_count);
     } else {
         residual[0] = residual[1] = residual[2] =
         residual[3] = residual[4] = residual[5] = T(0);
@@ -197,9 +205,9 @@ bool TripletGlobalError::operator()(const T* const pose_i,
     return true;
 }
 
-
 ceres::CostFunction* TripletGlobalError::Create(
     const std::vector<MeshModel::Vertex>& vertices,
+    const std::vector<MeshModel::Triangle>& triangles,
     const Eigen::Matrix3f& camera_intrinsics,
     const cv::Mat& depth_map_i,
     const cv::Mat& depth_map_j,
@@ -210,7 +218,7 @@ ceres::CostFunction* TripletGlobalError::Create(
     double weight_global_depth,
     double weight_global_gradient) {
     return new ceres::AutoDiffCostFunction<TripletGlobalError, 6, 6, 6, 6>(
-        new TripletGlobalError(vertices, camera_intrinsics,
+        new TripletGlobalError(vertices, triangles, camera_intrinsics,
         depth_map_i, depth_map_j, depth_map_k,
         image_i, image_j, image_k, weight_global_depth, weight_global_gradient));
 }

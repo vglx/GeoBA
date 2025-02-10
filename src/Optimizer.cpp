@@ -43,16 +43,16 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
         problem.AddResidualBlock(cost_function, nullptr, poses[i].data());
     }
 
-    // **2. 添加 TripletGlobalError 误差项**
-    for (size_t i = 0; i < frame_count - 2; ++i) {  // 每个误差项连接 3 帧
-        ceres::CostFunction* triplet_cost_function = TripletGlobalError::Create(
-            mesh_vertices, camera_intrinsics,
-            observed_depth_maps[i], observed_depth_maps[i + 1], observed_depth_maps[i + 2],
-            observed_images[i], observed_images[i + 1], observed_images[i + 2],
-            weight_global_depth_, weight_global_gradient_);
+    // // **2. 添加 TripletGlobalError 误差项**
+    // for (size_t i = 0; i < frame_count - 2; ++i) {  // 每个误差项连接 3 帧
+    //     ceres::CostFunction* triplet_cost_function = TripletGlobalError::Create(
+    //         mesh_vertices, mesh_triangles, camera_intrinsics,
+    //         observed_depth_maps[i], observed_depth_maps[i + 1], observed_depth_maps[i + 2],
+    //         observed_images[i], observed_images[i + 1], observed_images[i + 2],
+    //         weight_global_depth_, weight_global_gradient_);
 
-        problem.AddResidualBlock(triplet_cost_function, nullptr, poses[i].data(), poses[i + 1].data(), poses[i + 2].data());
-    }
+    //     problem.AddResidualBlock(triplet_cost_function, nullptr, poses[i].data(), poses[i + 1].data(), poses[i + 2].data());
+    // }
 
     // **3. 配置 Ceres Solver**
     ceres::Solver::Summary summary;

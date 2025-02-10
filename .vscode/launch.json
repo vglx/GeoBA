@@ -1,0 +1,24 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Attach to gdbserver in Remote Container",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "/app/build/GeoBA",
+            "miDebuggerServerAddress": "localhost:1234",
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "miDebuggerPath": "/usr/bin/gdb",
+            "sourceFileMap": {
+                "/app": "${workspaceFolder}"
+            }
+        }
+    ]
+}

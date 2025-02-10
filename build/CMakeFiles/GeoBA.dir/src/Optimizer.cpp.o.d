@@ -599,6 +599,7 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
  /usr/include/opencv4/opencv2/video/tracking.hpp \
  /usr/include/opencv4/opencv2/video/background_segm.hpp \
  /app/include/MeshModel.h /app/include/CostFunctions.h \
+ /app/include/Projection.h /app/include/ImageProcessor.h \
  /usr/local/include/sophus/se3.hpp /usr/local/include/sophus/so3.hpp \
  /usr/local/include/sophus/rotation_matrix.hpp /opt/eigen/Eigen/SVD \
  /usr/local/include/sophus/types.hpp /usr/local/include/sophus/common.hpp \
