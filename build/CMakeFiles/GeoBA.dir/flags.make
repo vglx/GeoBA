@@ -6,5 +6,5 @@ CXX_DEFINES = -DGFLAGS_IS_A_DLL=0 -DGOOGLE_GLOG_DLL_DECL="" -DGOOGLE_GLOG_DLL_DE
 
 CXX_INCLUDES = -I/app/include -I/opt/eigen -I/opt/tinyobjloader -isystem /usr/include/opencv4 -isystem /usr/local/include/eigen3
 
-CXX_FLAGS = -O3 -DNDEBUG -std=gnu++17
+CXX_FLAGS = -O3 -DNDEBUG -std=gnu++17 -fopenmp
 

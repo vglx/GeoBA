@@ -49,11 +49,15 @@ bool DatasetManager::loadAllDepthImages(std::vector<cv::Mat>& depth_images) {
                           << entry.path().string() << std::endl;
                 return false;
             }
-
+            // double minVal, maxVal;
+            // cv::minMaxLoc(image, &minVal, &maxVal);
+            // std::cout << "Raw depth: min = " << minVal << ", max = " << maxVal << std::endl;
             // **将 16-bit 深度图转换回 0-100mm 真实深度值**
             cv::Mat depth_in_mm;
             image.convertTo(depth_in_mm, CV_32F, 100.0 / 65535.0); // 0-100mm 线性缩放
-
+            double minVal1, maxVal1;
+            cv::minMaxLoc(depth_in_mm, &minVal1, &maxVal1);
+            std::cout << "Converted depth: min = " << minVal1 << ", max = " << maxVal1 << std::endl;
             depth_images.push_back(depth_in_mm);
         }
     }
@@ -143,7 +147,7 @@ bool DatasetManager::loadMeshModel(MeshModel& mesh) {
 }
 
 // 加载相机内参
-bool DatasetManager::loadCameraIntrinsics(Eigen::Matrix3f& intrinsics) {
+bool DatasetManager::loadCameraIntrinsics(Eigen::Matrix3d& intrinsics) {
     std::string intrinsics_path = dataset_path_ + "camera_intrinsics.json";
     std::ifstream file(intrinsics_path);
     if (!file.is_open()) {
@@ -153,9 +157,11 @@ bool DatasetManager::loadCameraIntrinsics(Eigen::Matrix3f& intrinsics) {
 
     nlohmann::json json_data;
     file >> json_data;
-    intrinsics << json_data["fx"], 0, json_data["cx"],
-                  0, json_data["fy"], json_data["cy"],
-                  0, 0, 1;
+
+    // 读取 double 类型的相机内参
+    intrinsics << static_cast<double>(json_data["fx"]), 0.0, static_cast<double>(json_data["cx"]),
+                  0.0, static_cast<double>(json_data["fy"]), static_cast<double>(json_data["cy"]),
+                  0.0, 0.0, 1.0;
 
     return true;
 }

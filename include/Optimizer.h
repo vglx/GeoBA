@@ -28,7 +28,7 @@ public:
      */
     void optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
                   const std::vector<MeshModel::Triangle>& mesh_triangles,
-                  const Eigen::Matrix3f& camera_intrinsics,
+                  const Eigen::Matrix3d& camera_intrinsics,
                   const std::vector<cv::Mat>& observed_images,
                   const std::vector<cv::Mat>& observed_depth_maps,
                   const std::vector<Eigen::MatrixXf>& depth_normals,

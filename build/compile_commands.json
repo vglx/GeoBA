@@ -1,43 +1,43 @@
 [
 {
   "directory": "/app/build",
-  "command": "/usr/bin/c++ -DGFLAGS_IS_A_DLL=0 -DGOOGLE_GLOG_DLL_DECL=\"\" -DGOOGLE_GLOG_DLL_DECL_FOR_UNITTESTS=\"\" -I/app/include -I/opt/eigen -I/opt/tinyobjloader -isystem /usr/include/opencv4 -isystem /usr/local/include/eigen3 -O3 -DNDEBUG -std=gnu++17 -o CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o -c /app/src/CostFunctions.cpp",
+  "command": "/usr/bin/c++ -DGFLAGS_IS_A_DLL=0 -DGOOGLE_GLOG_DLL_DECL=\"\" -DGOOGLE_GLOG_DLL_DECL_FOR_UNITTESTS=\"\" -I/app/include -I/opt/eigen -I/opt/tinyobjloader -isystem /usr/include/opencv4 -isystem /usr/local/include/eigen3 -O3 -DNDEBUG -std=gnu++17 -fopenmp -o CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o -c /app/src/CostFunctions.cpp",
   "file": "/app/src/CostFunctions.cpp",
   "output": "CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o"
 },
 {
   "directory": "/app/build",
-  "command": "/usr/bin/c++ -DGFLAGS_IS_A_DLL=0 -DGOOGLE_GLOG_DLL_DECL=\"\" -DGOOGLE_GLOG_DLL_DECL_FOR_UNITTESTS=\"\" -I/app/include -I/opt/eigen -I/opt/tinyobjloader -isystem /usr/include/opencv4 -isystem /usr/local/include/eigen3 -O3 -DNDEBUG -std=gnu++17 -o CMakeFiles/GeoBA.dir/src/DatasetManager.cpp.o -c /app/src/DatasetManager.cpp",
+  "command": "/usr/bin/c++ -DGFLAGS_IS_A_DLL=0 -DGOOGLE_GLOG_DLL_DECL=\"\" -DGOOGLE_GLOG_DLL_DECL_FOR_UNITTESTS=\"\" -I/app/include -I/opt/eigen -I/opt/tinyobjloader -isystem /usr/include/opencv4 -isystem /usr/local/include/eigen3 -O3 -DNDEBUG -std=gnu++17 -fopenmp -o CMakeFiles/GeoBA.dir/src/DatasetManager.cpp.o -c /app/src/DatasetManager.cpp",
   "file": "/app/src/DatasetManager.cpp",
   "output": "CMakeFiles/GeoBA.dir/src/DatasetManager.cpp.o"
 },
 {
   "directory": "/app/build",
-  "command": "/usr/bin/c++ -DGFLAGS_IS_A_DLL=0 -DGOOGLE_GLOG_DLL_DECL=\"\" -DGOOGLE_GLOG_DLL_DECL_FOR_UNITTESTS=\"\" -I/app/include -I/opt/eigen -I/opt/tinyobjloader -isystem /usr/include/opencv4 -isystem /usr/local/include/eigen3 -O3 -DNDEBUG -std=gnu++17 -o CMakeFiles/GeoBA.dir/src/ImageProcessor.cpp.o -c /app/src/ImageProcessor.cpp",
+  "command": "/usr/bin/c++ -DGFLAGS_IS_A_DLL=0 -DGOOGLE_GLOG_DLL_DECL=\"\" -DGOOGLE_GLOG_DLL_DECL_FOR_UNITTESTS=\"\" -I/app/include -I/opt/eigen -I/opt/tinyobjloader -isystem /usr/include/opencv4 -isystem /usr/local/include/eigen3 -O3 -DNDEBUG -std=gnu++17 -fopenmp -o CMakeFiles/GeoBA.dir/src/ImageProcessor.cpp.o -c /app/src/ImageProcessor.cpp",
   "file": "/app/src/ImageProcessor.cpp",
   "output": "CMakeFiles/GeoBA.dir/src/ImageProcessor.cpp.o"
 },
 {
   "directory": "/app/build",
-  "command": "/usr/bin/c++ -DGFLAGS_IS_A_DLL=0 -DGOOGLE_GLOG_DLL_DECL=\"\" -DGOOGLE_GLOG_DLL_DECL_FOR_UNITTESTS=\"\" -I/app/include -I/opt/eigen -I/opt/tinyobjloader -isystem /usr/include/opencv4 -isystem /usr/local/include/eigen3 -O3 -DNDEBUG -std=gnu++17 -o CMakeFiles/GeoBA.dir/src/MeshModel.cpp.o -c /app/src/MeshModel.cpp",
+  "command": "/usr/bin/c++ -DGFLAGS_IS_A_DLL=0 -DGOOGLE_GLOG_DLL_DECL=\"\" -DGOOGLE_GLOG_DLL_DECL_FOR_UNITTESTS=\"\" -I/app/include -I/opt/eigen -I/opt/tinyobjloader -isystem /usr/include/opencv4 -isystem /usr/local/include/eigen3 -O3 -DNDEBUG -std=gnu++17 -fopenmp -o CMakeFiles/GeoBA.dir/src/MeshModel.cpp.o -c /app/src/MeshModel.cpp",
   "file": "/app/src/MeshModel.cpp",
   "output": "CMakeFiles/GeoBA.dir/src/MeshModel.cpp.o"
 },
 {
   "directory": "/app/build",
-  "command": "/usr/bin/c++ -DGFLAGS_IS_A_DLL=0 -DGOOGLE_GLOG_DLL_DECL=\"\" -DGOOGLE_GLOG_DLL_DECL_FOR_UNITTESTS=\"\" -I/app/include -I/opt/eigen -I/opt/tinyobjloader -isystem /usr/include/opencv4 -isystem /usr/local/include/eigen3 -O3 -DNDEBUG -std=gnu++17 -o CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o -c /app/src/Optimizer.cpp",
+  "command": "/usr/bin/c++ -DGFLAGS_IS_A_DLL=0 -DGOOGLE_GLOG_DLL_DECL=\"\" -DGOOGLE_GLOG_DLL_DECL_FOR_UNITTESTS=\"\" -I/app/include -I/opt/eigen -I/opt/tinyobjloader -isystem /usr/include/opencv4 -isystem /usr/local/include/eigen3 -O3 -DNDEBUG -std=gnu++17 -fopenmp -o CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o -c /app/src/Optimizer.cpp",
   "file": "/app/src/Optimizer.cpp",
   "output": "CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o"
 },
 {
   "directory": "/app/build",
-  "command": "/usr/bin/c++ -DGFLAGS_IS_A_DLL=0 -DGOOGLE_GLOG_DLL_DECL=\"\" -DGOOGLE_GLOG_DLL_DECL_FOR_UNITTESTS=\"\" -I/app/include -I/opt/eigen -I/opt/tinyobjloader -isystem /usr/include/opencv4 -isystem /usr/local/include/eigen3 -O3 -DNDEBUG -std=gnu++17 -o CMakeFiles/GeoBA.dir/src/Projection.cpp.o -c /app/src/Projection.cpp",
+  "command": "/usr/bin/c++ -DGFLAGS_IS_A_DLL=0 -DGOOGLE_GLOG_DLL_DECL=\"\" -DGOOGLE_GLOG_DLL_DECL_FOR_UNITTESTS=\"\" -I/app/include -I/opt/eigen -I/opt/tinyobjloader -isystem /usr/include/opencv4 -isystem /usr/local/include/eigen3 -O3 -DNDEBUG -std=gnu++17 -fopenmp -o CMakeFiles/GeoBA.dir/src/Projection.cpp.o -c /app/src/Projection.cpp",
   "file": "/app/src/Projection.cpp",
   "output": "CMakeFiles/GeoBA.dir/src/Projection.cpp.o"
 },
 {
   "directory": "/app/build",
-  "command": "/usr/bin/c++ -DGFLAGS_IS_A_DLL=0 -DGOOGLE_GLOG_DLL_DECL=\"\" -DGOOGLE_GLOG_DLL_DECL_FOR_UNITTESTS=\"\" -I/app/include -I/opt/eigen -I/opt/tinyobjloader -isystem /usr/include/opencv4 -isystem /usr/local/include/eigen3 -O3 -DNDEBUG -std=gnu++17 -o CMakeFiles/GeoBA.dir/main.cpp.o -c /app/main.cpp",
+  "command": "/usr/bin/c++ -DGFLAGS_IS_A_DLL=0 -DGOOGLE_GLOG_DLL_DECL=\"\" -DGOOGLE_GLOG_DLL_DECL_FOR_UNITTESTS=\"\" -I/app/include -I/opt/eigen -I/opt/tinyobjloader -isystem /usr/include/opencv4 -isystem /usr/local/include/eigen3 -O3 -DNDEBUG -std=gnu++17 -fopenmp -o CMakeFiles/GeoBA.dir/main.cpp.o -c /app/main.cpp",
   "file": "/app/main.cpp",
   "output": "CMakeFiles/GeoBA.dir/main.cpp.o"
 }

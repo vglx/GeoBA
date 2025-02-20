@@ -259,6 +259,8 @@ GeoBA: /usr/lib/x86_64-linux-gnu/liblapack.so
 GeoBA: /usr/lib/x86_64-linux-gnu/libblas.so
 GeoBA: /usr/lib/x86_64-linux-gnu/libf77blas.so
 GeoBA: /usr/lib/x86_64-linux-gnu/libatlas.so
+GeoBA: /usr/lib/gcc/x86_64-linux-gnu/11/libgomp.so
+GeoBA: /usr/lib/x86_64-linux-gnu/libpthread.a
 GeoBA: CMakeFiles/GeoBA.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/app/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Linking CXX executable GeoBA"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/GeoBA.dir/link.txt --verbose=$(VERBOSE)

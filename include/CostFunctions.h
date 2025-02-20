@@ -1,88 +1,78 @@
-#ifndef COST_FUNCTIONS_H
-#define COST_FUNCTIONS_H
+#ifndef COSTFUNCTIONS_H
+#define COSTFUNCTIONS_H
 
-#include <vector>
-#include <Eigen/Core>
+#include <ceres/ceres.h>
 #include <Eigen/Dense>
 #include <opencv2/opencv.hpp>
-#include <opencv2/core.hpp>
-#include <ceres/ceres.h>
-#include "Projection.h"
-#include "ImageProcessor.h"
+#include <vector>
 #include "MeshModel.h"
 
-class LocalGeometricError {
+class LocalGeometricError : public ceres::CostFunction {
 public:
     LocalGeometricError(const std::vector<MeshModel::Vertex>& vertices,
                         const std::vector<MeshModel::Triangle>& triangles,
-                        const Eigen::Matrix3f& camera_intrinsics,
+                        const Eigen::Matrix3d& camera_intrinsics,
                         const cv::Mat& depth_map,
-                        const Eigen::MatrixXf& depth_normals,
-                        double weight_local_depth,
-                        double weight_local_normal);
+                        double weight_local_depth);
 
-    template <typename T>
-    bool operator()(const T* const se3, T* residual) const;
+    bool Evaluate(double const* const* param, double* residuals, double** jacobians) const override;
 
     static ceres::CostFunction* Create(const std::vector<MeshModel::Vertex>& vertices,
                                        const std::vector<MeshModel::Triangle>& triangles,
-                                       const Eigen::Matrix3f& camera_intrinsics,
+                                       const Eigen::Matrix3d& camera_intrinsics,
                                        const cv::Mat& depth_map,
-                                       const Eigen::MatrixXf& depth_normals,
-                                       double weight_local_depth,
-                                       double weight_local_normal);
+                                       double weight_local_depth);
 
 private:
+    Eigen::Matrix<double,1,6> computeAnalyticalJacobian(
+        const Eigen::Matrix3d& rotation,
+        const Eigen::Vector3d& translation,
+        const Eigen::Matrix3d& intrinsics,
+        const MeshModel::Vertex& vertex,
+        int u, int v,
+        const cv::Mat& image) const;
+
     const std::vector<MeshModel::Vertex>& vertices_;
     const std::vector<MeshModel::Triangle>& triangles_;
-    const Eigen::Matrix3f& camera_intrinsics_;
-    const cv::Mat& depth_map_;
-    const Eigen::MatrixXf& depth_normals_;
+    Eigen::Matrix3d camera_intrinsics_;
+    cv::Mat depth_map_;
     double weight_local_depth_;
-    double weight_local_normal_;
 };
 
-class TripletGlobalError {
-    public:
-        TripletGlobalError(const std::vector<MeshModel::Vertex>& vertices,
+class NormalConsistencyError : public ceres::CostFunction {
+public:
+    NormalConsistencyError(const std::vector<MeshModel::Vertex>& vertices,
                            const std::vector<MeshModel::Triangle>& triangles,
-                           const Eigen::Matrix3f& camera_intrinsics,
-                           const cv::Mat& depth_map_i,
-                           const cv::Mat& depth_map_j,
-                           const cv::Mat& depth_map_k,
-                           const cv::Mat& image_i,
-                           const cv::Mat& image_j,
-                           const cv::Mat& image_k,
-                           double weight_global_depth,
-                           double weight_global_gradient);
-    
-        template <typename T>
-        bool operator()(const T* const pose_i, const T* const pose_j, const T* const pose_k, T* residual) const;
-    
-        static ceres::CostFunction* Create(const std::vector<MeshModel::Vertex>& vertices,
-                                           const std::vector<MeshModel::Triangle>& triangles,
-                                           const Eigen::Matrix3f& camera_intrinsics,
-                                           const cv::Mat& depth_map_i,
-                                           const cv::Mat& depth_map_j,
-                                           const cv::Mat& depth_map_k,
-                                           const cv::Mat& image_i,
-                                           const cv::Mat& image_j,
-                                           const cv::Mat& image_k,
-                                           double weight_global_depth,
-                                           double weight_global_gradient);
-    
-    private:
-        const std::vector<MeshModel::Vertex>& vertices_;
-        const std::vector<MeshModel::Triangle>& triangles_;
-        const Eigen::Matrix3f& camera_intrinsics_;
-        const cv::Mat& depth_map_i_;
-        const cv::Mat& depth_map_j_;
-        const cv::Mat& depth_map_k_;
-        const cv::Mat& image_i_;
-        const cv::Mat& image_j_;
-        const cv::Mat& image_k_;
-        double weight_global_depth_;
-        double weight_global_gradient_;
+                           const Eigen::Matrix3d& camera_intrinsics,
+                           const std::vector<cv::Mat>& depth_maps,  // 传入所有深度图
+                           double weight);
+
+    bool Evaluate(double const* const* param, double* residuals, double** jacobians) const override;
+
+    static ceres::CostFunction* Create(const std::vector<MeshModel::Vertex>& vertices,
+                                       const std::vector<MeshModel::Triangle>& triangles,
+                                       const Eigen::Matrix3d& camera_intrinsics,
+                                       const std::vector<cv::Mat>& depth_maps,  // 传入所有深度图
+                                       double weight);
+
+private:
+    Eigen::Matrix<double, 1, 6> ComputeJacobian(
+        int u, int v,
+        const cv::Mat &depthMap,
+        const Eigen::Matrix3d &camera_intrinsics,
+        const Eigen::Vector3d& n_i,         // 当前帧法向量 at (u,v)
+        const Eigen::Vector3d& n_avg,         // 三帧归一化平均法向量
+        double s,                           // s = || n_i + n_j + n_k ||
+        const Eigen::Vector3d& p,             // 顶点在世界坐标系下的位置
+        const Eigen::Matrix3d& R,             // 当前帧旋转矩阵（相机到世界）
+        const Eigen::Vector3d& t,             // 当前帧平移向量
+        double fx, double fy) const;
+
+    const std::vector<MeshModel::Vertex>& vertices_;
+    const std::vector<MeshModel::Triangle>& triangles_;
+    Eigen::Matrix3d camera_intrinsics_;
+    std::vector<cv::Mat> depth_maps_;  // 存储三帧深度图
+    double weight_;
 };
 
-#endif // COST_FUNCTIONS_H
+#endif // COSTFUNCTIONS_H

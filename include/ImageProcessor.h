@@ -20,7 +20,9 @@ public:
     // 计算深度图法向量
     Eigen::MatrixXf computeDepthNormals(const cv::Mat& depthImage, float fx, float fy, float cx, float cy);
 
-    static float computeGradient(const cv::Mat& image, int u, int v);
+    static std::pair<float, float> computeGradient(const cv::Mat& image, int u, int v);
+
+    static Eigen::Vector3d computeNormal(int u, int v, const cv::Mat& depthMap, const Eigen::Matrix3d& camera_intrinsics);
 
 private:
     // 构建金字塔

@@ -64,13 +64,13 @@ CMAKE_AR:FILEPATH=/usr/bin/ar
 
 //Choose the type of build, options are: None Debug Release RelWithDebInfo
 // MinSizeRel ...
-CMAKE_BUILD_TYPE:STRING=Debug
+CMAKE_BUILD_TYPE:STRING=
 
 //Enable/Disable color output during build.
 CMAKE_COLOR_MAKEFILE:BOOL=ON
 
 //CXX compiler
-CMAKE_CXX_COMPILER:STRING=/usr/bin/c++
+CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++
 
 //A wrapper around 'ar' adding the appropriate '--plugin' option
 // for the GCC compiler
@@ -96,7 +96,7 @@ CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG
 CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING=-O2 -g -DNDEBUG
 
 //C compiler
-CMAKE_C_COMPILER:STRING=/usr/bin/cc
+CMAKE_C_COMPILER:FILEPATH=/usr/bin/cc
 
 //A wrapper around 'ar' adding the appropriate '--plugin' option
 // for the GCC compiler
@@ -323,6 +323,24 @@ METIS_LIBRARY_RELEASE:FILEPATH=METIS_LIBRARY_RELEASE-NOTFOUND
 //The directory containing a CMake configuration file for OpenCV.
 OpenCV_DIR:PATH=/usr/lib/x86_64-linux-gnu/cmake/opencv4
 
+//CXX compiler flags for OpenMP parallelization
+OpenMP_CXX_FLAGS:STRING=-fopenmp
+
+//CXX compiler libraries for OpenMP parallelization
+OpenMP_CXX_LIB_NAMES:STRING=gomp;pthread
+
+//C compiler flags for OpenMP parallelization
+OpenMP_C_FLAGS:STRING=-fopenmp
+
+//C compiler libraries for OpenMP parallelization
+OpenMP_C_LIB_NAMES:STRING=gomp;pthread
+
+//Path to the gomp library for OpenMP
+OpenMP_gomp_LIBRARY:FILEPATH=/usr/lib/gcc/x86_64-linux-gnu/11/libgomp.so
+
+//Path to the pthread library for OpenMP
+OpenMP_pthread_LIBRARY:FILEPATH=/usr/lib/x86_64-linux-gnu/libpthread.a
+
 //Path to a file.
 SuiteSparse_AMD_INCLUDE_DIR:PATH=/usr/include/suitesparse
 
@@ -496,8 +514,6 @@ CMAKE_GENERATOR_PLATFORM:INTERNAL=
 CMAKE_GENERATOR_TOOLSET:INTERNAL=
 //Test CMAKE_HAVE_LIBC_PTHREAD
 CMAKE_HAVE_LIBC_PTHREAD:INTERNAL=1
-//Have include pthread.h
-CMAKE_HAVE_PTHREAD_H:INTERNAL=1
 //Source directory with the top level CMakeLists.txt file for this
 // project
 CMAKE_HOME_DIRECTORY:INTERNAL=/app
@@ -573,6 +589,12 @@ CXSparse_LIBRARY-ADVANCED:INTERNAL=1
 FIND_PACKAGE_MESSAGE_DETAILS_CXSparse:INTERNAL=[/usr/include/suitesparse][/usr/lib/x86_64-linux-gnu/libcxsparse.so][v3.2.0(3.2.0)]
 //Details about finding OpenCV
 FIND_PACKAGE_MESSAGE_DETAILS_OpenCV:INTERNAL=[/usr][v4.5.4()]
+//Details about finding OpenMP
+FIND_PACKAGE_MESSAGE_DETAILS_OpenMP:INTERNAL=[TRUE][TRUE][c ][v4.5()]
+//Details about finding OpenMP_C
+FIND_PACKAGE_MESSAGE_DETAILS_OpenMP_C:INTERNAL=[-fopenmp][/usr/lib/gcc/x86_64-linux-gnu/11/libgomp.so][/usr/lib/x86_64-linux-gnu/libpthread.a][v4.5()]
+//Details about finding OpenMP_CXX
+FIND_PACKAGE_MESSAGE_DETAILS_OpenMP_CXX:INTERNAL=[-fopenmp][/usr/lib/gcc/x86_64-linux-gnu/11/libgomp.so][/usr/lib/x86_64-linux-gnu/libpthread.a][v4.5()]
 //Details about finding SuiteSparse
 FIND_PACKAGE_MESSAGE_DETAILS_SuiteSparse:INTERNAL=[/usr/include/suitesparse][/usr/lib/x86_64-linux-gnu/libamd.so][/usr/include/suitesparse][/usr/lib/x86_64-linux-gnu/libcamd.so][/usr/include/suitesparse][/usr/lib/x86_64-linux-gnu/libccolamd.so][/usr/include/suitesparse][/usr/lib/x86_64-linux-gnu/libcholmod.so][/usr/include/suitesparse][/usr/lib/x86_64-linux-gnu/libcolamd.so][/usr/include/suitesparse][/usr/lib/x86_64-linux-gnu/libspqr.so][/usr/include/suitesparse][/usr/lib/x86_64-linux-gnu/libsuitesparseconfig.so][cfound components: AMD CAMD CCOLAMD CHOLMOD COLAMD SPQR Config ][v5.10.1(5.10.1)]
 //Details about finding Threads
@@ -595,8 +617,6 @@ LAPACK_goto2_LIBRARY-ADVANCED:INTERNAL=1
 LAPACK_lapack_LIBRARY-ADVANCED:INTERNAL=1
 //Have function cheev_
 LAPACK_lapack_WORKS:INTERNAL=1
-//Have function cheev_
-LAPACK_lapack_deps_WORKS:INTERNAL=
 //ADVANCED property for variable: LAPACK_mkl_lapack_LIBRARY
 LAPACK_mkl_lapack_LIBRARY-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: LAPACK_openblas_LIBRARY
@@ -611,6 +631,30 @@ METIS_INCLUDE_DIR-ADVANCED:INTERNAL=1
 METIS_LIBRARY_DEBUG-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: METIS_LIBRARY_RELEASE
 METIS_LIBRARY_RELEASE-ADVANCED:INTERNAL=1
+//Result of TRY_COMPILE
+OpenMP_COMPILE_RESULT_CXX_fopenmp:INTERNAL=TRUE
+//Result of TRY_COMPILE
+OpenMP_COMPILE_RESULT_C_fopenmp:INTERNAL=TRUE
+//ADVANCED property for variable: OpenMP_CXX_FLAGS
+OpenMP_CXX_FLAGS-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: OpenMP_CXX_LIB_NAMES
+OpenMP_CXX_LIB_NAMES-ADVANCED:INTERNAL=1
+//CXX compiler's OpenMP specification date
+OpenMP_CXX_SPEC_DATE:INTERNAL=201511
+//ADVANCED property for variable: OpenMP_C_FLAGS
+OpenMP_C_FLAGS-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: OpenMP_C_LIB_NAMES
+OpenMP_C_LIB_NAMES-ADVANCED:INTERNAL=1
+//C compiler's OpenMP specification date
+OpenMP_C_SPEC_DATE:INTERNAL=201511
+//Result of TRY_COMPILE
+OpenMP_SPECTEST_CXX_:INTERNAL=TRUE
+//Result of TRY_COMPILE
+OpenMP_SPECTEST_C_:INTERNAL=TRUE
+//ADVANCED property for variable: OpenMP_gomp_LIBRARY
+OpenMP_gomp_LIBRARY-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: OpenMP_pthread_LIBRARY
+OpenMP_pthread_LIBRARY-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: SuiteSparse_AMD_INCLUDE_DIR
 SuiteSparse_AMD_INCLUDE_DIR-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: SuiteSparse_AMD_LIBRARY

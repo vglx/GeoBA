@@ -624,6 +624,7 @@ CMakeFiles/GeoBA.dir/main.cpp.o
  /usr/lib/gcc/x86_64-linux-gnu/11/include/limits.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/mm_malloc.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/mmintrin.h
+ /usr/lib/gcc/x86_64-linux-gnu/11/include/omp.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stdarg.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stddef.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stdint.h
@@ -705,15 +706,6 @@ CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o
  /opt/eigen/Eigen/StdVector
  /opt/eigen/Eigen/src/Cholesky/LDLT.h
  /opt/eigen/Eigen/src/Cholesky/LLT.h
- /opt/eigen/Eigen/src/plugins/ArrayCwiseBinaryOps.h
- /opt/eigen/Eigen/src/plugins/ArrayCwiseUnaryOps.h
- /opt/eigen/Eigen/src/plugins/BlockMethods.h
- /opt/eigen/Eigen/src/plugins/CommonCwiseBinaryOps.h
- /opt/eigen/Eigen/src/plugins/CommonCwiseUnaryOps.h
- /opt/eigen/Eigen/src/plugins/IndexedViewMethods.h
- /opt/eigen/Eigen/src/plugins/MatrixCwiseBinaryOps.h
- /opt/eigen/Eigen/src/plugins/MatrixCwiseUnaryOps.h
- /opt/eigen/Eigen/src/plugins/ReshapedMethods.h
  /opt/eigen/Eigen/src/Core/ArithmeticSequence.h
  /opt/eigen/Eigen/src/Core/Array.h
  /opt/eigen/Eigen/src/Core/ArrayBase.h
@@ -830,11 +822,6 @@ CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o
  /opt/eigen/Eigen/src/Core/util/StaticAssert.h
  /opt/eigen/Eigen/src/Core/util/SymbolicIndex.h
  /opt/eigen/Eigen/src/Core/util/XprHelper.h
- /opt/eigen/Eigen/src/Eigenvalues/ComplexSchur.h
- /opt/eigen/Eigen/src/Eigenvalues/HessenbergDecomposition.h
- /opt/eigen/Eigen/src/Eigenvalues/RealQZ.h
- /opt/eigen/Eigen/src/Eigenvalues/RealSchur.h
- /opt/eigen/Eigen/src/Eigenvalues/Tridiagonalization.h
  /opt/eigen/Eigen/src/Eigenvalues/ComplexEigenSolver.h
  /opt/eigen/Eigen/src/Eigenvalues/ComplexSchur.h
  /opt/eigen/Eigen/src/Eigenvalues/EigenSolver.h
@@ -883,6 +870,15 @@ CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o
  /opt/eigen/Eigen/src/misc/Image.h
  /opt/eigen/Eigen/src/misc/Kernel.h
  /opt/eigen/Eigen/src/misc/RealSvd2x2.h
+ /opt/eigen/Eigen/src/plugins/ArrayCwiseBinaryOps.h
+ /opt/eigen/Eigen/src/plugins/ArrayCwiseUnaryOps.h
+ /opt/eigen/Eigen/src/plugins/BlockMethods.h
+ /opt/eigen/Eigen/src/plugins/CommonCwiseBinaryOps.h
+ /opt/eigen/Eigen/src/plugins/CommonCwiseUnaryOps.h
+ /opt/eigen/Eigen/src/plugins/IndexedViewMethods.h
+ /opt/eigen/Eigen/src/plugins/MatrixCwiseBinaryOps.h
+ /opt/eigen/Eigen/src/plugins/MatrixCwiseUnaryOps.h
+ /opt/eigen/Eigen/src/plugins/ReshapedMethods.h
  /usr/include/alloca.h
  /usr/include/asm-generic/errno-base.h
  /usr/include/asm-generic/errno.h
@@ -1319,6 +1315,7 @@ CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o
  /usr/lib/gcc/x86_64-linux-gnu/11/include/limits.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/mm_malloc.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/mmintrin.h
+ /usr/lib/gcc/x86_64-linux-gnu/11/include/omp.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stdarg.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stddef.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stdint.h
@@ -2040,6 +2037,7 @@ CMakeFiles/GeoBA.dir/src/DatasetManager.cpp.o
  /usr/lib/gcc/x86_64-linux-gnu/11/include/limits.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/mm_malloc.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/mmintrin.h
+ /usr/lib/gcc/x86_64-linux-gnu/11/include/omp.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stdarg.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stddef.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stdint.h
@@ -2049,7 +2047,16 @@ CMakeFiles/GeoBA.dir/src/DatasetManager.cpp.o
 CMakeFiles/GeoBA.dir/src/ImageProcessor.cpp.o
  /app/src/ImageProcessor.cpp
  /app/include/ImageProcessor.h
+ /opt/eigen/Eigen/Cholesky
  /opt/eigen/Eigen/Core
+ /opt/eigen/Eigen/Geometry
+ /opt/eigen/Eigen/Householder
+ /opt/eigen/Eigen/Jacobi
+ /opt/eigen/Eigen/LU
+ /opt/eigen/Eigen/QR
+ /opt/eigen/Eigen/SVD
+ /opt/eigen/Eigen/src/Cholesky/LDLT.h
+ /opt/eigen/Eigen/src/Cholesky/LLT.h
  /opt/eigen/Eigen/src/plugins/ArrayCwiseBinaryOps.h
  /opt/eigen/Eigen/src/plugins/ArrayCwiseUnaryOps.h
  /opt/eigen/Eigen/src/plugins/BlockMethods.h
@@ -2175,6 +2182,41 @@ CMakeFiles/GeoBA.dir/src/ImageProcessor.cpp.o
  /opt/eigen/Eigen/src/Core/util/StaticAssert.h
  /opt/eigen/Eigen/src/Core/util/SymbolicIndex.h
  /opt/eigen/Eigen/src/Core/util/XprHelper.h
+ /opt/eigen/Eigen/src/Geometry/AlignedBox.h
+ /opt/eigen/Eigen/src/Geometry/AngleAxis.h
+ /opt/eigen/Eigen/src/Geometry/EulerAngles.h
+ /opt/eigen/Eigen/src/Geometry/Homogeneous.h
+ /opt/eigen/Eigen/src/Geometry/Hyperplane.h
+ /opt/eigen/Eigen/src/Geometry/OrthoMethods.h
+ /opt/eigen/Eigen/src/Geometry/ParametrizedLine.h
+ /opt/eigen/Eigen/src/Geometry/Quaternion.h
+ /opt/eigen/Eigen/src/Geometry/Rotation2D.h
+ /opt/eigen/Eigen/src/Geometry/RotationBase.h
+ /opt/eigen/Eigen/src/Geometry/Scaling.h
+ /opt/eigen/Eigen/src/Geometry/Transform.h
+ /opt/eigen/Eigen/src/Geometry/Translation.h
+ /opt/eigen/Eigen/src/Geometry/Umeyama.h
+ /opt/eigen/Eigen/src/Geometry/arch/Geometry_SIMD.h
+ /opt/eigen/Eigen/src/Householder/BlockHouseholder.h
+ /opt/eigen/Eigen/src/Householder/Householder.h
+ /opt/eigen/Eigen/src/Householder/HouseholderSequence.h
+ /opt/eigen/Eigen/src/Jacobi/Jacobi.h
+ /opt/eigen/Eigen/src/LU/Determinant.h
+ /opt/eigen/Eigen/src/LU/FullPivLU.h
+ /opt/eigen/Eigen/src/LU/InverseImpl.h
+ /opt/eigen/Eigen/src/LU/PartialPivLU.h
+ /opt/eigen/Eigen/src/LU/arch/InverseSize4.h
+ /opt/eigen/Eigen/src/QR/ColPivHouseholderQR.h
+ /opt/eigen/Eigen/src/QR/CompleteOrthogonalDecomposition.h
+ /opt/eigen/Eigen/src/QR/FullPivHouseholderQR.h
+ /opt/eigen/Eigen/src/QR/HouseholderQR.h
+ /opt/eigen/Eigen/src/SVD/BDCSVD.h
+ /opt/eigen/Eigen/src/SVD/JacobiSVD.h
+ /opt/eigen/Eigen/src/SVD/SVDBase.h
+ /opt/eigen/Eigen/src/SVD/UpperBidiagonalization.h
+ /opt/eigen/Eigen/src/misc/Image.h
+ /opt/eigen/Eigen/src/misc/Kernel.h
+ /opt/eigen/Eigen/src/misc/RealSvd2x2.h
  /usr/include/alloca.h
  /usr/include/asm-generic/errno-base.h
  /usr/include/asm-generic/errno.h
@@ -2585,6 +2627,7 @@ CMakeFiles/GeoBA.dir/src/ImageProcessor.cpp.o
  /usr/lib/gcc/x86_64-linux-gnu/11/include/limits.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/mm_malloc.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/mmintrin.h
+ /usr/lib/gcc/x86_64-linux-gnu/11/include/omp.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stdarg.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stddef.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stdint.h
@@ -3033,6 +3076,7 @@ CMakeFiles/GeoBA.dir/src/MeshModel.cpp.o
  /usr/lib/gcc/x86_64-linux-gnu/11/include/limits.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/mm_malloc.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/mmintrin.h
+ /usr/lib/gcc/x86_64-linux-gnu/11/include/omp.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stdarg.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stddef.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stdint.h
@@ -3042,10 +3086,8 @@ CMakeFiles/GeoBA.dir/src/MeshModel.cpp.o
 CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o
  /app/src/Optimizer.cpp
  /app/include/CostFunctions.h
- /app/include/ImageProcessor.h
  /app/include/MeshModel.h
  /app/include/Optimizer.h
- /app/include/Projection.h
  /opt/eigen/Eigen/Cholesky
  /opt/eigen/Eigen/Core
  /opt/eigen/Eigen/Dense
@@ -3668,6 +3710,7 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o
  /usr/lib/gcc/x86_64-linux-gnu/11/include/limits.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/mm_malloc.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/mmintrin.h
+ /usr/lib/gcc/x86_64-linux-gnu/11/include/omp.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stdarg.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stddef.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stdint.h
@@ -3750,7 +3793,6 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o
  /opt/eigen/Eigen/LU
  /opt/eigen/Eigen/QR
  /opt/eigen/Eigen/SVD
- /opt/eigen/Eigen/StdVector
  /opt/eigen/Eigen/src/Cholesky/LDLT.h
  /opt/eigen/Eigen/src/Cholesky/LLT.h
  /opt/eigen/Eigen/src/plugins/ArrayCwiseBinaryOps.h
@@ -3878,6 +3920,11 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o
  /opt/eigen/Eigen/src/Core/util/StaticAssert.h
  /opt/eigen/Eigen/src/Core/util/SymbolicIndex.h
  /opt/eigen/Eigen/src/Core/util/XprHelper.h
+ /opt/eigen/Eigen/src/Eigenvalues/ComplexSchur.h
+ /opt/eigen/Eigen/src/Eigenvalues/HessenbergDecomposition.h
+ /opt/eigen/Eigen/src/Eigenvalues/RealQZ.h
+ /opt/eigen/Eigen/src/Eigenvalues/RealSchur.h
+ /opt/eigen/Eigen/src/Eigenvalues/Tridiagonalization.h
  /opt/eigen/Eigen/src/Eigenvalues/ComplexEigenSolver.h
  /opt/eigen/Eigen/src/Eigenvalues/ComplexSchur.h
  /opt/eigen/Eigen/src/Eigenvalues/EigenSolver.h
@@ -3921,8 +3968,6 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o
  /opt/eigen/Eigen/src/SVD/JacobiSVD.h
  /opt/eigen/Eigen/src/SVD/SVDBase.h
  /opt/eigen/Eigen/src/SVD/UpperBidiagonalization.h
- /opt/eigen/Eigen/src/StlSupport/StdVector.h
- /opt/eigen/Eigen/src/StlSupport/details.h
  /opt/eigen/Eigen/src/misc/Image.h
  /opt/eigen/Eigen/src/misc/Kernel.h
  /opt/eigen/Eigen/src/misc/RealSvd2x2.h
@@ -3933,13 +3978,9 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o
  /usr/include/c++/11/algorithm
  /usr/include/c++/11/array
  /usr/include/c++/11/atomic
- /usr/include/c++/11/backward/auto_ptr.h
  /usr/include/c++/11/backward/binders.h
- /usr/include/c++/11/bit
  /usr/include/c++/11/bits/algorithmfwd.h
- /usr/include/c++/11/bits/align.h
  /usr/include/c++/11/bits/alloc_traits.h
- /usr/include/c++/11/bits/allocated_ptr.h
  /usr/include/c++/11/bits/allocator.h
  /usr/include/c++/11/bits/atomic_base.h
  /usr/include/c++/11/bits/atomic_lockfree_defines.h
@@ -3982,9 +4023,6 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o
  /usr/include/c++/11/bits/ptr_traits.h
  /usr/include/c++/11/bits/range_access.h
  /usr/include/c++/11/bits/refwrap.h
- /usr/include/c++/11/bits/shared_ptr.h
- /usr/include/c++/11/bits/shared_ptr_atomic.h
- /usr/include/c++/11/bits/shared_ptr_base.h
  /usr/include/c++/11/bits/specfun.h
  /usr/include/c++/11/bits/sstream.tcc
  /usr/include/c++/11/bits/std_abs.h
@@ -3998,16 +4036,9 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o
  /usr/include/c++/11/bits/stl_iterator.h
  /usr/include/c++/11/bits/stl_iterator_base_funcs.h
  /usr/include/c++/11/bits/stl_iterator_base_types.h
- /usr/include/c++/11/bits/stl_map.h
- /usr/include/c++/11/bits/stl_multimap.h
- /usr/include/c++/11/bits/stl_multiset.h
- /usr/include/c++/11/bits/stl_numeric.h
  /usr/include/c++/11/bits/stl_pair.h
- /usr/include/c++/11/bits/stl_raw_storage_iter.h
  /usr/include/c++/11/bits/stl_relops.h
- /usr/include/c++/11/bits/stl_set.h
  /usr/include/c++/11/bits/stl_tempbuf.h
- /usr/include/c++/11/bits/stl_tree.h
  /usr/include/c++/11/bits/stl_uninitialized.h
  /usr/include/c++/11/bits/stl_vector.h
  /usr/include/c++/11/bits/streambuf.tcc
@@ -4015,9 +4046,7 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o
  /usr/include/c++/11/bits/string_view.tcc
  /usr/include/c++/11/bits/stringfwd.h
  /usr/include/c++/11/bits/uniform_int_dist.h
- /usr/include/c++/11/bits/unique_ptr.h
  /usr/include/c++/11/bits/unordered_map.h
- /usr/include/c++/11/bits/unordered_set.h
  /usr/include/c++/11/bits/uses_allocator.h
  /usr/include/c++/11/bits/vector.tcc
  /usr/include/c++/11/cassert
@@ -4040,7 +4069,6 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o
  /usr/include/c++/11/ext/aligned_buffer.h
  /usr/include/c++/11/ext/alloc_traits.h
  /usr/include/c++/11/ext/atomicity.h
- /usr/include/c++/11/ext/concurrence.h
  /usr/include/c++/11/ext/new_allocator.h
  /usr/include/c++/11/ext/numeric_traits.h
  /usr/include/c++/11/ext/string_conversions.h
@@ -4049,20 +4077,13 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o
  /usr/include/c++/11/initializer_list
  /usr/include/c++/11/ios
  /usr/include/c++/11/iosfwd
- /usr/include/c++/11/iostream
  /usr/include/c++/11/istream
  /usr/include/c++/11/limits
- /usr/include/c++/11/map
- /usr/include/c++/11/memory
  /usr/include/c++/11/new
- /usr/include/c++/11/numeric
  /usr/include/c++/11/ostream
  /usr/include/c++/11/pstl/execution_defs.h
  /usr/include/c++/11/pstl/glue_algorithm_defs.h
- /usr/include/c++/11/pstl/glue_memory_defs.h
- /usr/include/c++/11/pstl/glue_numeric_defs.h
  /usr/include/c++/11/pstl/pstl_config.h
- /usr/include/c++/11/set
  /usr/include/c++/11/sstream
  /usr/include/c++/11/stdexcept
  /usr/include/c++/11/stdlib.h
@@ -4086,7 +4107,6 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o
  /usr/include/c++/11/type_traits
  /usr/include/c++/11/typeinfo
  /usr/include/c++/11/unordered_map
- /usr/include/c++/11/unordered_set
  /usr/include/c++/11/utility
  /usr/include/c++/11/vector
  /usr/include/ctype.h
@@ -4094,15 +4114,7 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o
  /usr/include/errno.h
  /usr/include/features-time64.h
  /usr/include/features.h
- /usr/include/gflags/gflags.h
- /usr/include/gflags/gflags_declare.h
- /usr/include/gflags/gflags_gflags.h
- /usr/include/glog/log_severity.h
- /usr/include/glog/logging.h
- /usr/include/glog/vlog_is_on.h
- /usr/include/inttypes.h
  /usr/include/limits.h
- /usr/include/linux/close_range.h
  /usr/include/linux/errno.h
  /usr/include/linux/limits.h
  /usr/include/locale.h
@@ -4116,25 +4128,20 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o
  /usr/include/string.h
  /usr/include/strings.h
  /usr/include/time.h
- /usr/include/unistd.h
  /usr/include/wchar.h
  /usr/include/wctype.h
  /usr/include/x86_64-linux-gnu/asm/errno.h
  /usr/include/x86_64-linux-gnu/bits/atomic_wide_counter.h
  /usr/include/x86_64-linux-gnu/bits/byteswap.h
- /usr/include/x86_64-linux-gnu/bits/confname.h
  /usr/include/x86_64-linux-gnu/bits/cpu-set.h
  /usr/include/x86_64-linux-gnu/bits/endian.h
  /usr/include/x86_64-linux-gnu/bits/endianness.h
- /usr/include/x86_64-linux-gnu/bits/environments.h
  /usr/include/x86_64-linux-gnu/bits/errno.h
  /usr/include/x86_64-linux-gnu/bits/floatn-common.h
  /usr/include/x86_64-linux-gnu/bits/floatn.h
  /usr/include/x86_64-linux-gnu/bits/flt-eval-method.h
  /usr/include/x86_64-linux-gnu/bits/fp-fast.h
  /usr/include/x86_64-linux-gnu/bits/fp-logb.h
- /usr/include/x86_64-linux-gnu/bits/getopt_core.h
- /usr/include/x86_64-linux-gnu/bits/getopt_posix.h
  /usr/include/x86_64-linux-gnu/bits/iscanonical.h
  /usr/include/x86_64-linux-gnu/bits/libc-header-start.h
  /usr/include/x86_64-linux-gnu/bits/libm-simd-decl-stubs.h
@@ -4147,7 +4154,6 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o
  /usr/include/x86_64-linux-gnu/bits/mathcalls.h
  /usr/include/x86_64-linux-gnu/bits/posix1_lim.h
  /usr/include/x86_64-linux-gnu/bits/posix2_lim.h
- /usr/include/x86_64-linux-gnu/bits/posix_opt.h
  /usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h
  /usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h
  /usr/include/x86_64-linux-gnu/bits/pthreadtypes.h
@@ -4200,8 +4206,6 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o
  /usr/include/x86_64-linux-gnu/bits/typesizes.h
  /usr/include/x86_64-linux-gnu/bits/uintn-identity.h
  /usr/include/x86_64-linux-gnu/bits/uio_lim.h
- /usr/include/x86_64-linux-gnu/bits/unistd.h
- /usr/include/x86_64-linux-gnu/bits/unistd_ext.h
  /usr/include/x86_64-linux-gnu/bits/waitflags.h
  /usr/include/x86_64-linux-gnu/bits/waitstatus.h
  /usr/include/x86_64-linux-gnu/bits/wchar.h
@@ -4230,65 +4234,10 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o
  /usr/lib/gcc/x86_64-linux-gnu/11/include/limits.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/mm_malloc.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/mmintrin.h
+ /usr/lib/gcc/x86_64-linux-gnu/11/include/omp.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stdarg.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stddef.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/stdint.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/syslimits.h
  /usr/lib/gcc/x86_64-linux-gnu/11/include/xmmintrin.h
- /usr/local/include/ceres/autodiff_cost_function.h
- /usr/local/include/ceres/autodiff_first_order_function.h
- /usr/local/include/ceres/autodiff_local_parameterization.h
- /usr/local/include/ceres/autodiff_manifold.h
- /usr/local/include/ceres/ceres.h
- /usr/local/include/ceres/conditioned_cost_function.h
- /usr/local/include/ceres/context.h
- /usr/local/include/ceres/cost_function.h
- /usr/local/include/ceres/cost_function_to_functor.h
- /usr/local/include/ceres/covariance.h
- /usr/local/include/ceres/crs_matrix.h
- /usr/local/include/ceres/dynamic_autodiff_cost_function.h
- /usr/local/include/ceres/dynamic_cost_function.h
- /usr/local/include/ceres/dynamic_cost_function_to_functor.h
- /usr/local/include/ceres/dynamic_numeric_diff_cost_function.h
- /usr/local/include/ceres/evaluation_callback.h
- /usr/local/include/ceres/first_order_function.h
- /usr/local/include/ceres/gradient_checker.h
- /usr/local/include/ceres/gradient_problem.h
- /usr/local/include/ceres/gradient_problem_solver.h
- /usr/local/include/ceres/internal/array_selector.h
- /usr/local/include/ceres/internal/autodiff.h
- /usr/local/include/ceres/internal/config.h
- /usr/local/include/ceres/internal/disable_warnings.h
- /usr/local/include/ceres/internal/eigen.h
- /usr/local/include/ceres/internal/export.h
- /usr/local/include/ceres/internal/fixed_array.h
- /usr/local/include/ceres/internal/householder_vector.h
- /usr/local/include/ceres/internal/integer_sequence_algorithm.h
- /usr/local/include/ceres/internal/jet_traits.h
- /usr/local/include/ceres/internal/line_parameterization.h
- /usr/local/include/ceres/internal/memory.h
- /usr/local/include/ceres/internal/numeric_diff.h
- /usr/local/include/ceres/internal/parameter_dims.h
- /usr/local/include/ceres/internal/port.h
- /usr/local/include/ceres/internal/reenable_warnings.h
- /usr/local/include/ceres/internal/sphere_manifold_functions.h
- /usr/local/include/ceres/internal/variadic_evaluate.h
- /usr/local/include/ceres/iteration_callback.h
- /usr/local/include/ceres/jet.h
- /usr/local/include/ceres/jet_fwd.h
- /usr/local/include/ceres/line_manifold.h
- /usr/local/include/ceres/local_parameterization.h
- /usr/local/include/ceres/loss_function.h
- /usr/local/include/ceres/manifold.h
- /usr/local/include/ceres/numeric_diff_cost_function.h
- /usr/local/include/ceres/numeric_diff_first_order_function.h
- /usr/local/include/ceres/numeric_diff_options.h
- /usr/local/include/ceres/ordered_groups.h
- /usr/local/include/ceres/problem.h
- /usr/local/include/ceres/product_manifold.h
- /usr/local/include/ceres/sized_cost_function.h
- /usr/local/include/ceres/solver.h
- /usr/local/include/ceres/sphere_manifold.h
- /usr/local/include/ceres/types.h
- /usr/local/include/ceres/version.h
 

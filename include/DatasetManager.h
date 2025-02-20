@@ -26,7 +26,7 @@ public:
     bool loadMeshModel(MeshModel& mesh);
 
     // 加载相机内参
-    bool loadCameraIntrinsics(Eigen::Matrix3f& intrinsics);
+    bool loadCameraIntrinsics(Eigen::Matrix3d& intrinsics);
 
     // 加载 Ground Truth 位姿
     bool loadPoses(std::vector<Eigen::Matrix4d>& poses, const std::string& fileName);

@@ -1,6 +1,6 @@
 CMakeFiles/GeoBA.dir/src/Projection.cpp.o: /app/src/Projection.cpp \
  /usr/include/stdc-predef.h /app/include/Projection.h \
- /opt/eigen/Eigen/Core \
+ /opt/eigen/Eigen/Dense /opt/eigen/Eigen/Core \
  /opt/eigen/Eigen/src/Core/util/DisableStupidWarnings.h \
  /opt/eigen/Eigen/src/Core/util/Macros.h /usr/include/c++/11/cmath \
  /usr/include/x86_64-linux-gnu/c++/11/bits/c++config.h \
@@ -183,11 +183,13 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o: /app/src/Projection.cpp \
  /usr/include/c++/11/bits/ostream.tcc \
  /usr/include/c++/11/bits/istream.tcc \
  /usr/include/c++/11/bits/sstream.tcc \
- /opt/eigen/Eigen/src/Core/util/MKL_support.h /usr/include/c++/11/cstddef \
- /usr/include/c++/11/cassert /usr/include/assert.h \
- /usr/include/c++/11/functional /usr/include/c++/11/tuple \
- /usr/include/c++/11/utility /usr/include/c++/11/bits/stl_relops.h \
- /usr/include/c++/11/array /usr/include/c++/11/bits/uses_allocator.h \
+ /opt/eigen/Eigen/src/Core/util/MKL_support.h \
+ /usr/lib/gcc/x86_64-linux-gnu/11/include/omp.h \
+ /usr/include/c++/11/cstddef /usr/include/c++/11/cassert \
+ /usr/include/assert.h /usr/include/c++/11/functional \
+ /usr/include/c++/11/tuple /usr/include/c++/11/utility \
+ /usr/include/c++/11/bits/stl_relops.h /usr/include/c++/11/array \
+ /usr/include/c++/11/bits/uses_allocator.h \
  /usr/include/c++/11/bits/invoke.h /usr/include/c++/11/bits/refwrap.h \
  /usr/include/c++/11/bits/std_function.h \
  /usr/include/c++/11/unordered_map \
@@ -337,72 +339,8 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o: /app/src/Projection.cpp \
  /opt/eigen/Eigen/src/Core/StlIterators.h \
  /opt/eigen/Eigen/src/Core/GlobalFunctions.h \
  /opt/eigen/Eigen/src/Core/util/ReenableStupidWarnings.h \
- /usr/local/include/ceres/ceres.h \
- /usr/local/include/ceres/autodiff_cost_function.h \
- /usr/include/c++/11/memory \
- /usr/include/c++/11/bits/stl_raw_storage_iter.h \
- /usr/include/c++/11/bits/align.h /usr/include/c++/11/bit \
- /usr/include/c++/11/bits/unique_ptr.h \
- /usr/include/c++/11/bits/shared_ptr.h \
- /usr/include/c++/11/bits/shared_ptr_base.h \
- /usr/include/c++/11/bits/allocated_ptr.h \
- /usr/include/c++/11/ext/concurrence.h \
- /usr/include/c++/11/bits/shared_ptr_atomic.h \
- /usr/include/c++/11/backward/auto_ptr.h \
- /usr/include/c++/11/pstl/glue_memory_defs.h \
- /usr/local/include/ceres/internal/autodiff.h \
- /usr/local/include/ceres/internal/array_selector.h \
- /usr/local/include/ceres/internal/fixed_array.h \
- /usr/local/include/ceres/internal/memory.h /usr/include/glog/logging.h \
- /usr/include/unistd.h /usr/include/x86_64-linux-gnu/bits/posix_opt.h \
- /usr/include/x86_64-linux-gnu/bits/environments.h \
- /usr/include/x86_64-linux-gnu/bits/confname.h \
- /usr/include/x86_64-linux-gnu/bits/getopt_posix.h \
- /usr/include/x86_64-linux-gnu/bits/getopt_core.h \
- /usr/include/x86_64-linux-gnu/bits/unistd.h \
- /usr/include/x86_64-linux-gnu/bits/unistd_ext.h \
- /usr/include/linux/close_range.h /usr/include/inttypes.h \
- /usr/include/gflags/gflags.h /usr/include/gflags/gflags_declare.h \
- /usr/include/gflags/gflags_gflags.h /usr/include/glog/log_severity.h \
- /usr/include/glog/vlog_is_on.h /usr/local/include/ceres/types.h \
- /usr/local/include/ceres/internal/disable_warnings.h \
- /usr/local/include/ceres/internal/export.h \
- /usr/local/include/ceres/internal/reenable_warnings.h \
- /usr/local/include/ceres/internal/eigen.h \
- /usr/local/include/ceres/internal/parameter_dims.h \
- /usr/local/include/ceres/internal/integer_sequence_algorithm.h \
- /usr/local/include/ceres/jet_fwd.h \
- /usr/local/include/ceres/internal/variadic_evaluate.h \
- /usr/local/include/ceres/cost_function.h /usr/local/include/ceres/jet.h \
- /usr/include/c++/11/iostream /usr/include/c++/11/numeric \
- /usr/include/c++/11/bits/stl_numeric.h \
- /usr/include/c++/11/pstl/glue_numeric_defs.h \
- /usr/local/include/ceres/internal/jet_traits.h \
- /usr/local/include/ceres/internal/port.h \
- /usr/local/include/ceres/sized_cost_function.h \
- /usr/local/include/ceres/internal/parameter_dims.h \
- /usr/local/include/ceres/autodiff_first_order_function.h \
- /usr/local/include/ceres/first_order_function.h \
- /usr/local/include/ceres/autodiff_local_parameterization.h \
- /usr/local/include/ceres/local_parameterization.h \
- /usr/local/include/ceres/internal/line_parameterization.h \
- /usr/local/include/ceres/internal/householder_vector.h \
- /usr/local/include/ceres/autodiff_manifold.h \
- /usr/local/include/ceres/manifold.h \
- /usr/local/include/ceres/conditioned_cost_function.h \
- /usr/local/include/ceres/context.h \
- /usr/local/include/ceres/cost_function_to_functor.h \
- /usr/local/include/ceres/dynamic_cost_function_to_functor.h \
- /usr/local/include/ceres/dynamic_cost_function.h \
- /usr/local/include/ceres/covariance.h \
- /usr/local/include/ceres/internal/config.h \
- /usr/local/include/ceres/crs_matrix.h \
- /usr/local/include/ceres/dynamic_autodiff_cost_function.h \
- /usr/local/include/ceres/dynamic_numeric_diff_cost_function.h \
- /usr/local/include/ceres/internal/numeric_diff.h /opt/eigen/Eigen/Dense \
- /opt/eigen/Eigen/Core /opt/eigen/Eigen/LU \
- /opt/eigen/Eigen/src/misc/Kernel.h /opt/eigen/Eigen/src/misc/Image.h \
- /opt/eigen/Eigen/src/LU/FullPivLU.h \
+ /opt/eigen/Eigen/LU /opt/eigen/Eigen/src/misc/Kernel.h \
+ /opt/eigen/Eigen/src/misc/Image.h /opt/eigen/Eigen/src/LU/FullPivLU.h \
  /opt/eigen/Eigen/src/LU/PartialPivLU.h \
  /opt/eigen/Eigen/src/LU/Determinant.h \
  /opt/eigen/Eigen/src/LU/InverseImpl.h \
@@ -439,42 +377,18 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o: /app/src/Projection.cpp \
  /opt/eigen/Eigen/Eigenvalues \
  /opt/eigen/Eigen/src/Eigenvalues/Tridiagonalization.h \
  /opt/eigen/Eigen/src/Eigenvalues/RealSchur.h \
- /opt/eigen/Eigen/src/Eigenvalues/HessenbergDecomposition.h \
+ /opt/eigen/Eigen/src/Eigenvalues/./HessenbergDecomposition.h \
  /opt/eigen/Eigen/src/Eigenvalues/EigenSolver.h \
- /opt/eigen/Eigen/src/Eigenvalues/RealSchur.h \
+ /opt/eigen/Eigen/src/Eigenvalues/./RealSchur.h \
  /opt/eigen/Eigen/src/Eigenvalues/SelfAdjointEigenSolver.h \
- /opt/eigen/Eigen/src/Eigenvalues/Tridiagonalization.h \
+ /opt/eigen/Eigen/src/Eigenvalues/./Tridiagonalization.h \
  /opt/eigen/Eigen/src/Eigenvalues/GeneralizedSelfAdjointEigenSolver.h \
  /opt/eigen/Eigen/src/Eigenvalues/HessenbergDecomposition.h \
  /opt/eigen/Eigen/src/Eigenvalues/ComplexSchur.h \
  /opt/eigen/Eigen/src/Eigenvalues/ComplexEigenSolver.h \
- /opt/eigen/Eigen/src/Eigenvalues/ComplexSchur.h \
+ /opt/eigen/Eigen/src/Eigenvalues/./ComplexSchur.h \
  /opt/eigen/Eigen/src/Eigenvalues/RealQZ.h \
  /opt/eigen/Eigen/src/Eigenvalues/GeneralizedEigenSolver.h \
- /opt/eigen/Eigen/src/Eigenvalues/RealQZ.h \
+ /opt/eigen/Eigen/src/Eigenvalues/./RealQZ.h \
  /opt/eigen/Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h \
- /opt/eigen/Eigen/StdVector /opt/eigen/Eigen/src/StlSupport/StdVector.h \
- /opt/eigen/Eigen/src/StlSupport/details.h \
- /usr/local/include/ceres/numeric_diff_options.h \
- /usr/local/include/ceres/evaluation_callback.h \
- /usr/local/include/ceres/gradient_checker.h \
- /usr/local/include/ceres/gradient_problem.h \
- /usr/local/include/ceres/gradient_problem_solver.h \
- /usr/local/include/ceres/iteration_callback.h \
- /usr/local/include/ceres/line_manifold.h \
- /usr/local/include/ceres/internal/householder_vector.h \
- /usr/local/include/ceres/internal/sphere_manifold_functions.h \
- /usr/local/include/ceres/loss_function.h \
- /usr/local/include/ceres/numeric_diff_cost_function.h \
- /usr/local/include/ceres/numeric_diff_first_order_function.h \
- /usr/local/include/ceres/ordered_groups.h /usr/include/c++/11/map \
- /usr/include/c++/11/bits/stl_tree.h /usr/include/c++/11/bits/stl_map.h \
- /usr/include/c++/11/bits/stl_multimap.h /usr/include/c++/11/set \
- /usr/include/c++/11/bits/stl_set.h \
- /usr/include/c++/11/bits/stl_multiset.h \
- /usr/local/include/ceres/problem.h \
- /usr/local/include/ceres/product_manifold.h \
- /usr/local/include/ceres/solver.h /usr/include/c++/11/unordered_set \
- /usr/include/c++/11/bits/unordered_set.h \
- /usr/local/include/ceres/sphere_manifold.h \
- /usr/local/include/ceres/version.h /app/include/MeshModel.h
+ /app/include/MeshModel.h /opt/eigen/Eigen/Core /opt/eigen/Eigen/Geometry

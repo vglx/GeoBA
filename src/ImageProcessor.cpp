@@ -1,5 +1,7 @@
 #include "ImageProcessor.h"
 #include <iostream>
+#include <cmath>
+#include <Eigen/Geometry>
 
 ImageProcessor::ImageProcessor() {}
 
@@ -32,9 +34,9 @@ void ImageProcessor::computeGradients(const cv::Mat& depthImage, cv::Mat& gradX,
     cv::Sobel(depthImage, gradY, CV_32F, 0, 1, 3);
 }
 
-float ImageProcessor::computeGradient(const cv::Mat& image, int u, int v) {
+std::pair<float, float> ImageProcessor::computeGradient(const cv::Mat& image, int u, int v) {
     // **检查边界**
-    if (u <= 0 || u >= image.cols - 1 || v <= 0 || v >= image.rows - 1) return 0.0f;
+    if (u <= 0 || u >= image.cols - 1 || v <= 0 || v >= image.rows - 1) return {0.0f, 0.0f};
 
     // **计算 Sobel 梯度**
     cv::Mat grad_x, grad_y;
@@ -42,10 +44,10 @@ float ImageProcessor::computeGradient(const cv::Mat& image, int u, int v) {
     cv::Sobel(image, grad_y, CV_32F, 0, 1, 3);  // y 方向梯度
 
     // **取 (u, v) 处梯度值**
-    float dx = grad_x.at<float>(v, u);
-    float dy = grad_y.at<float>(v, u);
+    float dx = grad_x.at<float>(v, u);  // ∂Z/∂u
+    float dy = grad_y.at<float>(v, u);  // ∂Z/∂v
 
-    return std::sqrt(dx * dx + dy * dy);  // **计算梯度强度**
+    return {dx, dy};  // 返回水平和垂直梯度
 }
 
 Eigen::MatrixXf ImageProcessor::computeDepthNormals(const cv::Mat& depthImage, float fx, float fy, float cx, float cy) {
@@ -136,4 +138,57 @@ cv::Mat ImageProcessor::photometricCompensation(const cv::Mat& image) {
     cv::addWeighted(smoothed, 0.5, compensated, 0.5, 0, result);
 
     return result;
+}
+
+Eigen::Vector3d ImageProcessor::computeNormal(int u, int v, const cv::Mat& depthMap, const Eigen::Matrix3d& camera_intrinsics) {
+    // 边界检查，确保能够取到邻域像素
+    if(u <= 0 || u >= depthMap.cols - 1 || v <= 0 || v >= depthMap.rows - 1) {
+        return Eigen::Vector3d(0, 0, 0);
+    }
+    
+    // 从内参矩阵中提取 fx, fy, cx, cy
+    double fx = camera_intrinsics(0, 0);
+    double fy = camera_intrinsics(1, 1);
+    double cx = camera_intrinsics(0, 2);
+    double cy = camera_intrinsics(1, 2);
+    
+    // 获取中心点及其邻域像素的深度值
+    float d_center = depthMap.at<float>(v, u);
+    float d_left   = depthMap.at<float>(v, u - 1);
+    float d_right  = depthMap.at<float>(v, u + 1);
+    float d_up     = depthMap.at<float>(v - 1, u);
+    float d_down   = depthMap.at<float>(v + 1, u);
+    
+    // 如果深度值无效，则返回零向量
+    if(d_center <= 0 || d_left <= 0 || d_right <= 0 || d_up <= 0 || d_down <= 0) {
+        return Eigen::Vector3d(0, 0, 0);
+    }
+    
+    // 内嵌将像素点转换为三维点的代码
+    auto to3D = [&](int u_coord, int v_coord, float depth) -> Eigen::Vector3d {
+        return Eigen::Vector3d((u_coord - cx) * depth / fx,
+                               (v_coord - cy) * depth / fy,
+                               depth);
+    };
+    
+    // 将邻域像素转换为 3D 点
+    Eigen::Vector3d p_left  = to3D(u - 1, v, d_left);
+    Eigen::Vector3d p_right = to3D(u + 1, v, d_right);
+    Eigen::Vector3d p_up    = to3D(u, v - 1, d_up);
+    Eigen::Vector3d p_down  = to3D(u, v + 1, d_down);
+    
+    // 使用中心差分计算局部 3D 坐标梯度
+    Eigen::Vector3d dpdx = (p_right - p_left) * 0.5;
+    Eigen::Vector3d dpdy = (p_down  - p_up)   * 0.5;
+    
+    // 叉乘得到法向量，注意叉乘顺序决定法向量方向
+    Eigen::Vector3d normal = dpdx.cross(dpdy);
+    
+    // 如果法向量模长为零，返回零向量，否则归一化后返回
+    double norm = normal.norm();
+    if(norm == 0)
+        return Eigen::Vector3d(0, 0, 0);
+    
+    normal.normalize();
+    return normal;
 }
