@@ -73,7 +73,6 @@ int main() {
         depth_normals.push_back(normals);
         double minVal1, maxVal1;
         cv::minMaxLoc(depth_images[i], &minVal1, &maxVal1);
-        std::cout << "depth in main: min = " << minVal1 << ", max = " << maxVal1 << std::endl;
     }
     std::cout << "Computed depth map normals for " << depth_normals.size() << " frames.\n";
 

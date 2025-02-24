@@ -13,6 +13,7 @@ Optimizer::Optimizer(double weight_global_depth, double weight_global_gradient,
     options_.linear_solver_type = ceres::SPARSE_SCHUR;
     options_.minimizer_progress_to_stdout = true;
     options_.max_num_iterations = 100;
+    options_.num_threads = 4;
 }
 
 void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
@@ -27,6 +28,8 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
 
     // **1. 绑定优化变量**
     std::vector<double> poses(frame_count * 6);  // 线性数组，每个 SE(3) 变量占 6 个 double
+
+    std::cout << "Adding Local Geo Error..." << std::endl;
 
     for (size_t i = 0; i < frame_count; ++i) {
         Sophus::SE3d pose_SE3(camera_poses[i].block<3, 3>(0, 0),
@@ -45,6 +48,8 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
         problem.AddResidualBlock(cost_function, nullptr, &poses[i * 6]);  // **传入 `double*` 指针**
     }
 
+    std::cout << "Adding Normal Consistency Error..." << std::endl;
+
     for (size_t i = 1; i < frame_count - 1; ++i) {
         std::vector<cv::Mat> depth_maps = {observed_depth_maps[i], observed_depth_maps[i - 1], observed_depth_maps[i + 1]};
     
@@ -53,6 +58,8 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
     
         problem.AddResidualBlock(cost_function, nullptr, &poses[i * 6], &poses[(i - 1) * 6], &poses[(i + 1) * 6]);
     }
+
+    std::cout << "Start solving..." << std::endl;
 
         // **3. 配置 Ceres Solver**
     ceres::Solver::Summary summary;

@@ -17,15 +17,25 @@ bool DatasetManager::loadAllRGBImages(std::vector<cv::Mat>& rgb_images) {
     rgb_images.clear();
     std::string rgb_path = dataset_path_ + "rgb/";
 
+    // 1. 收集所有符合扩展名的文件路径
+    std::vector<std::string> image_filenames;
     for (const auto& entry : fs::directory_iterator(rgb_path)) {
         if (entry.path().extension() == ".jpg" || entry.path().extension() == ".png") {
-            cv::Mat image = cv::imread(entry.path().string());
-            if (image.empty()) {
-                std::cerr << "Failed to load RGB image: " << entry.path().string() << std::endl;
-                return false;
-            }
-            rgb_images.push_back(image);
+            image_filenames.push_back(entry.path().string());
         }
+    }
+
+    // 2. 按照文件名进行排序（字典序）
+    std::sort(image_filenames.begin(), image_filenames.end());
+
+    // 3. 依次读取排序后的图像
+    for (const auto& filename : image_filenames) {
+        cv::Mat image = cv::imread(filename);
+        if (image.empty()) {
+            std::cerr << "Failed to load RGB image: " << filename << std::endl;
+            return false;
+        }
+        rgb_images.push_back(image);
     }
 
     std::cout << "Loaded " << rgb_images.size() << " RGB images.\n";
@@ -36,33 +46,38 @@ bool DatasetManager::loadAllDepthImages(std::vector<cv::Mat>& depth_images) {
     depth_images.clear();
     std::string depth_path = dataset_path_ + "depth/";
 
+    // 1. 收集文件路径
+    std::vector<std::string> depth_filenames;
     for (const auto& entry : fs::directory_iterator(depth_path)) {
         if (entry.path().extension() == ".png" || entry.path().extension() == ".tiff") {
-            cv::Mat image = cv::imread(entry.path().string(), cv::IMREAD_UNCHANGED);
-            if (image.empty()) {
-                std::cerr << "Failed to load depth image: " << entry.path().string() << std::endl;
-                return false;
-            }
-
-            if (image.type() != CV_16U) {  // 确保是 16-bit 深度图
-                std::cerr << "Unexpected depth image format (expected CV_16U): " 
-                          << entry.path().string() << std::endl;
-                return false;
-            }
-            // double minVal, maxVal;
-            // cv::minMaxLoc(image, &minVal, &maxVal);
-            // std::cout << "Raw depth: min = " << minVal << ", max = " << maxVal << std::endl;
-            // **将 16-bit 深度图转换回 0-100mm 真实深度值**
-            cv::Mat depth_in_mm;
-            image.convertTo(depth_in_mm, CV_32F, 100.0 / 65535.0); // 0-100mm 线性缩放
-            double minVal1, maxVal1;
-            cv::minMaxLoc(depth_in_mm, &minVal1, &maxVal1);
-            std::cout << "Converted depth: min = " << minVal1 << ", max = " << maxVal1 << std::endl;
-            depth_images.push_back(depth_in_mm);
+            depth_filenames.push_back(entry.path().string());
         }
     }
 
-    std::cout << "Loaded " << depth_images.size() << " depth images (converted to meters).\n";
+    // 2. 对文件名进行排序（字典序）
+    std::sort(depth_filenames.begin(), depth_filenames.end());
+
+    // 3. 依次读取并处理深度图
+    for (const auto& filename : depth_filenames) {
+        cv::Mat image = cv::imread(filename, cv::IMREAD_UNCHANGED);
+        if (image.empty()) {
+            std::cerr << "Failed to load depth image: " << filename << std::endl;
+            return false;
+        }
+
+        if (image.type() != CV_16U) {  // 确保是 16-bit 深度图
+            std::cerr << "Unexpected depth image format (expected CV_16U): " 
+                      << filename << std::endl;
+            return false;
+        }
+        cv::Mat depth_in_mm;
+        // 假设这里你想把 0~65535 的深度值线性缩放到 0~100mm
+        image.convertTo(depth_in_mm, CV_32F, 100.0 / 65535.0);
+
+        depth_images.push_back(depth_in_mm);
+    }
+
+    std::cout << "Loaded " << depth_images.size() << " depth images.\n";
     return true;
 }
 
