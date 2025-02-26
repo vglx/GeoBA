@@ -203,8 +203,6 @@ bool NormalConsistencyError::Evaluate(double const* const* param, double* residu
         transform_2.translation()
     };
 
-    int res_index = 0;
-
     // 检查可见性（此处假设 Projection::handleOcclusion 接受 triangles_ 作为参数）
     std::vector<bool> visibility[3];
     for (int f = 0; f < 3; ++f) {
@@ -231,8 +229,8 @@ bool NormalConsistencyError::Evaluate(double const* const* param, double* residu
             }
         }
     }
+
     #pragma omp parallel for
-    // 遍历所有共视点（每个顶点）
     for (size_t i = 0; i < vertices_.size(); ++i) {
         int res_index = i * 3;
         // 必须三帧都可见
@@ -264,6 +262,10 @@ bool NormalConsistencyError::Evaluate(double const* const* param, double* residu
         // 计算三个法向量的归一化平均值以及 s = || n0+n1+n2 ||
         Eigen::Vector3d sum_normals = normals[0] + normals[1] + normals[2];
         double s = sum_normals.norm();
+        if (s < 1e-8) {
+            // s 太小，无法计算稳定的平均法向量，跳过该顶点
+            continue;
+        }
         Eigen::Vector3d avg_normal = sum_normals / s;
 
         // 获取顶点在世界坐标下的位置 p（假设 MeshModel::Vertex 转为 Eigen::Vector3d）
@@ -293,6 +295,9 @@ bool NormalConsistencyError::Evaluate(double const* const* param, double* residu
                                                                 normals[f], avg_normal, s,
                                                                 p, rotations[f], translations[f],
                                                                 fx, fy);
+
+                J *= weight_;
+
                 // 将雅可比结果写入 jacobians 对应的优化变量块中
                 // 此处我们假设 jacobians[f] 指向第 f 个参数块的雅可比数组
                 for (int j = 0; j < 6; ++j) {
@@ -319,10 +324,23 @@ Eigen::Matrix<double, 1, 6> NormalConsistencyError::ComputeJacobian(
 
     // 1. 计算 Jₙ,(u,v) = ∂nᵢ/∂(u,v) —— 通过中心差分
     double delta = 1.0; // 像素步长
-    Eigen::Vector3d n_right = ImageProcessor::computeNormal(u + 1, v, depthMap, camera_intrinsics);
-    Eigen::Vector3d n_left  = ImageProcessor::computeNormal(u - 1, v, depthMap, camera_intrinsics);
-    Eigen::Vector3d n_down  = ImageProcessor::computeNormal(u, v + 1, depthMap, camera_intrinsics);
-    Eigen::Vector3d n_up    = ImageProcessor::computeNormal(u, v - 1, depthMap, camera_intrinsics);
+    // 获取图像尺寸
+    int width = depthMap.cols;
+    int height = depthMap.rows;
+
+    // 定义 lambda 用于安全获取法向量
+    auto safeComputeNormal = [&](int x, int y) -> Eigen::Vector3d {
+        if (x < 0 || x >= width || y < 0 || y >= height) {
+            // 超出范围，返回当前点的法向量（也可以返回一个默认值或进行前向/后向差分）
+            return ImageProcessor::computeNormal(u, v, depthMap, camera_intrinsics);
+        }
+        return ImageProcessor::computeNormal(x, y, depthMap, camera_intrinsics);
+    };
+
+    Eigen::Vector3d n_right = safeComputeNormal(u + 1, v);
+    Eigen::Vector3d n_left  = safeComputeNormal(u - 1, v);
+    Eigen::Vector3d n_down  = safeComputeNormal(u, v + 1);
+    Eigen::Vector3d n_up    = safeComputeNormal(u, v - 1);
     Eigen::Vector3d dndu = (n_right - n_left) / (2.0 * delta);
     Eigen::Vector3d dndv = (n_down - n_up) / (2.0 * delta);
     Eigen::Matrix<double, 3, 2> J_n_uv; // 3×2
