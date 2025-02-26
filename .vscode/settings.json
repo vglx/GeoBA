@@ -61,6 +61,18 @@
               "forward_list": "cpp",
               "iomanip": "cpp",
               "optional": "cpp",
-              "ratio": "cpp"
+              "ratio": "cpp",
+              "array": "cpp",
+              "*.tcc": "cpp",
+              "codecvt": "cpp",
+              "cstdarg": "cpp",
+              "cwctype": "cpp",
+              "deque": "cpp",
+              "functional": "cpp",
+              "memory_resource": "cpp",
+              "numeric": "cpp",
+              "random": "cpp",
+              "string_view": "cpp",
+              "numbers": "cpp"
        }
 }

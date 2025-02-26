@@ -49,7 +49,7 @@ int main() {
     }
 
     // **5. 加载相机位姿**
-    if (!dataset_manager.loadPoses(camera_poses, "poses_init")) {
+    if (!dataset_manager.loadPoses(camera_poses, "poses_gt")) {
         std::cerr << "Failed to load initialized poses.\n";
         return -1;
     }
@@ -82,7 +82,7 @@ int main() {
 
     // **9. 运行优化**
     std::cout << "Start optimization.\n";
-    Optimizer optimizer(1, 1, 1, 1);  // 传入误差权重（可调节）
+    Optimizer optimizer(1, 1, 0.1, 1);  // 传入误差权重（可调节）
     optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, rgb_images, depth_images,
                        depth_normals, camera_poses);
 

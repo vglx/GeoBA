@@ -447,6 +447,7 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
     }
 
     // 遍历每个顶点计算残差
+    #pragma omp parallel for
     for (size_t i = 0; i < vertices_.size(); ++i) {
         residuals[i] = 0.0;
         // 初始化当前帧雅可比为零
