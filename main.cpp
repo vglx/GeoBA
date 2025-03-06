@@ -82,7 +82,7 @@ int main() {
 
     // **9. 运行优化**
     std::cout << "Start optimization.\n";
-    Optimizer optimizer(1, 1, 0.1, 1);  // 传入误差权重（可调节）
+    Optimizer optimizer(1, 1, 0.000001, 0);  // 传入误差权重（可调节）
     optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, rgb_images, depth_images,
                        depth_normals, camera_poses);
 

@@ -261,6 +261,13 @@ std::vector<bool> Projection::handleOcclusion(
     #pragma omp parallel for
     for (size_t i = 0; i < vertices.size(); ++i) {
         Eigen::Vector3d vertex(vertices[i].x, vertices[i].y, vertices[i].z);
+        // 先将顶点转换到相机坐标系
+        Eigen::Vector3d camPoint = rotation.transpose() * (vertex - translation);
+        // 如果 Z <= 0，则该点在相机后面，不可见
+        if (camPoint.z() <= 0) {
+            visibleMask[i] = false;
+            continue;
+        }
         Eigen::Vector3d rayDir = (vertex - cameraCenter).normalized();
         double tHit = std::numeric_limits<double>::max();
         bool hit = traverseBVH(nodes, triangles, vertices, rootIndex, cameraCenter, rayDir, tHit);

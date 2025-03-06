@@ -497,20 +497,21 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
             count++;
         }
 
-        if (count < 10)
-            continue;
+        // if (count < 10)
+        //     continue;
 
         double I_avg = sum_intensity / count;
         residuals[i] = sqrt_weight * (I_current - I_avg);
         
         // 计算当前帧雅可比（仅当前帧为优化变量）
+        double factor = sqrt_weight * (1.0 - 1.0 / count);
         if (jacobians && jacobians[0]) {
             Eigen::Matrix<double,1,6> J_current = computeJacobianForVertex(vertices_[i],
                                                                             camera_intrinsics_,
                                                                             R_current, t_current,
                                                                             current_image_,
                                                                             u_current, v_current);
-            Eigen::Matrix<double,1,6> row = -sqrt_weight * J_current;
+            Eigen::Matrix<double,1,6> row = factor * J_current;
             for (int j = 0; j < 6; ++j) {
                 jacobians[0][i * 6 + j] = row(j);
             }
