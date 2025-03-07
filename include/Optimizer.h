@@ -8,15 +8,8 @@
 
 class Optimizer {
 public:
-    /**
-     * @brief 构造优化器，初始化 Ceres Solver 配置
-     * @param weight_global_depth 全局深度误差权重
-     * @param weight_global_gradient 全局光度梯度误差权重
-     * @param weight_local_depth 局部深度误差权重
-     * @param weight_local_normal 局部法向量误差权重
-     */
-    Optimizer(double weight_global_depth = 1.0, double weight_global_gradient = 1.0,
-              double weight_local_depth = 1.0, double weight_local_normal = 1.0);
+   
+    Optimizer(double weight = 1.0);
 
     /**
      * @brief 运行优化，调整相机位姿
@@ -38,10 +31,7 @@ private:
     ceres::Solver::Options options_;  // Ceres 迭代优化参数
 
     // **误差项权重**
-    double weight_global_depth_;
-    double weight_global_gradient_;
-    double weight_local_depth_;
-    double weight_local_normal_;
+    double weight_;
 };
 
 #endif // OPTIMIZER_H
