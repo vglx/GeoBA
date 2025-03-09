@@ -153,6 +153,30 @@ main.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/GeoBA.dir/build.make CMakeFiles/GeoBA.dir/main.cpp.s
 .PHONY : main.cpp.s
 
+src/BVH.o: src/BVH.cpp.o
+.PHONY : src/BVH.o
+
+# target to build an object file
+src/BVH.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/GeoBA.dir/build.make CMakeFiles/GeoBA.dir/src/BVH.cpp.o
+.PHONY : src/BVH.cpp.o
+
+src/BVH.i: src/BVH.cpp.i
+.PHONY : src/BVH.i
+
+# target to preprocess a source file
+src/BVH.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/GeoBA.dir/build.make CMakeFiles/GeoBA.dir/src/BVH.cpp.i
+.PHONY : src/BVH.cpp.i
+
+src/BVH.s: src/BVH.cpp.s
+.PHONY : src/BVH.s
+
+# target to generate assembly for a file
+src/BVH.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/GeoBA.dir/build.make CMakeFiles/GeoBA.dir/src/BVH.cpp.s
+.PHONY : src/BVH.cpp.s
+
 src/CostFunctions.o: src/CostFunctions.cpp.o
 .PHONY : src/CostFunctions.o
 
@@ -309,6 +333,9 @@ help:
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"
+	@echo "... src/BVH.o"
+	@echo "... src/BVH.i"
+	@echo "... src/BVH.s"
 	@echo "... src/CostFunctions.o"
 	@echo "... src/CostFunctions.i"
 	@echo "... src/CostFunctions.s"

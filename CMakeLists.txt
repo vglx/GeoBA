@@ -20,6 +20,7 @@ set(SOURCE_FILES
     src/MeshModel.cpp
     src/Optimizer.cpp
     src/Projection.cpp
+    src/BVH.cpp
     main.cpp
 )
 

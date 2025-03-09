@@ -4,6 +4,7 @@
 #include <Eigen/Dense>
 #include <vector>
 #include "MeshModel.h"
+#include "BVH.h"
 
 class Projection {
 public:
@@ -12,19 +13,13 @@ public:
         const Eigen::Matrix3d& intrinsics, 
         const Eigen::Matrix3d& rotation, 
         const Eigen::Vector3d& translation);
-
-    static double computeVertexDepth(
-        const MeshModel::Vertex& vertex, 
-        const Eigen::Matrix3d& intrinsics,
-        const Eigen::Matrix3d& rotation, 
-        const Eigen::Vector3d& translation);
-
-    static std::vector<bool> handleOcclusion(
-        const std::vector<MeshModel::Vertex>& vertices,
-        const std::vector<MeshModel::Triangle>& triangles,
+    
+    static bool isVertexVisible(
+        const MeshModel::Vertex& vertex,
         const Eigen::Matrix3d& intrinsics,
         const Eigen::Matrix3d& rotation,
         const Eigen::Vector3d& translation,
+        const BVH& bvh,
         int imageWidth,
         int imageHeight);
 };

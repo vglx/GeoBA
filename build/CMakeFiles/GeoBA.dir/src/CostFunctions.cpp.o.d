@@ -599,7 +599,7 @@ CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o: /app/src/CostFunctions.cpp \
  /usr/include/opencv4/opencv2/video.hpp \
  /usr/include/opencv4/opencv2/video/tracking.hpp \
  /usr/include/opencv4/opencv2/video/background_segm.hpp \
- /app/include/MeshModel.h /app/include/Projection.h \
+ /app/include/MeshModel.h /app/include/BVH.h /app/include/Projection.h \
  /usr/local/include/sophus/se3.hpp /usr/local/include/sophus/so3.hpp \
  /usr/local/include/sophus/rotation_matrix.hpp /opt/eigen/Eigen/SVD \
  /usr/local/include/sophus/types.hpp /usr/local/include/sophus/common.hpp \

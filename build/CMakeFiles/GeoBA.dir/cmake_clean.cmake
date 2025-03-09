@@ -1,6 +1,8 @@
 file(REMOVE_RECURSE
   "CMakeFiles/GeoBA.dir/main.cpp.o"
   "CMakeFiles/GeoBA.dir/main.cpp.o.d"
+  "CMakeFiles/GeoBA.dir/src/BVH.cpp.o"
+  "CMakeFiles/GeoBA.dir/src/BVH.cpp.o.d"
   "CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o"
   "CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o.d"
   "CMakeFiles/GeoBA.dir/src/DatasetManager.cpp.o"

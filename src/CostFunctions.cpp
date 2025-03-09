@@ -1,140 +1,103 @@
 #include "CostFunctions.h"
 #include "Projection.h"
 #include <sophus/se3.hpp>
+#include <algorithm>
+#include <cmath>
 #include "ImageProcessor.h"
-#include <omp.h>
 
-MultiViewPhotometricError::MultiViewPhotometricError(const std::vector<MeshModel::Vertex>& vertices,
-                                                     const std::vector<MeshModel::Triangle>& triangles,
-                                                     const Eigen::Matrix3d& camera_intrinsics,
-                                                     const cv::Mat& current_image,
-                                                     const std::vector<cv::Mat>& other_images,
-                                                     const std::vector<const double*>& other_se3,
-                                                     double weight_photometric)
-    : vertices_(vertices),
+MultiViewPhotometricError::MultiViewPhotometricError(
+    const MeshModel::Vertex& vertex,
+    const std::vector<MeshModel::Triangle>& triangles,
+    const Eigen::Matrix3d& camera_intrinsics,
+    const cv::Mat& current_image,
+    const BVH& bvh,
+    double weight_photometric)
+    : vertex_(vertex),
       triangles_(triangles),
       camera_intrinsics_(camera_intrinsics),
       current_image_(current_image),
-      other_images_(other_images),
-      other_se3_(other_se3),
+      bvh_(bvh),
       weight_photometric_(weight_photometric) {
-    // 设置残差数量为每个顶点一个
-    set_num_residuals(vertices_.size());
-    // 参数块设置：这里只有当前帧作为优化变量，因此只设置一个6维参数块
+
+    set_num_residuals(1);
     mutable_parameter_block_sizes()->push_back(6);
+    mutable_parameter_block_sizes()->push_back(1);
 }
 
 bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
                                          double* residuals,
                                          double** jacobians) const {
-    // 当前帧位姿（优化变量），从参数块中读取
-    Eigen::Map<const Eigen::Matrix<double,6,1>> se3_current(parameters[0]);
+
+    Eigen::Map<const Eigen::Matrix<double,6,1>> se3_current(parameters[0]); // 访问 x1（相机位姿）
+    double intensity_avg = parameters[1][0]; // 访问 x2（光度均值） 
+
     Sophus::SE3d transform_current = Sophus::SE3d::exp(se3_current);
     Eigen::Matrix3d R_current = transform_current.rotationMatrix();
     Eigen::Vector3d t_current = transform_current.translation();
 
     double sqrt_weight = std::sqrt(weight_photometric_);
-    
-    // 对当前帧进行可见性检测
-    std::vector<bool> vis_current = Projection::handleOcclusion(vertices_,
-                                                                triangles_,
-                                                                camera_intrinsics_,
-                                                                R_current, t_current,
-                                                                current_image_.cols,
-                                                                current_image_.rows);
-    // 对其他帧依次检测可见性，并存入二维 bool 向量（顺序与 other_images_ 对应）
-    std::vector<std::vector<bool>> vis_all;
-    for (size_t k = 0; k < other_images_.size(); ++k) {
-        // 从固定其他帧位姿指针中读取数据
-        Eigen::Map<const Eigen::Matrix<double,6,1>> se3_other(other_se3_[k]);
-        Sophus::SE3d transform_other = Sophus::SE3d::exp(se3_other);
-        Eigen::Matrix3d R_other = transform_other.rotationMatrix();
-        Eigen::Vector3d t_other = transform_other.translation();
-        std::vector<bool> vis = Projection::handleOcclusion(vertices_,
-                                                            triangles_,
-                                                            camera_intrinsics_,
-                                                            R_other, t_other,
-                                                            other_images_[k].cols,
-                                                            other_images_[k].rows);
-        vis_all.push_back(vis);
+
+    // 先检查顶点可见性
+    bool visible = Projection::isVertexVisible(
+        vertex_, camera_intrinsics_,
+        transform_current.rotationMatrix(), t_current,
+        bvh_, current_image_.cols, current_image_.rows
+    );
+
+    if (!visible) {
+        residuals[0] = 0.0;
+        
+        if (jacobians) {
+            if (jacobians[0]) { 
+                std::fill(jacobians[0], jacobians[0] + 6, 0.0);
+            }
+            if (jacobians[1]) { 
+                jacobians[1][0] = 0.0;
+            }
+        }
+        
+        return true;
     }
 
-    // 遍历每个顶点计算残差
-    #pragma omp parallel for
-    for (size_t i = 0; i < vertices_.size(); ++i) {
-        residuals[i] = 0.0;
-        // 初始化当前帧雅可比为零
-        if (jacobians && jacobians[0]) {
+    // 计算投影误差
+    Eigen::Vector2d proj = Projection::projectPoint(
+        vertex_, camera_intrinsics_, 
+        transform_current.rotationMatrix(), t_current
+    );
+    int u = static_cast<int>(proj(0));
+    int v = static_cast<int>(proj(1));
+
+    if (u < 0 || u >= current_image_.cols || v < 0 || v >= current_image_.rows) {
+        residuals[0] = 0.0;
+        if (jacobians) {
+            std::fill(jacobians[0], jacobians[0] + 7, 0.0);
+        }
+        return true;
+    }
+
+    float I_proj = current_image_.at<float>(v, u);
+    residuals[0] = sqrt_weight * (I_proj - intensity_avg);
+
+    if (jacobians) {
+        Eigen::Matrix<double,1,6> J_current = computeJacobian(
+            vertex_, camera_intrinsics_,
+            transform_current.rotationMatrix(), t_current,
+            current_image_, u, v
+        );
+        if (jacobians[0]) { // 6D 位姿的 Jacobian
             for (int j = 0; j < 6; ++j) {
-                jacobians[0][i * 6 + j] = 0.0;
+                jacobians[0][j] = sqrt_weight * J_current(j);
             }
         }
-        // 仅当当前帧中该点可见时，才进行残差计算
-        if (!vis_current[i])
-            continue;
-        // 当前帧的投影及光度值
-        Eigen::Vector2d proj_current = Projection::projectPoint(vertices_[i],
-                                                                camera_intrinsics_,
-                                                                R_current, t_current);
-        int u_current = static_cast<int>(proj_current(0));
-        int v_current = static_cast<int>(proj_current(1));
-        if (u_current < 0 || u_current >= current_image_.cols ||
-            v_current < 0 || v_current >= current_image_.rows)
-            continue;
-        float I_current = current_image_.at<float>(v_current, u_current);
-
-        // 将当前帧的观测计入平均（包含当前帧）
-        double sum_intensity = I_current;
-        int count = 1;
-        
-        // 遍历其他帧：仅当该点在该帧中可见时提取光度
-        for (size_t k = 0; k < other_images_.size(); ++k) {
-            const cv::Mat& img = other_images_[k];
-            if (!vis_all[k][i])
-                continue;
-            // 通过 other_se3_ 指针读取其他帧位姿
-            Eigen::Map<const Eigen::Matrix<double,6,1>> se3_other(other_se3_[k]);
-            Sophus::SE3d transform_other = Sophus::SE3d::exp(se3_other);
-            Eigen::Matrix3d R_other = transform_other.rotationMatrix();
-            Eigen::Vector3d t_other = transform_other.translation();
-            Eigen::Vector2d proj_other = Projection::projectPoint(vertices_[i],
-                                                                    camera_intrinsics_,
-                                                                    R_other, t_other);
-            int u_other = static_cast<int>(proj_other(0));
-            int v_other = static_cast<int>(proj_other(1));
-            if (u_other < 0 || u_other >= img.cols || v_other < 0 || v_other >= img.rows)
-                continue;
-            
-            float I_other = img.at<float>(v_other, u_other);
-            sum_intensity += I_other;
-            count++;
-        }
-
-        // if (count < 10)
-        //     continue;
-
-        double I_avg = sum_intensity / count;
-        residuals[i] = sqrt_weight * (I_current - I_avg);
-        
-        // 计算当前帧雅可比（仅当前帧为优化变量）
-        double factor = sqrt_weight * (1.0 - 1.0 / count);
-        if (jacobians && jacobians[0]) {
-            Eigen::Matrix<double,1,6> J_current = computeJacobianForVertex(vertices_[i],
-                                                                            camera_intrinsics_,
-                                                                            R_current, t_current,
-                                                                            current_image_,
-                                                                            u_current, v_current);
-            Eigen::Matrix<double,1,6> row = factor * J_current;
-            for (int j = 0; j < 6; ++j) {
-                jacobians[0][i * 6 + j] = row(j);
-            }
+        if (jacobians[1]) { // 1D 光度的 Jacobian
+            jacobians[1][0] = -sqrt_weight; // ✅ 正确
         }
     }
 
     return true;
 }
 
-Eigen::Matrix<double,1,6> MultiViewPhotometricError::computeJacobianForVertex(
+Eigen::Matrix<double,1,6> MultiViewPhotometricError::computeJacobian(
     const MeshModel::Vertex& vertex,
     const Eigen::Matrix3d& intrinsics,
     const Eigen::Matrix3d& R,
@@ -175,14 +138,13 @@ Eigen::Matrix<double,1,6> MultiViewPhotometricError::computeJacobianForVertex(
 }
 
 ceres::CostFunction* MultiViewPhotometricError::Create(
-    const std::vector<MeshModel::Vertex>& vertices,
+    const MeshModel::Vertex& vertex,
     const std::vector<MeshModel::Triangle>& triangles,
     const Eigen::Matrix3d& camera_intrinsics,
     const cv::Mat& current_image,
-    const std::vector<cv::Mat>& other_images,
-    const std::vector<const double*>& other_se3,
+    const BVH& bvh,
     double weight_photometric) {
-    return new MultiViewPhotometricError(vertices, triangles, camera_intrinsics,
-                                       current_image, other_images,
-                                       other_se3, weight_photometric);
+    return new MultiViewPhotometricError(
+        vertex, triangles, camera_intrinsics, current_image, bvh, weight_photometric
+    );
 }
