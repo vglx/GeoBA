@@ -21,6 +21,7 @@ set(SOURCE_FILES
     src/Optimizer.cpp
     src/Projection.cpp
     src/BVH.cpp
+    src/Evaluation.cpp
     main.cpp
 )
 

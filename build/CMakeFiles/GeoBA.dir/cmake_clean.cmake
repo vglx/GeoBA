@@ -7,6 +7,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o.d"
   "CMakeFiles/GeoBA.dir/src/DatasetManager.cpp.o"
   "CMakeFiles/GeoBA.dir/src/DatasetManager.cpp.o.d"
+  "CMakeFiles/GeoBA.dir/src/Evaluation.cpp.o"
+  "CMakeFiles/GeoBA.dir/src/Evaluation.cpp.o.d"
   "CMakeFiles/GeoBA.dir/src/ImageProcessor.cpp.o"
   "CMakeFiles/GeoBA.dir/src/ImageProcessor.cpp.o.d"
   "CMakeFiles/GeoBA.dir/src/MeshModel.cpp.o"

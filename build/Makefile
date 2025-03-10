@@ -225,6 +225,30 @@ src/DatasetManager.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/GeoBA.dir/build.make CMakeFiles/GeoBA.dir/src/DatasetManager.cpp.s
 .PHONY : src/DatasetManager.cpp.s
 
+src/Evaluation.o: src/Evaluation.cpp.o
+.PHONY : src/Evaluation.o
+
+# target to build an object file
+src/Evaluation.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/GeoBA.dir/build.make CMakeFiles/GeoBA.dir/src/Evaluation.cpp.o
+.PHONY : src/Evaluation.cpp.o
+
+src/Evaluation.i: src/Evaluation.cpp.i
+.PHONY : src/Evaluation.i
+
+# target to preprocess a source file
+src/Evaluation.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/GeoBA.dir/build.make CMakeFiles/GeoBA.dir/src/Evaluation.cpp.i
+.PHONY : src/Evaluation.cpp.i
+
+src/Evaluation.s: src/Evaluation.cpp.s
+.PHONY : src/Evaluation.s
+
+# target to generate assembly for a file
+src/Evaluation.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/GeoBA.dir/build.make CMakeFiles/GeoBA.dir/src/Evaluation.cpp.s
+.PHONY : src/Evaluation.cpp.s
+
 src/ImageProcessor.o: src/ImageProcessor.cpp.o
 .PHONY : src/ImageProcessor.o
 
@@ -342,6 +366,9 @@ help:
 	@echo "... src/DatasetManager.o"
 	@echo "... src/DatasetManager.i"
 	@echo "... src/DatasetManager.s"
+	@echo "... src/Evaluation.o"
+	@echo "... src/Evaluation.i"
+	@echo "... src/Evaluation.s"
 	@echo "... src/ImageProcessor.o"
 	@echo "... src/ImageProcessor.i"
 	@echo "... src/ImageProcessor.s"

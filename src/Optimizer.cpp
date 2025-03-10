@@ -101,6 +101,22 @@ void Optimizer::optimize(
         }
     }
 
+    // // **运行 Ceres 优化前，添加参数块排序**
+    // auto ordering = std::make_shared<ceres::ParameterBlockOrdering>();
+
+    // // **相机位姿优先优化**
+    // for (size_t i = 0; i < frame_count; ++i) {
+    //     ordering->AddElementToGroup(&poses[i * 6], 0);
+    // }
+
+    // // **然后优化 x2_values（光度均值）**
+    // for (size_t i = 0; i < vertex_count; ++i) {
+    //     ordering->AddElementToGroup(&x2_values[i], 1);
+    // }
+
+    // // **应用排序**
+    // options_.linear_solver_ordering = ordering;
+
     // **运行 Ceres 优化**
     ceres::Solver::Summary summary;
     ceres::Solve(options_, &problem, &summary);

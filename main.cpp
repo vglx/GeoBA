@@ -3,6 +3,7 @@
 #include "MeshModel.h"
 #include "ImageProcessor.h"
 #include <iostream>
+#include "Evaluation.h"
 
 int main() {
     std::cout << "GeoBA System Starting with Dataset...\n";
@@ -14,6 +15,7 @@ int main() {
     std::vector<cv::Mat> depth_images;
     std::vector<Eigen::Matrix4d> gt_camera_poses;
     std::vector<Eigen::Matrix4d> camera_poses;
+    std::vector<Eigen::Matrix4d> opt_camera_poses;
     Eigen::Matrix3d camera_intrinsics;
     MeshModel mesh_model;
     ImageProcessor image_processor;
@@ -80,11 +82,16 @@ int main() {
     mesh_model.computeVertexNormals();
     std::cout << "Computed vertex normals for mesh model.\n";
 
+    opt_camera_poses = camera_poses;
+
     // **9. 运行优化**
     std::cout << "Start optimization.\n";
     Optimizer optimizer(1);  // 传入误差权重（可调节）
-    optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, rgb_images, camera_poses);
+    optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, rgb_images, opt_camera_poses);
 
     std::cout << "Optimization completed.\n";
+
+    Evaluation::ComputeRMSE(gt_camera_poses, camera_poses, opt_camera_poses);
+
     return 0;
 }
