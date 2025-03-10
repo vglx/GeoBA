@@ -101,24 +101,26 @@ void Optimizer::optimize(
         }
     }
 
-    // // **运行 Ceres 优化前，添加参数块排序**
-    // auto ordering = std::make_shared<ceres::ParameterBlockOrdering>();
-
-    // // **相机位姿优先优化**
-    // for (size_t i = 0; i < frame_count; ++i) {
-    //     ordering->AddElementToGroup(&poses[i * 6], 0);
-    // }
-
-    // // **然后优化 x2_values（光度均值）**
-    // for (size_t i = 0; i < vertex_count; ++i) {
-    //     ordering->AddElementToGroup(&x2_values[i], 1);
-    // }
-
-    // // **应用排序**
-    // options_.linear_solver_ordering = ordering;
-
     // **运行 Ceres 优化**
     ceres::Solver::Summary summary;
     ceres::Solve(options_, &problem, &summary);
     std::cout << summary.FullReport() << std::endl;
+
+    // **将优化后的 poses 传回 camera_poses**
+    for (size_t i = 0; i < frame_count; ++i) {
+        // 读取优化后的 SE(3) 6D 变量
+        Eigen::Matrix<double,6,1> se3_vec;
+        for (int j = 0; j < 6; ++j) {
+            se3_vec[j] = poses[i * 6 + j];
+        }
+
+        // **从李代数转换回 SE(3) 变换矩阵**
+        Sophus::SE3d pose_SE3 = Sophus::SE3d::exp(se3_vec);
+        Eigen::Matrix4d pose_mat = Eigen::Matrix4d::Identity();
+        pose_mat.block<3,3>(0,0) = pose_SE3.rotationMatrix();
+        pose_mat.block<3,1>(0,3) = pose_SE3.translation();
+
+        // **更新 camera_poses**
+        camera_poses[i] = pose_mat;
+    }
 }

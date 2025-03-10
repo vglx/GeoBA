@@ -133,7 +133,7 @@ Eigen::Matrix<double,1,6> MultiViewPhotometricError::computeJacobian(
              0, 0, 1, -Y,  X,  0;
 
     Eigen::Matrix<double,1,6> J_current = J_grad * J_proj * J_se3;
-    J = J_current;
+    J = -J_current;
     return J;
 }
 
