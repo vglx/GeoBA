@@ -11,7 +11,7 @@ public:
                                const std::vector<Eigen::Matrix4d>& optimized_poses);
 
 private:
-       static double ComputeRMSE(const std::vector<Eigen::Matrix4d>& gt, 
+       static void ComputeRMSE(const std::vector<Eigen::Matrix4d>& gt, 
                                  const std::vector<Eigen::Matrix4d>& poses);
 };
 

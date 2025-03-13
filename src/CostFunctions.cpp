@@ -69,8 +69,8 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
 
     if (u < 0 || u >= current_image_.cols || v < 0 || v >= current_image_.rows) {
         residuals[0] = 0.0;
-        if (jacobians) {
-            std::fill(jacobians[0], jacobians[0] + 7, 0.0);
+        if (jacobians && jacobians[0]) {
+            std::fill(jacobians[0], jacobians[0] + 6, 0.0);
         }
         return true;
     }

@@ -54,28 +54,40 @@ int BVH::buildBVH(const std::vector<int>& triIndices,
         return nodes.size() - 1;
     }
 
-    int axis = (bbox_max - bbox_min).maxCoeff();
+    // 当 triIndices.size() > 4 时，进行中值划分
+    Eigen::Vector3d extents = bbox_max - bbox_min;
+    int axis;
+    extents.maxCoeff(&axis);
 
-    std::vector<int> leftIndices, rightIndices;
-    double median = centroids[triIndices.size() / 2][axis];
-
+    // 将每个三角形的索引与其质心在选定轴上的坐标关联
+    std::vector<std::pair<int, double>> centroidWithIndex;
+    centroidWithIndex.reserve(triIndices.size());
     for (size_t i = 0; i < triIndices.size(); ++i) {
-        if (centroids[i][axis] < median) {
-            leftIndices.push_back(triIndices[i]);
-        } else {
-            rightIndices.push_back(triIndices[i]);
-        }
+        // centroids 数组的顺序与 triIndices 一致
+        centroidWithIndex.emplace_back(triIndices[i], centroids[i][axis]);
     }
 
+    // 按照质心在选定轴上的坐标排序
+    std::sort(centroidWithIndex.begin(), centroidWithIndex.end(), 
+        [](const std::pair<int, double>& a, const std::pair<int, double>& b) {
+            return a.second < b.second;
+        });
+
+    // 使用排序后的索引拆分左右子集
+    size_t mid = centroidWithIndex.size() / 2;
+    std::vector<int> leftIndices, rightIndices;
+    for (size_t i = 0; i < centroidWithIndex.size(); ++i) {
+        if (i < mid)
+            leftIndices.push_back(centroidWithIndex[i].first);
+        else
+            rightIndices.push_back(centroidWithIndex[i].first);
+    }
+    
+    // 可选：检查左右子集是否为空，若为空则将当前节点作为叶节点
     if (leftIndices.empty() || rightIndices.empty()) {
-        leftIndices.clear();
-        rightIndices.clear();
-        for (size_t i = 0; i < triIndices.size(); ++i) {
-            if (i < triIndices.size() / 2)
-                leftIndices.push_back(triIndices[i]);
-            else
-                rightIndices.push_back(triIndices[i]);
-        }
+        node.triangleIndices = triIndices;
+        nodes.push_back(node);
+        return nodes.size() - 1;
     }
 
     int leftChild = buildBVH(leftIndices, triangles, vertices);
