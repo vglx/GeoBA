@@ -10,6 +10,7 @@ Optimizer::Optimizer(double weight)
     : weight_(weight) {
     options_.linear_solver_type = ceres::SPARSE_SCHUR;
     options_.minimizer_progress_to_stdout = true;
+    options_.trust_region_strategy_type = ceres::DOGLEG;
     options_.max_num_iterations = 100;
     options_.num_threads = 4;
 }
@@ -77,6 +78,7 @@ void Optimizer::optimize(
         }
         if (count > 0) {
             x2_values[i] = sum_intensity / count;
+            // x2_values[i] = 0.0;
             x2_counts[i] = count;
         }
     }

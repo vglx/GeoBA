@@ -35,8 +35,6 @@ void Evaluation::ComputeRMSE(const std::vector<Eigen::Matrix4d>& gt,
 
     std::cout << "Translation RMSE: " << trans_rmse << std::endl;
     std::cout << "Rotation RMSE (radians): " << rot_rmse << std::endl;
-    // 如有需要，也可以转换为度数：
-    std::cout << "Rotation RMSE (degrees): " << (rot_rmse * 180.0 / M_PI) << std::endl;
 }
 
 void Evaluation::ComputeRMSE(const std::vector<Eigen::Matrix4d>& ground_truth,
