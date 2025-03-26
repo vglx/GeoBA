@@ -50,4 +50,10 @@ bool Projection::isVertexVisible(
     // 调用 BVH 进行遮挡检测
     return bvh.traverse(cameraCenter, rayDir, tHit) && 
            std::abs(tHit - (vertexPos - cameraCenter).norm()) < 0.005 * tHit;
+
+    // double distance = (vertexPos - cameraCenter).norm();
+    // bool hit = bvh.traverse(cameraCenter, rayDir, tHit);
+    
+    // const double epsilon = 1.0; // mm 级别容差
+    // return !hit || std::abs(tHit - distance) < epsilon;
 }

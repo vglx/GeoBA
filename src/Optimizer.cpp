@@ -5,6 +5,7 @@
 #include <iostream>
 #include <sophus/se3.hpp>
 #include <omp.h>
+#include <ceres/numeric_diff_cost_function.h>
 
 Optimizer::Optimizer(double weight)
     : weight_(weight) {
@@ -55,6 +56,8 @@ void Optimizer::optimize(
     std::vector<double> x2_values(vertex_count, 0.0);
     std::vector<int> x2_counts(vertex_count, 0);
 
+    std::vector<int> visible_vertex_per_frame(frame_count, 0);
+
     #pragma omp parallel for
     for (size_t i = 0; i < vertex_count; ++i) {
         double sum_intensity = 0.0;
@@ -73,6 +76,9 @@ void Optimizer::optimize(
                 if (u >= 0 && u < observed_images_gray[j].cols && v >= 0 && v < observed_images_gray[j].rows) {
                     sum_intensity += observed_images_gray[j].at<float>(v, u);
                     count++;
+
+                    #pragma omp atomic
+                    visible_vertex_per_frame[j]++;
                 }
             }
         }
@@ -81,6 +87,10 @@ void Optimizer::optimize(
             // x2_values[i] = 0.0;
             x2_counts[i] = count;
         }
+    }
+
+    for (size_t j = 0; j < frame_count; ++j) {
+        std::cout << "Frame " << j << " visible vertices: " << visible_vertex_per_frame[j] << std::endl;
     }
 
     // **添加残差项**
@@ -98,7 +108,32 @@ void Optimizer::optimize(
                 );
 
                 // **添加到 Ceres 优化问题**
-                problem.AddResidualBlock(photometric_cf, nullptr, &poses[j * 6], &x2_values[i]);
+                // problem.AddResidualBlock(photometric_cf, nullptr, &poses[j * 6], &x2_values[i]);
+                // ceres::LossFunction* loss = new ceres::HuberLoss(1.0);
+                // problem.AddResidualBlock(photometric_cf, loss, &poses[j * 6], &x2_values[i]);
+
+                ceres::CostFunction* numeric_cf =
+                new ceres::NumericDiffCostFunction<
+                    MultiViewPhotometricError, 
+                    ceres::CENTRAL, 
+                    1,    // residual dimension
+                    6,    // pose
+                    1     // intensity
+                    >( new MultiViewPhotometricError(
+                            mesh_vertices[i],
+                            mesh_triangles,
+                            camera_intrinsics,
+                            observed_images_gray[j],
+                            bvh,
+                            weight_
+                        ) );
+
+                problem.AddResidualBlock(
+                    numeric_cf,
+                    nullptr,
+                    &poses[j * 6],
+                    &x2_values[i]
+                );
             }
         }
     }
