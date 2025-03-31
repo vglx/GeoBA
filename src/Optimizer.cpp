@@ -3,17 +3,16 @@
 #include "Projection.h"
 #include "BVH.h"
 #include <iostream>
+#include <vector>
+#include <Eigen/Core>
+#include <Eigen/Sparse>
+#include <Eigen/Dense>
 #include <sophus/se3.hpp>
 #include <omp.h>
-#include <ceres/numeric_diff_cost_function.h>
 
-Optimizer::Optimizer(double weight)
-    : weight_(weight) {
-    options_.linear_solver_type = ceres::SPARSE_SCHUR;
-    options_.minimizer_progress_to_stdout = true;
-    options_.trust_region_strategy_type = ceres::DOGLEG;
-    options_.max_num_iterations = 100;
-    options_.num_threads = 4;
+Optimizer::Optimizer(double weight, int maxIterations)
+    : weight_(weight), maxIterations_(maxIterations) {
+    // 如果仍使用 Ceres，这里可初始化 options_ 等，但下面示例为手写优化器
 }
 
 void Optimizer::optimize(
@@ -25,11 +24,14 @@ void Optimizer::optimize(
 
     size_t frame_count = observed_images.size();
     size_t vertex_count = mesh_vertices.size();
-    ceres::Problem problem;
+    int poseDim = static_cast<int>(frame_count * 6);         // 每帧6维
+    int intensityDim = static_cast<int>(vertex_count);         // 每个顶点1维光度
+    int stateDim = poseDim + intensityDim;
 
-    // **构建 BVH 结构**
+    // 构建 BVH 结构（基于 mesh_triangles 和 mesh_vertices）
     BVH bvh(mesh_triangles, mesh_vertices);
 
+    // 将所有观测图像转换为灰度（CV_32F）格式
     std::vector<cv::Mat> observed_images_gray;
     for (const auto& img : observed_images) {
         cv::Mat gray;
@@ -42,20 +44,18 @@ void Optimizer::optimize(
         observed_images_gray.push_back(gray);
     }
 
-    // **初始化优化变量** (frame_count 个相机位姿，每个 6 维)
-    std::vector<double> poses(frame_count * 6);
-    for (size_t i = 0; i < frame_count; ++i) {
-        Sophus::SE3d pose_SE3(camera_poses[i].block<3,3>(0,0), camera_poses[i].block<3,1>(0,3));
-        Eigen::Matrix<double,6,1> se3_vec = pose_SE3.log();
-        for (int j = 0; j < 6; ++j) {
-            poses[i * 6 + j] = se3_vec[j];
-        }
+    // 构造全局状态向量 X：
+    // 前 poseDim 元素为每帧的 6D 位姿（SE3 对数表示），后 intensityDim 元素为每个顶点的光度值
+    Eigen::VectorXd X = Eigen::VectorXd::Zero(stateDim);
+    for (size_t i = 0; i < frame_count; i++) {
+        // 将 camera_poses[i]（4x4 矩阵）转换为 6D 李代数表示
+        Sophus::SE3d T(camera_poses[i].block<3,3>(0,0), camera_poses[i].block<3,1>(0,3));
+        X.segment<6>(i*6) = T.log();
     }
 
-    // **计算每个顶点的光度均值 x2**
+    // 利用所有帧对每个顶点计算初始光度均值
     std::vector<double> x2_values(vertex_count, 0.0);
     std::vector<int> x2_counts(vertex_count, 0);
-
     std::vector<int> visible_vertex_per_frame(frame_count, 0);
 
     #pragma omp parallel for
@@ -69,14 +69,13 @@ void Optimizer::optimize(
 
                 Eigen::Vector2d proj = Projection::projectPoint(mesh_vertices[i], camera_intrinsics,
                     camera_poses[j].block<3,3>(0,0), camera_poses[j].block<3,1>(0,3));
-
                 int u = static_cast<int>(proj(0));
                 int v = static_cast<int>(proj(1));
 
-                if (u >= 0 && u < observed_images_gray[j].cols && v >= 0 && v < observed_images_gray[j].rows) {
+                if (u >= 0 && u < observed_images_gray[j].cols &&
+                    v >= 0 && v < observed_images_gray[j].rows) {
                     sum_intensity += observed_images_gray[j].at<float>(v, u);
                     count++;
-
                     #pragma omp atomic
                     visible_vertex_per_frame[j]++;
                 }
@@ -84,7 +83,6 @@ void Optimizer::optimize(
         }
         if (count > 0) {
             x2_values[i] = sum_intensity / count;
-            // x2_values[i] = 0.0;
             x2_counts[i] = count;
         }
     }
@@ -93,71 +91,103 @@ void Optimizer::optimize(
         std::cout << "Frame " << j << " visible vertices: " << visible_vertex_per_frame[j] << std::endl;
     }
 
-    // **添加残差项**
-    for (size_t i = 0; i < vertex_count; ++i) {
-        if (x2_counts[i] == 0) continue;  // **跳过不可见顶点**
-        
-        for (size_t j = 0; j < frame_count; ++j) {
-            if (Projection::isVertexVisible(mesh_vertices[i], camera_intrinsics,
-                camera_poses[j].block<3,3>(0,0), camera_poses[j].block<3,1>(0,3),
-                bvh, observed_images_gray[j].cols, observed_images_gray[j].rows)) {
-
-                // **创建残差项**
-                ceres::CostFunction* photometric_cf = MultiViewPhotometricError::Create(
-                    mesh_vertices[i], mesh_triangles, camera_intrinsics, observed_images_gray[j], bvh, weight_
-                );
-
-                // **添加到 Ceres 优化问题**
-                // problem.AddResidualBlock(photometric_cf, nullptr, &poses[j * 6], &x2_values[i]);
-                // ceres::LossFunction* loss = new ceres::HuberLoss(1.0);
-                // problem.AddResidualBlock(photometric_cf, loss, &poses[j * 6], &x2_values[i]);
-
-                ceres::CostFunction* numeric_cf =
-                new ceres::NumericDiffCostFunction<
-                    MultiViewPhotometricError, 
-                    ceres::CENTRAL, 
-                    1,    // residual dimension
-                    6,    // pose
-                    1     // intensity
-                    >( new MultiViewPhotometricError(
-                            mesh_vertices[i],
-                            mesh_triangles,
-                            camera_intrinsics,
-                            observed_images_gray[j],
-                            bvh,
-                            weight_
-                        ) );
-
-                problem.AddResidualBlock(
-                    numeric_cf,
-                    nullptr,
-                    &poses[j * 6],
-                    &x2_values[i]
-                );
-            }
-        }
+    // 将初始光度均值写入状态向量 X（后 intensityDim 部分）
+    for (size_t i = 0; i < vertex_count; i++) {
+        X(poseDim + i) = x2_values[i];
     }
 
-    // **运行 Ceres 优化**
-    ceres::Solver::Summary summary;
-    ceres::Solve(options_, &problem, &summary);
-    std::cout << summary.FullReport() << std::endl;
+    // Gauss-Newton 优化迭代
+    for (int iter = 0; iter < maxIterations_; iter++) {
+        std::vector<double> residuals;
+        std::vector<Eigen::Triplet<double>> triplets;
+        int rowIndex = 0;
 
-    // **将优化后的 poses 传回 camera_poses**
-    for (size_t i = 0; i < frame_count; ++i) {
-        // 读取优化后的 SE(3) 6D 变量
-        Eigen::Matrix<double,6,1> se3_vec;
-        for (int j = 0; j < 6; ++j) {
-            se3_vec[j] = poses[i * 6 + j];
+        // 对每个顶点和每帧构造残差项
+        for (size_t i = 0; i < vertex_count; i++) {
+            if (x2_counts[i] == 0) continue;  // 跳过所有帧均不可见的顶点
+
+            for (size_t j = 0; j < frame_count; j++) {
+                Eigen::Matrix<double, 6, 1> se3 = X.segment<6>(j*6);
+                Sophus::SE3d T = Sophus::SE3d::exp(se3);
+                Eigen::Matrix3d R = T.rotationMatrix();
+                Eigen::Vector3d t = T.translation();
+                const cv::Mat& image = observed_images_gray[j];
+
+                if (!Projection::isVertexVisible(mesh_vertices[i], camera_intrinsics, R, t,
+                                                 bvh, image.cols, image.rows)) {
+                    continue;
+                }
+
+                PhotometricError costFunc(mesh_vertices[i], mesh_triangles,
+                                          camera_intrinsics, image, bvh, weight_);
+                double r = 0.0;
+                Eigen::Matrix<double, 1, 6> J_pose;
+                double J_intensity = 0.0;
+                double intensity = X(poseDim + i);
+
+                costFunc.Evaluate(se3, intensity, r, &J_pose, &J_intensity);
+                residuals.push_back(r);
+
+                // 当前观测对应雅可比行：
+                // 对应列：帧 j 的位姿 (j*6 到 j*6+5) 和顶点 i 的光度 (poseDim + i)
+                for (int k = 0; k < 6; k++) {
+                    triplets.push_back(Eigen::Triplet<double>(rowIndex, j*6 + k, J_pose(k)));
+                }
+                triplets.push_back(Eigen::Triplet<double>(rowIndex, poseDim + i, J_intensity));
+                rowIndex++;
+            }
         }
 
-        // **从李代数转换回 SE(3) 变换矩阵**
-        Sophus::SE3d pose_SE3 = Sophus::SE3d::exp(se3_vec);
-        Eigen::Matrix4d pose_mat = Eigen::Matrix4d::Identity();
-        pose_mat.block<3,3>(0,0) = pose_SE3.rotationMatrix();
-        pose_mat.block<3,1>(0,3) = pose_SE3.translation();
+        Eigen::VectorXd F = Eigen::Map<Eigen::VectorXd>(residuals.data(), residuals.size());
+        Eigen::SparseMatrix<double> J(rowIndex, stateDim);
+        J.setFromTriplets(triplets.begin(), triplets.end());
 
-        // **更新 camera_poses**
-        camera_poses[i] = pose_mat;
+        // 计算当前 cost 和梯度
+        double cost = F.squaredNorm();
+        Eigen::SparseMatrix<double> H = J.transpose() * J;
+        Eigen::VectorXd g = -J.transpose() * F;
+        double gradNorm = g.norm();
+
+        // 将 H 分块：前 poseDim 为相机位姿，后 intensityDim 为光度
+        Eigen::SparseMatrix<double> U = H.block(0, 0, poseDim, poseDim);
+        Eigen::SparseMatrix<double> W = H.block(0, poseDim, poseDim, intensityDim);
+        Eigen::SparseMatrix<double> V = H.block(poseDim, poseDim, intensityDim, intensityDim);
+        Eigen::VectorXd bp = g.segment(0, poseDim);
+        Eigen::VectorXd bf = g.segment(poseDim, intensityDim);
+
+        // 这里转换为 dense 求解 Schur 补（实际可用稀疏求解器提高效率）
+        Eigen::MatrixXd U_dense = Eigen::MatrixXd(U);
+        Eigen::MatrixXd W_dense = Eigen::MatrixXd(W);
+        Eigen::MatrixXd V_dense = Eigen::MatrixXd(V);
+        Eigen::MatrixXd V_inv = V_dense.inverse();
+
+        Eigen::MatrixXd Schur = U_dense - W_dense * V_inv * W_dense.transpose();
+        Eigen::VectorXd delta_pose = Schur.ldlt().solve(bp - W_dense * V_inv * bf);
+        Eigen::VectorXd delta_intensity = V_inv * (bf - W_dense.transpose() * delta_pose);
+
+        Eigen::VectorXd delta(stateDim);
+        delta.head(poseDim) = delta_pose;
+        delta.tail(intensityDim) = delta_intensity;
+
+        X += delta;
+        double deltaNorm = delta.norm();
+
+        // 打印当前迭代信息：cost, 梯度范数, 更新量范数
+        std::cout << "Iteration " << iter
+                  << ", cost = " << cost
+                  << ", grad norm = " << gradNorm
+                  << ", delta norm = " << deltaNorm << std::endl;
+
+        if (deltaNorm < 1e-6) break;
+    }
+
+    // 更新优化后的位姿到 camera_poses（从 X 的前 poseDim 部分恢复）
+    for (size_t i = 0; i < frame_count; i++) {
+        Eigen::Matrix<double, 6, 1> se3 = X.segment<6>(i*6);
+        Sophus::SE3d T = Sophus::SE3d::exp(se3);
+        Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
+        pose.block<3,3>(0,0) = T.rotationMatrix();
+        pose.block<3,1>(0,3) = T.translation();
+        camera_poses[i] = pose;
     }
 }

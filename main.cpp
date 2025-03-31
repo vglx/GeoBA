@@ -9,8 +9,8 @@ int main() {
     std::cout << "GeoBA System Starting with Dataset...\n";
 
     // **1. 初始化数据集管理器**
-    DatasetManager dataset_manager("../data/Triplettest/");
-    // DatasetManager dataset_manager("../data/sim_rectum/");
+    // DatasetManager dataset_manager("../data/Triplettest/");
+    DatasetManager dataset_manager("../data/sim_rectum/");
 
     std::vector<cv::Mat> rgb_images;
     // std::vector<cv::Mat> depth_images;
@@ -95,10 +95,10 @@ int main() {
 
     // **9. 运行优化**
     std::cout << "Start optimization.\n";
-    Optimizer optimizer(1);  // 传入误差权重（可调节）
+    Optimizer optimizer(1, 20);
     optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, rgb_images, opt_camera_poses);
 
-    std::cout << "Optimization completed.\n";
+    std::cout << "Optimization complete.\n";
 
     Evaluation::ComputeRMSE(gt_camera_poses, camera_poses, opt_camera_poses);
 

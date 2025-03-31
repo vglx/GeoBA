@@ -1165,9 +1165,17 @@ CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o: /app/src/CostFunctions.cpp \
   /opt/eigen/Eigen/LU \
   /opt/eigen/Eigen/QR \
   /opt/eigen/Eigen/SVD \
-  /opt/eigen/Eigen/StdVector \
   /opt/eigen/Eigen/src/Cholesky/LDLT.h \
   /opt/eigen/Eigen/src/Cholesky/LLT.h \
+  /opt/eigen/Eigen/src/plugins/ArrayCwiseBinaryOps.h \
+  /opt/eigen/Eigen/src/plugins/ArrayCwiseUnaryOps.h \
+  /opt/eigen/Eigen/src/plugins/BlockMethods.h \
+  /opt/eigen/Eigen/src/plugins/CommonCwiseBinaryOps.h \
+  /opt/eigen/Eigen/src/plugins/CommonCwiseUnaryOps.h \
+  /opt/eigen/Eigen/src/plugins/IndexedViewMethods.h \
+  /opt/eigen/Eigen/src/plugins/MatrixCwiseBinaryOps.h \
+  /opt/eigen/Eigen/src/plugins/MatrixCwiseUnaryOps.h \
+  /opt/eigen/Eigen/src/plugins/ReshapedMethods.h \
   /opt/eigen/Eigen/src/Core/ArithmeticSequence.h \
   /opt/eigen/Eigen/src/Core/Array.h \
   /opt/eigen/Eigen/src/Core/ArrayBase.h \
@@ -1284,6 +1292,11 @@ CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o: /app/src/CostFunctions.cpp \
   /opt/eigen/Eigen/src/Core/util/StaticAssert.h \
   /opt/eigen/Eigen/src/Core/util/SymbolicIndex.h \
   /opt/eigen/Eigen/src/Core/util/XprHelper.h \
+  /opt/eigen/Eigen/src/Eigenvalues/ComplexSchur.h \
+  /opt/eigen/Eigen/src/Eigenvalues/HessenbergDecomposition.h \
+  /opt/eigen/Eigen/src/Eigenvalues/RealQZ.h \
+  /opt/eigen/Eigen/src/Eigenvalues/RealSchur.h \
+  /opt/eigen/Eigen/src/Eigenvalues/Tridiagonalization.h \
   /opt/eigen/Eigen/src/Eigenvalues/ComplexEigenSolver.h \
   /opt/eigen/Eigen/src/Eigenvalues/ComplexSchur.h \
   /opt/eigen/Eigen/src/Eigenvalues/EigenSolver.h \
@@ -1327,20 +1340,9 @@ CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o: /app/src/CostFunctions.cpp \
   /opt/eigen/Eigen/src/SVD/JacobiSVD.h \
   /opt/eigen/Eigen/src/SVD/SVDBase.h \
   /opt/eigen/Eigen/src/SVD/UpperBidiagonalization.h \
-  /opt/eigen/Eigen/src/StlSupport/StdVector.h \
-  /opt/eigen/Eigen/src/StlSupport/details.h \
   /opt/eigen/Eigen/src/misc/Image.h \
   /opt/eigen/Eigen/src/misc/Kernel.h \
   /opt/eigen/Eigen/src/misc/RealSvd2x2.h \
-  /opt/eigen/Eigen/src/plugins/ArrayCwiseBinaryOps.h \
-  /opt/eigen/Eigen/src/plugins/ArrayCwiseUnaryOps.h \
-  /opt/eigen/Eigen/src/plugins/BlockMethods.h \
-  /opt/eigen/Eigen/src/plugins/CommonCwiseBinaryOps.h \
-  /opt/eigen/Eigen/src/plugins/CommonCwiseUnaryOps.h \
-  /opt/eigen/Eigen/src/plugins/IndexedViewMethods.h \
-  /opt/eigen/Eigen/src/plugins/MatrixCwiseBinaryOps.h \
-  /opt/eigen/Eigen/src/plugins/MatrixCwiseUnaryOps.h \
-  /opt/eigen/Eigen/src/plugins/ReshapedMethods.h \
   /usr/include/alloca.h \
   /usr/include/asm-generic/errno-base.h \
   /usr/include/asm-generic/errno.h \
@@ -1447,7 +1449,6 @@ CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o: /app/src/CostFunctions.cpp \
   /usr/include/c++/11/bits/unique_lock.h \
   /usr/include/c++/11/bits/unique_ptr.h \
   /usr/include/c++/11/bits/unordered_map.h \
-  /usr/include/c++/11/bits/unordered_set.h \
   /usr/include/c++/11/bits/uses_allocator.h \
   /usr/include/c++/11/bits/vector.tcc \
   /usr/include/c++/11/cassert \
@@ -1529,7 +1530,6 @@ CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o: /app/src/CostFunctions.cpp \
   /usr/include/c++/11/type_traits \
   /usr/include/c++/11/typeinfo \
   /usr/include/c++/11/unordered_map \
-  /usr/include/c++/11/unordered_set \
   /usr/include/c++/11/utility \
   /usr/include/c++/11/vector \
   /usr/include/ctype.h \
@@ -1537,16 +1537,8 @@ CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o: /app/src/CostFunctions.cpp \
   /usr/include/errno.h \
   /usr/include/features-time64.h \
   /usr/include/features.h \
-  /usr/include/gflags/gflags.h \
-  /usr/include/gflags/gflags_declare.h \
-  /usr/include/gflags/gflags_gflags.h \
-  /usr/include/glog/log_severity.h \
-  /usr/include/glog/logging.h \
-  /usr/include/glog/vlog_is_on.h \
-  /usr/include/inttypes.h \
   /usr/include/libintl.h \
   /usr/include/limits.h \
-  /usr/include/linux/close_range.h \
   /usr/include/linux/errno.h \
   /usr/include/linux/limits.h \
   /usr/include/locale.h \
@@ -1659,25 +1651,20 @@ CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o: /app/src/CostFunctions.cpp \
   /usr/include/string.h \
   /usr/include/strings.h \
   /usr/include/time.h \
-  /usr/include/unistd.h \
   /usr/include/wchar.h \
   /usr/include/wctype.h \
   /usr/include/x86_64-linux-gnu/asm/errno.h \
   /usr/include/x86_64-linux-gnu/bits/atomic_wide_counter.h \
   /usr/include/x86_64-linux-gnu/bits/byteswap.h \
-  /usr/include/x86_64-linux-gnu/bits/confname.h \
   /usr/include/x86_64-linux-gnu/bits/cpu-set.h \
   /usr/include/x86_64-linux-gnu/bits/endian.h \
   /usr/include/x86_64-linux-gnu/bits/endianness.h \
-  /usr/include/x86_64-linux-gnu/bits/environments.h \
   /usr/include/x86_64-linux-gnu/bits/errno.h \
   /usr/include/x86_64-linux-gnu/bits/floatn-common.h \
   /usr/include/x86_64-linux-gnu/bits/floatn.h \
   /usr/include/x86_64-linux-gnu/bits/flt-eval-method.h \
   /usr/include/x86_64-linux-gnu/bits/fp-fast.h \
   /usr/include/x86_64-linux-gnu/bits/fp-logb.h \
-  /usr/include/x86_64-linux-gnu/bits/getopt_core.h \
-  /usr/include/x86_64-linux-gnu/bits/getopt_posix.h \
   /usr/include/x86_64-linux-gnu/bits/iscanonical.h \
   /usr/include/x86_64-linux-gnu/bits/libc-header-start.h \
   /usr/include/x86_64-linux-gnu/bits/libm-simd-decl-stubs.h \
@@ -1690,7 +1677,6 @@ CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o: /app/src/CostFunctions.cpp \
   /usr/include/x86_64-linux-gnu/bits/mathcalls.h \
   /usr/include/x86_64-linux-gnu/bits/posix1_lim.h \
   /usr/include/x86_64-linux-gnu/bits/posix2_lim.h \
-  /usr/include/x86_64-linux-gnu/bits/posix_opt.h \
   /usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h \
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h \
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes.h \
@@ -1743,8 +1729,6 @@ CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o: /app/src/CostFunctions.cpp \
   /usr/include/x86_64-linux-gnu/bits/typesizes.h \
   /usr/include/x86_64-linux-gnu/bits/uintn-identity.h \
   /usr/include/x86_64-linux-gnu/bits/uio_lim.h \
-  /usr/include/x86_64-linux-gnu/bits/unistd.h \
-  /usr/include/x86_64-linux-gnu/bits/unistd_ext.h \
   /usr/include/x86_64-linux-gnu/bits/waitflags.h \
   /usr/include/x86_64-linux-gnu/bits/waitstatus.h \
   /usr/include/x86_64-linux-gnu/bits/wchar.h \
@@ -1783,62 +1767,6 @@ CMakeFiles/GeoBA.dir/src/CostFunctions.cpp.o: /app/src/CostFunctions.cpp \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/stdint.h \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/syslimits.h \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/xmmintrin.h \
-  /usr/local/include/ceres/autodiff_cost_function.h \
-  /usr/local/include/ceres/autodiff_first_order_function.h \
-  /usr/local/include/ceres/autodiff_local_parameterization.h \
-  /usr/local/include/ceres/autodiff_manifold.h \
-  /usr/local/include/ceres/ceres.h \
-  /usr/local/include/ceres/conditioned_cost_function.h \
-  /usr/local/include/ceres/context.h \
-  /usr/local/include/ceres/cost_function.h \
-  /usr/local/include/ceres/cost_function_to_functor.h \
-  /usr/local/include/ceres/covariance.h \
-  /usr/local/include/ceres/crs_matrix.h \
-  /usr/local/include/ceres/dynamic_autodiff_cost_function.h \
-  /usr/local/include/ceres/dynamic_cost_function.h \
-  /usr/local/include/ceres/dynamic_cost_function_to_functor.h \
-  /usr/local/include/ceres/dynamic_numeric_diff_cost_function.h \
-  /usr/local/include/ceres/evaluation_callback.h \
-  /usr/local/include/ceres/first_order_function.h \
-  /usr/local/include/ceres/gradient_checker.h \
-  /usr/local/include/ceres/gradient_problem.h \
-  /usr/local/include/ceres/gradient_problem_solver.h \
-  /usr/local/include/ceres/internal/array_selector.h \
-  /usr/local/include/ceres/internal/autodiff.h \
-  /usr/local/include/ceres/internal/config.h \
-  /usr/local/include/ceres/internal/disable_warnings.h \
-  /usr/local/include/ceres/internal/eigen.h \
-  /usr/local/include/ceres/internal/export.h \
-  /usr/local/include/ceres/internal/fixed_array.h \
-  /usr/local/include/ceres/internal/householder_vector.h \
-  /usr/local/include/ceres/internal/integer_sequence_algorithm.h \
-  /usr/local/include/ceres/internal/jet_traits.h \
-  /usr/local/include/ceres/internal/line_parameterization.h \
-  /usr/local/include/ceres/internal/memory.h \
-  /usr/local/include/ceres/internal/numeric_diff.h \
-  /usr/local/include/ceres/internal/parameter_dims.h \
-  /usr/local/include/ceres/internal/port.h \
-  /usr/local/include/ceres/internal/reenable_warnings.h \
-  /usr/local/include/ceres/internal/sphere_manifold_functions.h \
-  /usr/local/include/ceres/internal/variadic_evaluate.h \
-  /usr/local/include/ceres/iteration_callback.h \
-  /usr/local/include/ceres/jet.h \
-  /usr/local/include/ceres/jet_fwd.h \
-  /usr/local/include/ceres/line_manifold.h \
-  /usr/local/include/ceres/local_parameterization.h \
-  /usr/local/include/ceres/loss_function.h \
-  /usr/local/include/ceres/manifold.h \
-  /usr/local/include/ceres/numeric_diff_cost_function.h \
-  /usr/local/include/ceres/numeric_diff_first_order_function.h \
-  /usr/local/include/ceres/numeric_diff_options.h \
-  /usr/local/include/ceres/ordered_groups.h \
-  /usr/local/include/ceres/problem.h \
-  /usr/local/include/ceres/product_manifold.h \
-  /usr/local/include/ceres/sized_cost_function.h \
-  /usr/local/include/ceres/solver.h \
-  /usr/local/include/ceres/sphere_manifold.h \
-  /usr/local/include/ceres/types.h \
-  /usr/local/include/ceres/version.h \
   /usr/local/include/sophus/common.hpp \
   /usr/local/include/sophus/rotation_matrix.hpp \
   /usr/local/include/sophus/se3.hpp \
@@ -4015,11 +3943,17 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /opt/eigen/Eigen/Eigenvalues \
   /opt/eigen/Eigen/Geometry \
   /opt/eigen/Eigen/Householder \
+  /opt/eigen/Eigen/IterativeLinearSolvers \
   /opt/eigen/Eigen/Jacobi \
   /opt/eigen/Eigen/LU \
+  /opt/eigen/Eigen/OrderingMethods \
   /opt/eigen/Eigen/QR \
   /opt/eigen/Eigen/SVD \
-  /opt/eigen/Eigen/StdVector \
+  /opt/eigen/Eigen/Sparse \
+  /opt/eigen/Eigen/SparseCholesky \
+  /opt/eigen/Eigen/SparseCore \
+  /opt/eigen/Eigen/SparseLU \
+  /opt/eigen/Eigen/SparseQR \
   /opt/eigen/Eigen/src/Cholesky/LDLT.h \
   /opt/eigen/Eigen/src/Cholesky/LLT.h \
   /opt/eigen/Eigen/src/plugins/ArrayCwiseBinaryOps.h \
@@ -4147,6 +4081,11 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /opt/eigen/Eigen/src/Core/util/StaticAssert.h \
   /opt/eigen/Eigen/src/Core/util/SymbolicIndex.h \
   /opt/eigen/Eigen/src/Core/util/XprHelper.h \
+  /opt/eigen/Eigen/src/Eigenvalues/ComplexSchur.h \
+  /opt/eigen/Eigen/src/Eigenvalues/HessenbergDecomposition.h \
+  /opt/eigen/Eigen/src/Eigenvalues/RealQZ.h \
+  /opt/eigen/Eigen/src/Eigenvalues/RealSchur.h \
+  /opt/eigen/Eigen/src/Eigenvalues/Tridiagonalization.h \
   /opt/eigen/Eigen/src/Eigenvalues/ComplexEigenSolver.h \
   /opt/eigen/Eigen/src/Eigenvalues/ComplexSchur.h \
   /opt/eigen/Eigen/src/Eigenvalues/EigenSolver.h \
@@ -4176,12 +4115,23 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /opt/eigen/Eigen/src/Householder/BlockHouseholder.h \
   /opt/eigen/Eigen/src/Householder/Householder.h \
   /opt/eigen/Eigen/src/Householder/HouseholderSequence.h \
+  /opt/eigen/Eigen/src/IterativeLinearSolvers/BasicPreconditioners.h \
+  /opt/eigen/Eigen/src/IterativeLinearSolvers/BiCGSTAB.h \
+  /opt/eigen/Eigen/src/IterativeLinearSolvers/ConjugateGradient.h \
+  /opt/eigen/Eigen/src/IterativeLinearSolvers/IncompleteCholesky.h \
+  /opt/eigen/Eigen/src/IterativeLinearSolvers/IncompleteLUT.h \
+  /opt/eigen/Eigen/src/IterativeLinearSolvers/IterativeSolverBase.h \
+  /opt/eigen/Eigen/src/IterativeLinearSolvers/LeastSquareConjugateGradient.h \
+  /opt/eigen/Eigen/src/IterativeLinearSolvers/SolveWithGuess.h \
   /opt/eigen/Eigen/src/Jacobi/Jacobi.h \
   /opt/eigen/Eigen/src/LU/Determinant.h \
   /opt/eigen/Eigen/src/LU/FullPivLU.h \
   /opt/eigen/Eigen/src/LU/InverseImpl.h \
   /opt/eigen/Eigen/src/LU/PartialPivLU.h \
   /opt/eigen/Eigen/src/LU/arch/InverseSize4.h \
+  /opt/eigen/Eigen/src/OrderingMethods/Amd.h \
+  /opt/eigen/Eigen/src/OrderingMethods/Eigen_Colamd.h \
+  /opt/eigen/Eigen/src/OrderingMethods/Ordering.h \
   /opt/eigen/Eigen/src/QR/ColPivHouseholderQR.h \
   /opt/eigen/Eigen/src/QR/CompleteOrthogonalDecomposition.h \
   /opt/eigen/Eigen/src/QR/FullPivHouseholderQR.h \
@@ -4190,8 +4140,61 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /opt/eigen/Eigen/src/SVD/JacobiSVD.h \
   /opt/eigen/Eigen/src/SVD/SVDBase.h \
   /opt/eigen/Eigen/src/SVD/UpperBidiagonalization.h \
-  /opt/eigen/Eigen/src/StlSupport/StdVector.h \
-  /opt/eigen/Eigen/src/StlSupport/details.h \
+  /opt/eigen/Eigen/src/SparseCholesky/SimplicialCholesky.h \
+  /opt/eigen/Eigen/src/SparseCholesky/SimplicialCholesky_impl.h \
+  /opt/eigen/Eigen/src/plugins/BlockMethods.h \
+  /opt/eigen/Eigen/src/plugins/CommonCwiseBinaryOps.h \
+  /opt/eigen/Eigen/src/plugins/CommonCwiseUnaryOps.h \
+  /opt/eigen/Eigen/src/plugins/MatrixCwiseBinaryOps.h \
+  /opt/eigen/Eigen/src/plugins/MatrixCwiseUnaryOps.h \
+  /opt/eigen/Eigen/src/SparseCore/AmbiVector.h \
+  /opt/eigen/Eigen/src/SparseCore/CompressedStorage.h \
+  /opt/eigen/Eigen/src/SparseCore/ConservativeSparseSparseProduct.h \
+  /opt/eigen/Eigen/src/SparseCore/MappedSparseMatrix.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseAssign.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseBlock.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseColEtree.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseCompressedBase.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseCwiseBinaryOp.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseCwiseUnaryOp.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseDenseProduct.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseDiagonalProduct.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseDot.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseFuzzy.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseMap.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseMatrix.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseMatrixBase.h \
+  /opt/eigen/Eigen/src/SparseCore/SparsePermutation.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseProduct.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseRedux.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseRef.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseSelfAdjointView.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseSolverBase.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseSparseProductWithPruning.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseTranspose.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseTriangularView.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseUtil.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseVector.h \
+  /opt/eigen/Eigen/src/SparseCore/SparseView.h \
+  /opt/eigen/Eigen/src/SparseCore/TriangularSolver.h \
+  /opt/eigen/Eigen/src/SparseLU/SparseLU.h \
+  /opt/eigen/Eigen/src/SparseLU/SparseLUImpl.h \
+  /opt/eigen/Eigen/src/SparseLU/SparseLU_Memory.h \
+  /opt/eigen/Eigen/src/SparseLU/SparseLU_Structs.h \
+  /opt/eigen/Eigen/src/SparseLU/SparseLU_SupernodalMatrix.h \
+  /opt/eigen/Eigen/src/SparseLU/SparseLU_Utils.h \
+  /opt/eigen/Eigen/src/SparseLU/SparseLU_column_bmod.h \
+  /opt/eigen/Eigen/src/SparseLU/SparseLU_column_dfs.h \
+  /opt/eigen/Eigen/src/SparseLU/SparseLU_copy_to_ucol.h \
+  /opt/eigen/Eigen/src/SparseLU/SparseLU_gemm_kernel.h \
+  /opt/eigen/Eigen/src/SparseLU/SparseLU_heap_relax_snode.h \
+  /opt/eigen/Eigen/src/SparseLU/SparseLU_kernel_bmod.h \
+  /opt/eigen/Eigen/src/SparseLU/SparseLU_panel_bmod.h \
+  /opt/eigen/Eigen/src/SparseLU/SparseLU_panel_dfs.h \
+  /opt/eigen/Eigen/src/SparseLU/SparseLU_pivotL.h \
+  /opt/eigen/Eigen/src/SparseLU/SparseLU_pruneL.h \
+  /opt/eigen/Eigen/src/SparseLU/SparseLU_relax_snode.h \
+  /opt/eigen/Eigen/src/SparseQR/SparseQR.h \
   /opt/eigen/Eigen/src/misc/Image.h \
   /opt/eigen/Eigen/src/misc/Kernel.h \
   /opt/eigen/Eigen/src/misc/RealSvd2x2.h \
@@ -4218,12 +4221,10 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /usr/include/c++/11/bits/basic_string.tcc \
   /usr/include/c++/11/bits/char_traits.h \
   /usr/include/c++/11/bits/charconv.h \
-  /usr/include/c++/11/bits/codecvt.h \
   /usr/include/c++/11/bits/concept_check.h \
   /usr/include/c++/11/bits/cpp_type_traits.h \
   /usr/include/c++/11/bits/cxxabi_forced.h \
   /usr/include/c++/11/bits/cxxabi_init_exception.h \
-  /usr/include/c++/11/bits/deque.tcc \
   /usr/include/c++/11/bits/enable_special_members.h \
   /usr/include/c++/11/bits/erase_if.h \
   /usr/include/c++/11/bits/exception.h \
@@ -4240,11 +4241,8 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /usr/include/c++/11/bits/list.tcc \
   /usr/include/c++/11/bits/locale_classes.h \
   /usr/include/c++/11/bits/locale_classes.tcc \
-  /usr/include/c++/11/bits/locale_conv.h \
   /usr/include/c++/11/bits/locale_facets.h \
   /usr/include/c++/11/bits/locale_facets.tcc \
-  /usr/include/c++/11/bits/locale_facets_nonio.h \
-  /usr/include/c++/11/bits/locale_facets_nonio.tcc \
   /usr/include/c++/11/bits/localefwd.h \
   /usr/include/c++/11/bits/memoryfwd.h \
   /usr/include/c++/11/bits/move.h \
@@ -4256,7 +4254,6 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /usr/include/c++/11/bits/postypes.h \
   /usr/include/c++/11/bits/predefined_ops.h \
   /usr/include/c++/11/bits/ptr_traits.h \
-  /usr/include/c++/11/bits/quoted_string.h \
   /usr/include/c++/11/bits/random.h \
   /usr/include/c++/11/bits/random.tcc \
   /usr/include/c++/11/bits/range_access.h \
@@ -4273,7 +4270,6 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /usr/include/c++/11/bits/stl_algobase.h \
   /usr/include/c++/11/bits/stl_bvector.h \
   /usr/include/c++/11/bits/stl_construct.h \
-  /usr/include/c++/11/bits/stl_deque.h \
   /usr/include/c++/11/bits/stl_function.h \
   /usr/include/c++/11/bits/stl_heap.h \
   /usr/include/c++/11/bits/stl_iterator.h \
@@ -4282,13 +4278,10 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /usr/include/c++/11/bits/stl_list.h \
   /usr/include/c++/11/bits/stl_map.h \
   /usr/include/c++/11/bits/stl_multimap.h \
-  /usr/include/c++/11/bits/stl_multiset.h \
   /usr/include/c++/11/bits/stl_numeric.h \
   /usr/include/c++/11/bits/stl_pair.h \
-  /usr/include/c++/11/bits/stl_queue.h \
   /usr/include/c++/11/bits/stl_raw_storage_iter.h \
   /usr/include/c++/11/bits/stl_relops.h \
-  /usr/include/c++/11/bits/stl_set.h \
   /usr/include/c++/11/bits/stl_tempbuf.h \
   /usr/include/c++/11/bits/stl_tree.h \
   /usr/include/c++/11/bits/stl_uninitialized.h \
@@ -4301,7 +4294,6 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /usr/include/c++/11/bits/unique_lock.h \
   /usr/include/c++/11/bits/unique_ptr.h \
   /usr/include/c++/11/bits/unordered_map.h \
-  /usr/include/c++/11/bits/unordered_set.h \
   /usr/include/c++/11/bits/uses_allocator.h \
   /usr/include/c++/11/bits/vector.tcc \
   /usr/include/c++/11/cassert \
@@ -4323,7 +4315,6 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /usr/include/c++/11/cwctype \
   /usr/include/c++/11/debug/assertions.h \
   /usr/include/c++/11/debug/debug.h \
-  /usr/include/c++/11/deque \
   /usr/include/c++/11/exception \
   /usr/include/c++/11/ext/aligned_buffer.h \
   /usr/include/c++/11/ext/alloc_traits.h \
@@ -4335,16 +4326,13 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /usr/include/c++/11/ext/type_traits.h \
   /usr/include/c++/11/functional \
   /usr/include/c++/11/initializer_list \
-  /usr/include/c++/11/iomanip \
   /usr/include/c++/11/ios \
   /usr/include/c++/11/iosfwd \
   /usr/include/c++/11/iostream \
   /usr/include/c++/11/istream \
   /usr/include/c++/11/limits \
   /usr/include/c++/11/list \
-  /usr/include/c++/11/locale \
   /usr/include/c++/11/map \
-  /usr/include/c++/11/math.h \
   /usr/include/c++/11/memory \
   /usr/include/c++/11/mutex \
   /usr/include/c++/11/new \
@@ -4356,10 +4344,8 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /usr/include/c++/11/pstl/glue_memory_defs.h \
   /usr/include/c++/11/pstl/glue_numeric_defs.h \
   /usr/include/c++/11/pstl/pstl_config.h \
-  /usr/include/c++/11/queue \
   /usr/include/c++/11/random \
   /usr/include/c++/11/ratio \
-  /usr/include/c++/11/set \
   /usr/include/c++/11/sstream \
   /usr/include/c++/11/stdexcept \
   /usr/include/c++/11/stdlib.h \
@@ -4383,7 +4369,6 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /usr/include/c++/11/type_traits \
   /usr/include/c++/11/typeinfo \
   /usr/include/c++/11/unordered_map \
-  /usr/include/c++/11/unordered_set \
   /usr/include/c++/11/utility \
   /usr/include/c++/11/vector \
   /usr/include/ctype.h \
@@ -4391,30 +4376,15 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /usr/include/errno.h \
   /usr/include/features-time64.h \
   /usr/include/features.h \
-  /usr/include/gflags/gflags.h \
-  /usr/include/gflags/gflags_declare.h \
-  /usr/include/gflags/gflags_gflags.h \
-  /usr/include/glog/log_severity.h \
-  /usr/include/glog/logging.h \
-  /usr/include/glog/vlog_is_on.h \
-  /usr/include/inttypes.h \
-  /usr/include/libintl.h \
   /usr/include/limits.h \
-  /usr/include/linux/close_range.h \
   /usr/include/linux/errno.h \
   /usr/include/linux/limits.h \
   /usr/include/locale.h \
   /usr/include/math.h \
-  /usr/include/opencv4/opencv2/calib3d.hpp \
   /usr/include/opencv4/opencv2/core.hpp \
-  /usr/include/opencv4/opencv2/core/affine.hpp \
-  /usr/include/opencv4/opencv2/core/async.hpp \
   /usr/include/opencv4/opencv2/core/base.hpp \
   /usr/include/opencv4/opencv2/core/bufferpool.hpp \
   /usr/include/opencv4/opencv2/core/check.hpp \
-  /usr/include/opencv4/opencv2/core/cuda.hpp \
-  /usr/include/opencv4/opencv2/core/cuda.inl.hpp \
-  /usr/include/opencv4/opencv2/core/cuda_types.hpp \
   /usr/include/opencv4/opencv2/core/cv_cpu_dispatch.h \
   /usr/include/opencv4/opencv2/core/cvdef.h \
   /usr/include/opencv4/opencv2/core/cvstd.hpp \
@@ -4436,74 +4406,7 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /usr/include/opencv4/opencv2/core/utility.hpp \
   /usr/include/opencv4/opencv2/core/version.hpp \
   /usr/include/opencv4/opencv2/core/vsx_utils.hpp \
-  /usr/include/opencv4/opencv2/dnn.hpp \
-  /usr/include/opencv4/opencv2/dnn/dict.hpp \
-  /usr/include/opencv4/opencv2/dnn/dnn.hpp \
-  /usr/include/opencv4/opencv2/dnn/dnn.inl.hpp \
-  /usr/include/opencv4/opencv2/dnn/layer.hpp \
-  /usr/include/opencv4/opencv2/dnn/utils/inference_engine.hpp \
-  /usr/include/opencv4/opencv2/dnn/version.hpp \
-  /usr/include/opencv4/opencv2/features2d.hpp \
-  /usr/include/opencv4/opencv2/flann.hpp \
-  /usr/include/opencv4/opencv2/flann/all_indices.h \
-  /usr/include/opencv4/opencv2/flann/allocator.h \
-  /usr/include/opencv4/opencv2/flann/any.h \
-  /usr/include/opencv4/opencv2/flann/autotuned_index.h \
-  /usr/include/opencv4/opencv2/flann/composite_index.h \
-  /usr/include/opencv4/opencv2/flann/config.h \
-  /usr/include/opencv4/opencv2/flann/defines.h \
-  /usr/include/opencv4/opencv2/flann/dist.h \
-  /usr/include/opencv4/opencv2/flann/dynamic_bitset.h \
-  /usr/include/opencv4/opencv2/flann/flann_base.hpp \
-  /usr/include/opencv4/opencv2/flann/general.h \
-  /usr/include/opencv4/opencv2/flann/ground_truth.h \
-  /usr/include/opencv4/opencv2/flann/heap.h \
-  /usr/include/opencv4/opencv2/flann/hierarchical_clustering_index.h \
-  /usr/include/opencv4/opencv2/flann/index_testing.h \
-  /usr/include/opencv4/opencv2/flann/kdtree_index.h \
-  /usr/include/opencv4/opencv2/flann/kdtree_single_index.h \
-  /usr/include/opencv4/opencv2/flann/kmeans_index.h \
-  /usr/include/opencv4/opencv2/flann/linear_index.h \
-  /usr/include/opencv4/opencv2/flann/logger.h \
-  /usr/include/opencv4/opencv2/flann/lsh_index.h \
-  /usr/include/opencv4/opencv2/flann/lsh_table.h \
-  /usr/include/opencv4/opencv2/flann/matrix.h \
-  /usr/include/opencv4/opencv2/flann/miniflann.hpp \
-  /usr/include/opencv4/opencv2/flann/nn_index.h \
-  /usr/include/opencv4/opencv2/flann/params.h \
-  /usr/include/opencv4/opencv2/flann/random.h \
-  /usr/include/opencv4/opencv2/flann/result_set.h \
-  /usr/include/opencv4/opencv2/flann/sampling.h \
-  /usr/include/opencv4/opencv2/flann/saving.h \
-  /usr/include/opencv4/opencv2/flann/timer.h \
-  /usr/include/opencv4/opencv2/highgui.hpp \
-  /usr/include/opencv4/opencv2/imgcodecs.hpp \
-  /usr/include/opencv4/opencv2/imgproc.hpp \
-  /usr/include/opencv4/opencv2/imgproc/segmentation.hpp \
-  /usr/include/opencv4/opencv2/ml.hpp \
-  /usr/include/opencv4/opencv2/ml/ml.inl.hpp \
-  /usr/include/opencv4/opencv2/objdetect.hpp \
-  /usr/include/opencv4/opencv2/objdetect/detection_based_tracker.hpp \
-  /usr/include/opencv4/opencv2/objdetect/face.hpp \
-  /usr/include/opencv4/opencv2/opencv.hpp \
   /usr/include/opencv4/opencv2/opencv_modules.hpp \
-  /usr/include/opencv4/opencv2/photo.hpp \
-  /usr/include/opencv4/opencv2/stitching.hpp \
-  /usr/include/opencv4/opencv2/stitching/detail/blenders.hpp \
-  /usr/include/opencv4/opencv2/stitching/detail/camera.hpp \
-  /usr/include/opencv4/opencv2/stitching/detail/exposure_compensate.hpp \
-  /usr/include/opencv4/opencv2/stitching/detail/matchers.hpp \
-  /usr/include/opencv4/opencv2/stitching/detail/motion_estimators.hpp \
-  /usr/include/opencv4/opencv2/stitching/detail/seam_finders.hpp \
-  /usr/include/opencv4/opencv2/stitching/detail/util.hpp \
-  /usr/include/opencv4/opencv2/stitching/detail/util_inl.hpp \
-  /usr/include/opencv4/opencv2/stitching/detail/warpers.hpp \
-  /usr/include/opencv4/opencv2/stitching/detail/warpers_inl.hpp \
-  /usr/include/opencv4/opencv2/stitching/warpers.hpp \
-  /usr/include/opencv4/opencv2/video.hpp \
-  /usr/include/opencv4/opencv2/video/background_segm.hpp \
-  /usr/include/opencv4/opencv2/video/tracking.hpp \
-  /usr/include/opencv4/opencv2/videoio.hpp \
   /usr/include/pthread.h \
   /usr/include/sched.h \
   /usr/include/stdc-predef.h \
@@ -4513,25 +4416,20 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /usr/include/string.h \
   /usr/include/strings.h \
   /usr/include/time.h \
-  /usr/include/unistd.h \
   /usr/include/wchar.h \
   /usr/include/wctype.h \
   /usr/include/x86_64-linux-gnu/asm/errno.h \
   /usr/include/x86_64-linux-gnu/bits/atomic_wide_counter.h \
   /usr/include/x86_64-linux-gnu/bits/byteswap.h \
-  /usr/include/x86_64-linux-gnu/bits/confname.h \
   /usr/include/x86_64-linux-gnu/bits/cpu-set.h \
   /usr/include/x86_64-linux-gnu/bits/endian.h \
   /usr/include/x86_64-linux-gnu/bits/endianness.h \
-  /usr/include/x86_64-linux-gnu/bits/environments.h \
   /usr/include/x86_64-linux-gnu/bits/errno.h \
   /usr/include/x86_64-linux-gnu/bits/floatn-common.h \
   /usr/include/x86_64-linux-gnu/bits/floatn.h \
   /usr/include/x86_64-linux-gnu/bits/flt-eval-method.h \
   /usr/include/x86_64-linux-gnu/bits/fp-fast.h \
   /usr/include/x86_64-linux-gnu/bits/fp-logb.h \
-  /usr/include/x86_64-linux-gnu/bits/getopt_core.h \
-  /usr/include/x86_64-linux-gnu/bits/getopt_posix.h \
   /usr/include/x86_64-linux-gnu/bits/iscanonical.h \
   /usr/include/x86_64-linux-gnu/bits/libc-header-start.h \
   /usr/include/x86_64-linux-gnu/bits/libm-simd-decl-stubs.h \
@@ -4544,7 +4442,6 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /usr/include/x86_64-linux-gnu/bits/mathcalls.h \
   /usr/include/x86_64-linux-gnu/bits/posix1_lim.h \
   /usr/include/x86_64-linux-gnu/bits/posix2_lim.h \
-  /usr/include/x86_64-linux-gnu/bits/posix_opt.h \
   /usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h \
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h \
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes.h \
@@ -4597,8 +4494,6 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /usr/include/x86_64-linux-gnu/bits/typesizes.h \
   /usr/include/x86_64-linux-gnu/bits/uintn-identity.h \
   /usr/include/x86_64-linux-gnu/bits/uio_lim.h \
-  /usr/include/x86_64-linux-gnu/bits/unistd.h \
-  /usr/include/x86_64-linux-gnu/bits/unistd_ext.h \
   /usr/include/x86_64-linux-gnu/bits/waitflags.h \
   /usr/include/x86_64-linux-gnu/bits/waitstatus.h \
   /usr/include/x86_64-linux-gnu/bits/wchar.h \
@@ -4616,10 +4511,8 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /usr/include/x86_64-linux-gnu/c++/11/bits/error_constants.h \
   /usr/include/x86_64-linux-gnu/c++/11/bits/gthr-default.h \
   /usr/include/x86_64-linux-gnu/c++/11/bits/gthr.h \
-  /usr/include/x86_64-linux-gnu/c++/11/bits/messages_members.h \
   /usr/include/x86_64-linux-gnu/c++/11/bits/opt_random.h \
   /usr/include/x86_64-linux-gnu/c++/11/bits/os_defines.h \
-  /usr/include/x86_64-linux-gnu/c++/11/bits/time_members.h \
   /usr/include/x86_64-linux-gnu/gnu/stubs-64.h \
   /usr/include/x86_64-linux-gnu/gnu/stubs.h \
   /usr/include/x86_64-linux-gnu/sys/cdefs.h \
@@ -4637,62 +4530,6 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/stdint.h \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/syslimits.h \
   /usr/lib/gcc/x86_64-linux-gnu/11/include/xmmintrin.h \
-  /usr/local/include/ceres/autodiff_cost_function.h \
-  /usr/local/include/ceres/autodiff_first_order_function.h \
-  /usr/local/include/ceres/autodiff_local_parameterization.h \
-  /usr/local/include/ceres/autodiff_manifold.h \
-  /usr/local/include/ceres/ceres.h \
-  /usr/local/include/ceres/conditioned_cost_function.h \
-  /usr/local/include/ceres/context.h \
-  /usr/local/include/ceres/cost_function.h \
-  /usr/local/include/ceres/cost_function_to_functor.h \
-  /usr/local/include/ceres/covariance.h \
-  /usr/local/include/ceres/crs_matrix.h \
-  /usr/local/include/ceres/dynamic_autodiff_cost_function.h \
-  /usr/local/include/ceres/dynamic_cost_function.h \
-  /usr/local/include/ceres/dynamic_cost_function_to_functor.h \
-  /usr/local/include/ceres/dynamic_numeric_diff_cost_function.h \
-  /usr/local/include/ceres/evaluation_callback.h \
-  /usr/local/include/ceres/first_order_function.h \
-  /usr/local/include/ceres/gradient_checker.h \
-  /usr/local/include/ceres/gradient_problem.h \
-  /usr/local/include/ceres/gradient_problem_solver.h \
-  /usr/local/include/ceres/internal/array_selector.h \
-  /usr/local/include/ceres/internal/autodiff.h \
-  /usr/local/include/ceres/internal/config.h \
-  /usr/local/include/ceres/internal/disable_warnings.h \
-  /usr/local/include/ceres/internal/eigen.h \
-  /usr/local/include/ceres/internal/export.h \
-  /usr/local/include/ceres/internal/fixed_array.h \
-  /usr/local/include/ceres/internal/householder_vector.h \
-  /usr/local/include/ceres/internal/integer_sequence_algorithm.h \
-  /usr/local/include/ceres/internal/jet_traits.h \
-  /usr/local/include/ceres/internal/line_parameterization.h \
-  /usr/local/include/ceres/internal/memory.h \
-  /usr/local/include/ceres/internal/numeric_diff.h \
-  /usr/local/include/ceres/internal/parameter_dims.h \
-  /usr/local/include/ceres/internal/port.h \
-  /usr/local/include/ceres/internal/reenable_warnings.h \
-  /usr/local/include/ceres/internal/sphere_manifold_functions.h \
-  /usr/local/include/ceres/internal/variadic_evaluate.h \
-  /usr/local/include/ceres/iteration_callback.h \
-  /usr/local/include/ceres/jet.h \
-  /usr/local/include/ceres/jet_fwd.h \
-  /usr/local/include/ceres/line_manifold.h \
-  /usr/local/include/ceres/local_parameterization.h \
-  /usr/local/include/ceres/loss_function.h \
-  /usr/local/include/ceres/manifold.h \
-  /usr/local/include/ceres/numeric_diff_cost_function.h \
-  /usr/local/include/ceres/numeric_diff_first_order_function.h \
-  /usr/local/include/ceres/numeric_diff_options.h \
-  /usr/local/include/ceres/ordered_groups.h \
-  /usr/local/include/ceres/problem.h \
-  /usr/local/include/ceres/product_manifold.h \
-  /usr/local/include/ceres/sized_cost_function.h \
-  /usr/local/include/ceres/solver.h \
-  /usr/local/include/ceres/sphere_manifold.h \
-  /usr/local/include/ceres/types.h \
-  /usr/local/include/ceres/version.h \
   /usr/local/include/sophus/common.hpp \
   /usr/local/include/sophus/rotation_matrix.hpp \
   /usr/local/include/sophus/se3.hpp \
@@ -5166,1548 +5003,1684 @@ CMakeFiles/GeoBA.dir/src/Projection.cpp.o: /app/src/Projection.cpp \
 
 /app/src/Projection.cpp:
 
-/usr/include/x86_64-linux-gnu/c++/11/bits/basic_file.h:
+/opt/eigen/Eigen/src/SparseLU/SparseLU_pruneL.h:
 
-/usr/include/nlohmann/thirdparty/hedley/hedley_undef.hpp:
+/opt/eigen/Eigen/src/SparseLU/SparseLU_pivotL.h:
 
-/usr/include/nlohmann/thirdparty/hedley/hedley.hpp:
+/opt/eigen/Eigen/src/SparseLU/SparseLU_panel_bmod.h:
 
-/usr/include/nlohmann/detail/output/output_adapters.hpp:
+/opt/eigen/Eigen/src/SparseLU/SparseLU_kernel_bmod.h:
 
-/usr/include/nlohmann/detail/meta/void_t.hpp:
+/opt/eigen/Eigen/src/SparseLU/SparseLU_heap_relax_snode.h:
 
-/usr/include/nlohmann/detail/meta/type_traits.hpp:
+/opt/eigen/Eigen/src/SparseLU/SparseLU_gemm_kernel.h:
 
-/usr/include/nlohmann/detail/meta/call_std/end.hpp:
+/opt/eigen/Eigen/src/SparseLU/SparseLU_copy_to_ucol.h:
 
-/usr/include/nlohmann/detail/meta/call_std/begin.hpp:
+/opt/eigen/Eigen/src/SparseLU/SparseLU_column_dfs.h:
 
-/usr/include/nlohmann/detail/macro_unscope.hpp:
+/opt/eigen/Eigen/src/SparseLU/SparseLU_column_bmod.h:
 
-/usr/include/nlohmann/detail/json_pointer.hpp:
+/opt/eigen/Eigen/src/SparseLU/SparseLU_Utils.h:
 
-/usr/include/nlohmann/detail/iterators/primitive_iterator.hpp:
+/opt/eigen/Eigen/src/SparseLU/SparseLU_SupernodalMatrix.h:
 
-/usr/include/nlohmann/detail/iterators/json_reverse_iterator.hpp:
+/opt/eigen/Eigen/src/SparseLU/SparseLU_Structs.h:
 
-/usr/include/nlohmann/detail/iterators/iterator_traits.hpp:
+/opt/eigen/Eigen/src/SparseLU/SparseLUImpl.h:
 
-/usr/include/nlohmann/detail/iterators/internal_iterator.hpp:
+/opt/eigen/Eigen/src/SparseLU/SparseLU.h:
 
-/usr/include/nlohmann/detail/input/position_t.hpp:
-
-/usr/include/nlohmann/detail/input/json_sax.hpp:
-
-/usr/include/nlohmann/detail/input/binary_reader.hpp:
-
-/usr/include/nlohmann/detail/exceptions.hpp:
-
-/usr/include/nlohmann/detail/conversions/to_json.hpp:
-
-/usr/include/nlohmann/byte_container_with_subtype.hpp:
-
-/usr/include/c++/11/forward_list:
-
-/usr/include/c++/11/codecvt:
-
-/usr/include/c++/11/bits/stream_iterator.h:
-
-/usr/include/c++/11/bits/slice_array.h:
-
-/usr/include/c++/11/bits/mask_array.h:
-
-/usr/include/c++/11/bits/gslice_array.h:
-
-/usr/include/c++/11/bits/fs_ops.h:
-
-/usr/include/c++/11/bits/fs_dir.h:
-
-/app/src/DatasetManager.cpp:
-
-/usr/local/include/sophus/so3.hpp:
-
-/usr/local/include/sophus/so2.hpp:
-
-/usr/local/include/sophus/rotation_matrix.hpp:
-
-/usr/local/include/sophus/common.hpp:
-
-/usr/include/c++/11/bits/random.tcc:
-
-/usr/include/c++/11/bits/random.h:
-
-/app/include/Projection.h:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/opt_random.h:
-
-/app/src/BVH.cpp:
-
-/usr/local/include/ceres/sphere_manifold.h:
-
-/usr/local/include/ceres/numeric_diff_first_order_function.h:
-
-/usr/local/include/ceres/numeric_diff_cost_function.h:
-
-/usr/local/include/ceres/jet_fwd.h:
-
-/usr/local/include/ceres/manifold.h:
-
-/usr/local/include/ceres/jet.h:
-
-/usr/local/include/ceres/internal/reenable_warnings.h:
-
-/usr/local/include/ceres/internal/line_parameterization.h:
-
-/usr/local/include/ceres/internal/jet_traits.h:
-
-/usr/local/include/ceres/internal/householder_vector.h:
-
-/usr/include/c++/11/bits/fstream.tcc:
-
-/usr/local/include/ceres/internal/export.h:
-
-/usr/local/include/ceres/gradient_problem_solver.h:
-
-/usr/local/include/ceres/gradient_problem.h:
-
-/usr/local/include/ceres/gradient_checker.h:
-
-/usr/local/include/ceres/dynamic_cost_function_to_functor.h:
-
-/usr/local/include/ceres/dynamic_cost_function.h:
-
-/usr/local/include/ceres/covariance.h:
-
-/usr/local/include/ceres/cost_function.h:
-
-/usr/local/include/ceres/ceres.h:
-
-/usr/local/include/ceres/autodiff_local_parameterization.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/syslimits.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/stddef.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/float.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/emmintrin.h:
-
-/usr/include/x86_64-linux-gnu/sys/types.h:
-
-/usr/include/x86_64-linux-gnu/sys/cdefs.h:
-
-/usr/include/x86_64-linux-gnu/gnu/stubs.h:
-
-/usr/local/include/ceres/sized_cost_function.h:
-
-/usr/include/x86_64-linux-gnu/gnu/stubs-64.h:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/time_members.h:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/os_defines.h:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/messages_members.h:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/gthr-default.h:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/error_constants.h:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/ctype_inline.h:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/ctype_base.h:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/c++allocator.h:
-
-/usr/include/nlohmann/detail/output/binary_writer.hpp:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/atomic_word.h:
-
-/usr/include/x86_64-linux-gnu/bits/xopen_lim.h:
-
-/usr/include/x86_64-linux-gnu/bits/wchar2.h:
-
-/usr/include/x86_64-linux-gnu/bits/wchar.h:
-
-/usr/include/x86_64-linux-gnu/bits/waitstatus.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/timer_t.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/mbstate_t.h:
-
-/usr/include/nlohmann/detail/meta/is_sax.hpp:
-
-/usr/include/x86_64-linux-gnu/bits/types/locale_t.h:
-
-/usr/local/include/ceres/dynamic_numeric_diff_cost_function.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/cookie_io_functions_t.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/clockid_t.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/clock_t.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/__locale_t.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/__fpos64_t.h:
-
-/usr/include/x86_64-linux-gnu/bits/timex.h:
-
-/usr/include/x86_64-linux-gnu/bits/time.h:
-
-/usr/include/x86_64-linux-gnu/bits/thread-shared-types.h:
-
-/usr/local/include/ceres/internal/disable_warnings.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/struct_timespec.h:
-
-/usr/include/x86_64-linux-gnu/bits/struct_rwlock.h:
-
-/usr/include/x86_64-linux-gnu/bits/struct_mutex.h:
-
-/usr/include/x86_64-linux-gnu/bits/string_fortified.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/xmmintrin.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdlib.h:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/c++config.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdio_lim.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdio2.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdio.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdint-uintn.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdint-intn.h:
-
-/usr/include/x86_64-linux-gnu/bits/select2.h:
-
-/usr/include/x86_64-linux-gnu/bits/sched.h:
-
-/usr/include/x86_64-linux-gnu/bits/uintn-identity.h:
-
-/usr/include/x86_64-linux-gnu/bits/pthreadtypes.h:
-
-/usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h:
-
-/usr/include/x86_64-linux-gnu/bits/posix_opt.h:
-
-/usr/include/x86_64-linux-gnu/bits/posix2_lim.h:
-
-/usr/include/x86_64-linux-gnu/bits/posix1_lim.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/struct_tm.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/__fpos_t.h:
-
-/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:
-
-/usr/include/x86_64-linux-gnu/bits/locale.h:
-
-/usr/include/x86_64-linux-gnu/bits/libc-header-start.h:
-
-/usr/include/x86_64-linux-gnu/bits/getopt_posix.h:
-
-/usr/include/x86_64-linux-gnu/bits/getopt_core.h:
-
-/usr/include/x86_64-linux-gnu/bits/fp-logb.h:
-
-/usr/include/x86_64-linux-gnu/bits/fp-fast.h:
-
-/usr/include/x86_64-linux-gnu/bits/floatn.h:
-
-/usr/include/x86_64-linux-gnu/bits/environments.h:
-
-/usr/include/x86_64-linux-gnu/bits/cpu-set.h:
-
-/usr/include/nlohmann/json_fwd.hpp:
-
-/usr/include/x86_64-linux-gnu/bits/types/FILE.h:
-
-/usr/include/x86_64-linux-gnu/bits/confname.h:
-
-/usr/include/x86_64-linux-gnu/bits/waitflags.h:
-
-/usr/include/x86_64-linux-gnu/bits/strings_fortified.h:
-
-/usr/include/x86_64-linux-gnu/bits/atomic_wide_counter.h:
-
-/usr/local/include/ceres/internal/config.h:
-
-/usr/include/x86_64-linux-gnu/asm/errno.h:
-
-/usr/include/wctype.h:
-
-/usr/include/wchar.h:
-
-/usr/include/time.h:
-
-/usr/include/stdint.h:
-
-/usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h:
-
-/usr/include/stdc-predef.h:
-
-/usr/include/sched.h:
-
-/usr/include/pthread.h:
-
-/usr/include/opencv4/opencv2/video.hpp:
-
-/usr/include/opencv4/opencv2/stitching/warpers.hpp:
-
-/usr/include/opencv4/opencv2/stitching/detail/warpers_inl.hpp:
-
-/usr/include/opencv4/opencv2/stitching/detail/util_inl.hpp:
-
-/usr/include/opencv4/opencv2/stitching/detail/seam_finders.hpp:
-
-/usr/include/opencv4/opencv2/stitching/detail/matchers.hpp:
-
-/usr/local/include/ceres/internal/autodiff.h:
-
-/usr/include/opencv4/opencv2/stitching/detail/camera.hpp:
-
-/usr/include/opencv4/opencv2/stitching/detail/blenders.hpp:
-
-/usr/include/opencv4/opencv2/stitching.hpp:
-
-/usr/include/x86_64-linux-gnu/bits/wctype-wchar.h:
-
-/usr/include/opencv4/opencv2/opencv_modules.hpp:
-
-/usr/include/opencv4/opencv2/opencv.hpp:
-
-/usr/local/include/ceres/line_manifold.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/__FILE.h:
-
-/usr/include/opencv4/opencv2/objdetect/face.hpp:
-
-/usr/include/opencv4/opencv2/objdetect/detection_based_tracker.hpp:
-
-/app/src/CostFunctions.cpp:
-
-/usr/include/opencv4/opencv2/objdetect.hpp:
-
-/usr/include/opencv4/opencv2/imgproc/segmentation.hpp:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/omp.h:
-
-/usr/include/x86_64-linux-gnu/bits/endian.h:
-
-/usr/include/opencv4/opencv2/highgui.hpp:
-
-/usr/local/include/ceres/autodiff_first_order_function.h:
-
-/usr/include/opencv4/opencv2/flann/saving.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/__sigset_t.h:
-
-/usr/include/opencv4/opencv2/flann/result_set.h:
-
-/usr/include/opencv4/opencv2/flann/miniflann.hpp:
-
-/usr/include/opencv4/opencv2/flann/matrix.h:
-
-/usr/include/opencv4/opencv2/flann/logger.h:
-
-/usr/include/opencv4/opencv2/flann/linear_index.h:
-
-/usr/include/opencv4/opencv2/flann/kmeans_index.h:
-
-/usr/local/include/ceres/problem.h:
-
-/usr/include/opencv4/opencv2/flann/hierarchical_clustering_index.h:
-
-/usr/include/x86_64-linux-gnu/bits/select.h:
-
-/usr/include/opencv4/opencv2/flann/ground_truth.h:
-
-/usr/include/c++/11/bits/fs_fwd.h:
-
-/usr/include/opencv4/opencv2/flann/general.h:
-
-/usr/include/opencv4/opencv2/flann/dynamic_bitset.h:
-
-/usr/include/opencv4/opencv2/flann/dist.h:
-
-/usr/include/opencv4/opencv2/flann/defines.h:
-
-/usr/include/opencv4/opencv2/flann/composite_index.h:
-
-/usr/include/opencv4/opencv2/flann/any.h:
-
-/usr/include/opencv4/opencv2/flann/all_indices.h:
-
-/usr/include/opencv4/opencv2/dnn/layer.hpp:
-
-/usr/include/opencv4/opencv2/dnn/dnn.inl.hpp:
-
-/usr/include/opencv4/opencv2/dnn/dnn.hpp:
-
-/usr/include/opencv4/opencv2/dnn/dict.hpp:
-
-/usr/include/opencv4/opencv2/dnn.hpp:
-
-/usr/include/opencv4/opencv2/flann/config.h:
-
-/usr/include/opencv4/opencv2/core/utility.hpp:
-
-/usr/include/x86_64-linux-gnu/bits/flt-eval-method.h:
-
-/usr/include/opencv4/opencv2/core/types.hpp:
-
-/usr/include/opencv4/opencv2/core/traits.hpp:
-
-/usr/include/opencv4/opencv2/core/persistence.hpp:
-
-/usr/include/c++/11/bits/forward_list.h:
-
-/usr/include/opencv4/opencv2/core/ovx.hpp:
-
-/usr/include/opencv4/opencv2/flann/sampling.h:
-
-/usr/include/opencv4/opencv2/core/optim.hpp:
-
-/usr/include/opencv4/opencv2/core/operations.hpp:
-
-/usr/include/opencv4/opencv2/core/neon_utils.hpp:
-
-/usr/include/opencv4/opencv2/core/matx.hpp:
-
-/usr/include/opencv4/opencv2/core/mat.inl.hpp:
-
-/usr/include/opencv4/opencv2/core/mat.hpp:
-
-/usr/include/opencv4/opencv2/core/fast_math.hpp:
-
-/usr/include/opencv4/opencv2/core/cvstd_wrapper.hpp:
-
-/usr/include/nlohmann/detail/iterators/iteration_proxy.hpp:
-
-/usr/include/opencv4/opencv2/core/cvstd.inl.hpp:
-
-/usr/include/opencv4/opencv2/core/cvstd.hpp:
-
-/usr/include/string.h:
-
-/usr/include/opencv4/opencv2/core/cvdef.h:
-
-/usr/include/x86_64-linux-gnu/bits/unistd.h:
-
-/usr/include/opencv4/opencv2/core/cv_cpu_dispatch.h:
-
-/opt/eigen/Eigen/src/misc/Kernel.h:
-
-/opt/eigen/Eigen/src/Core/GlobalFunctions.h:
-
-/usr/include/opencv4/opencv2/stitching/detail/util.hpp:
-
-/opt/eigen/Eigen/src/SVD/BDCSVD.h:
-
-/usr/include/gflags/gflags.h:
-
-/opt/eigen/Eigen/src/QR/ColPivHouseholderQR.h:
-
-/usr/include/nlohmann/json.hpp:
-
-/opt/eigen/Eigen/src/Core/ArrayWrapper.h:
-
-/opt/eigen/Eigen/src/LU/FullPivLU.h:
-
-/usr/include/errno.h:
-
-/usr/include/nlohmann/detail/macro_scope.hpp:
-
-/opt/eigen/Eigen/src/Jacobi/Jacobi.h:
-
-/opt/eigen/Eigen/src/Householder/HouseholderSequence.h:
-
-/opt/eigen/Eigen/src/Householder/BlockHouseholder.h:
-
-/usr/include/c++/11/tr1/legendre_function.tcc:
-
-/usr/include/asm-generic/errno-base.h:
-
-/opt/eigen/Eigen/src/Geometry/Scaling.h:
-
-/usr/include/asm-generic/errno.h:
-
-/opt/eigen/Eigen/src/Core/util/Macros.h:
-
-/app/src/Optimizer.cpp:
-
-/opt/eigen/Eigen/src/Geometry/Quaternion.h:
-
-/opt/eigen/Eigen/src/Geometry/OrthoMethods.h:
-
-/usr/include/c++/11/bits/stl_bvector.h:
-
-/usr/local/include/ceres/product_manifold.h:
-
-/opt/eigen/Eigen/src/Geometry/Hyperplane.h:
-
-/usr/include/c++/11/functional:
-
-/usr/include/x86_64-linux-gnu/bits/types/error_t.h:
-
-/opt/eigen/Eigen/src/Eigenvalues/RealQZ.h:
-
-/usr/include/opencv4/opencv2/video/tracking.hpp:
-
-/usr/include/c++/11/bits/sstream.tcc:
-
-/usr/include/opencv4/opencv2/flann/lsh_table.h:
-
-/usr/include/c++/11/bits/cxxabi_init_exception.h:
-
-/usr/include/c++/11/cassert:
-
-/opt/eigen/Eigen/src/Eigenvalues/EigenSolver.h:
-
-/usr/include/nlohmann/detail/hash.hpp:
-
-/opt/eigen/Eigen/src/QR/FullPivHouseholderQR.h:
-
-/opt/eigen/Eigen/src/Eigenvalues/ComplexEigenSolver.h:
-
-/opt/eigen/Eigen/src/Core/util/XprHelper.h:
-
-/opt/eigen/Eigen/src/Core/util/ReenableStupidWarnings.h:
-
-/usr/include/x86_64-linux-gnu/bits/math-vector.h:
-
-/opt/eigen/Eigen/src/Geometry/RotationBase.h:
-
-/opt/eigen/Eigen/src/Core/util/MKL_support.h:
-
-/usr/include/c++/11/bits/valarray_after.h:
-
-/usr/include/c++/11/bits/stl_algobase.h:
-
-/opt/eigen/Eigen/src/Core/util/ConfigureVectorization.h:
-
-/usr/local/include/ceres/internal/eigen.h:
-
-/usr/include/c++/11/bits/std_function.h:
-
-/opt/eigen/Eigen/src/Core/products/TriangularMatrixMatrix.h:
-
-/opt/eigen/Eigen/src/Core/DenseCoeffsBase.h:
-
-/usr/include/c++/11/bits/hashtable.h:
-
-/usr/include/nlohmann/detail/conversions/to_chars.hpp:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/mmintrin.h:
-
-/opt/eigen/Eigen/src/Core/products/Parallelizer.h:
-
-/opt/eigen/Eigen/src/Geometry/Rotation2D.h:
-
-/app/include/CostFunctions.h:
-
-/opt/eigen/Eigen/src/LU/PartialPivLU.h:
-
-/opt/eigen/Eigen/src/Core/arch/Default/BFloat16.h:
-
-/opt/eigen/Eigen/src/Core/util/ForwardDeclarations.h:
-
-/usr/local/include/ceres/dynamic_autodiff_cost_function.h:
-
-/usr/include/c++/11/bits/basic_ios.h:
-
-/usr/include/nlohmann/detail/meta/detected.hpp:
-
-/opt/eigen/Eigen/src/Core/products/GeneralMatrixVector.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/struct___jmp_buf_tag.h:
-
-/usr/include/c++/11/tr1/special_function_util.h:
-
-/usr/include/x86_64-linux-gnu/bits/typesizes.h:
-
-/opt/eigen/Eigen/src/SVD/SVDBase.h:
-
-/opt/eigen/Eigen/src/Core/products/SelfadjointRank2Update.h:
-
-/opt/eigen/Eigen/src/Core/products/GeneralMatrixMatrix.h:
-
-/usr/include/c++/11/ios:
-
-/opt/eigen/Eigen/src/Core/util/ReshapedHelper.h:
-
-/usr/include/c++/11/fstream:
-
-/opt/eigen/Eigen/src/Cholesky/LDLT.h:
-
-/opt/eigen/Eigen/src/Core/DenseStorage.h:
-
-/usr/include/x86_64-linux-gnu/bits/local_lim.h:
-
-/opt/eigen/Eigen/src/Core/Product.h:
-
-/usr/local/include/ceres/types.h:
-
-/opt/eigen/Eigen/src/Core/util/SymbolicIndex.h:
-
-/usr/include/opencv4/opencv2/flann/flann_base.hpp:
-
-/opt/eigen/Eigen/src/Core/functors/NullaryFunctors.h:
-
-/app/src/Evaluation.cpp:
-
-/opt/eigen/Eigen/src/Geometry/EulerAngles.h:
-
-/usr/include/nlohmann/detail/conversions/from_json.hpp:
-
-/usr/include/c++/11/stdlib.h:
-
-/opt/eigen/Eigen/src/Eigenvalues/HessenbergDecomposition.h:
-
-/opt/eigen/Eigen/src/Core/arch/SSE/MathFunctions.h:
-
-/usr/include/c++/11/bits/shared_ptr_base.h:
-
-/opt/eigen/Eigen/src/Core/arch/SSE/Complex.h:
-
-/opt/eigen/Eigen/src/Geometry/ParametrizedLine.h:
-
-/opt/eigen/Eigen/src/Core/arch/Default/TypeCasting.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdlib-float.h:
-
-/usr/include/c++/11/bits/basic_ios.tcc:
-
-/opt/eigen/Eigen/src/Core/arch/Default/Half.h:
-
-/usr/include/opencv4/opencv2/imgproc.hpp:
-
-/opt/eigen/Eigen/src/Core/arch/Default/GenericPacketMathFunctionsFwd.h:
-
-/usr/include/x86_64-linux-gnu/bits/floatn-common.h:
-
-/opt/eigen/Eigen/src/Core/Visitor.h:
-
-/usr/local/include/ceres/evaluation_callback.h:
-
-/opt/eigen/Eigen/src/Core/util/StaticAssert.h:
-
-/opt/eigen/Eigen/src/Core/functors/TernaryFunctors.h:
-
-/opt/eigen/Eigen/src/Core/StlIterators.h:
-
-/opt/eigen/Eigen/src/Core/VectorBlock.h:
-
-/usr/include/c++/11/tr1/hypergeometric.tcc:
-
-/opt/eigen/Eigen/src/Eigenvalues/Tridiagonalization.h:
-
-/usr/include/c++/11/bits/indirect_array.h:
-
-/opt/eigen/Eigen/src/Core/ArithmeticSequence.h:
-
-/usr/include/x86_64-linux-gnu/bits/mathcalls-narrow.h:
-
-/usr/include/opencv4/opencv2/flann/nn_index.h:
-
-/opt/eigen/Eigen/src/Core/Diagonal.h:
-
-/usr/include/nlohmann/ordered_map.hpp:
-
-/usr/local/include/ceres/loss_function.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/mm_malloc.h:
-
-/opt/eigen/Eigen/src/Core/AssignEvaluator.h:
-
-/usr/include/opencv4/opencv2/core/check.hpp:
-
-/usr/include/opencv4/opencv2/photo.hpp:
-
-/usr/include/c++/11/bits/localefwd.h:
-
-/usr/include/c++/11/limits:
-
-/usr/include/opencv4/opencv2/core/hal/interface.h:
-
-/usr/include/c++/11/bits/unique_lock.h:
-
-/opt/eigen/Eigen/src/Core/ConditionEstimator.h:
-
-/usr/include/c++/11/bits/exception_defines.h:
-
-/usr/include/c++/11/optional:
-
-/app/main.cpp:
-
-/opt/eigen/Eigen/src/Eigenvalues/GeneralizedEigenSolver.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h:
-
-/opt/eigen/Eigen/src/Core/products/SelfadjointMatrixMatrix.h:
-
-/usr/include/nlohmann/detail/json_ref.hpp:
-
-/opt/eigen/Eigen/src/SVD/JacobiSVD.h:
-
-/opt/eigen/Eigen/src/Core/ArrayBase.h:
-
-/opt/eigen/Eigen/src/Core/CwiseNullaryOp.h:
-
-/usr/local/include/ceres/internal/integer_sequence_algorithm.h:
-
-/opt/eigen/Eigen/src/Core/TriangularMatrix.h:
-
-/opt/eigen/Eigen/src/Core/CwiseTernaryOp.h:
-
-/usr/include/gflags/gflags_declare.h:
-
-/opt/eigen/Eigen/src/Householder/Householder.h:
-
-/usr/include/opencv4/opencv2/ml.hpp:
-
-/usr/include/c++/11/bits/streambuf.tcc:
-
-/usr/local/include/sophus/se3.hpp:
-
-/opt/eigen/Eigen/src/Geometry/Transform.h:
-
-/opt/eigen/Eigen/src/Core/IndexedView.h:
-
-/usr/local/include/ceres/internal/sphere_manifold_functions.h:
-
-/opt/eigen/Eigen/Cholesky:
-
-/usr/local/include/ceres/autodiff_manifold.h:
-
-/usr/include/c++/11/bits/locale_facets_nonio.tcc:
-
-/opt/eigen/Eigen/src/Core/BooleanRedux.h:
-
-/usr/include/opencv4/opencv2/video/background_segm.hpp:
-
-/opt/eigen/Eigen/src/Core/util/IntegralConstant.h:
-
-/usr/include/assert.h:
-
-/opt/eigen/Eigen/src/Core/Redux.h:
-
-/usr/include/c++/11/bits/streambuf_iterator.h:
-
-/usr/local/include/ceres/solver.h:
-
-/usr/include/c++/11/cerrno:
-
-/usr/include/libintl.h:
-
-/opt/eigen/Eigen/src/misc/Image.h:
-
-/opt/eigen/Eigen/src/Core/Stride.h:
-
-/usr/local/include/ceres/crs_matrix.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/wint_t.h:
-
-/opt/eigen/Eigen/src/Eigenvalues/ComplexSchur.h:
-
-/usr/include/c++/11/complex:
-
-/opt/eigen/Eigen/src/Core/util/Memory.h:
-
-/usr/include/c++/11/bits/hash_bytes.h:
-
-/usr/local/include/ceres/conditioned_cost_function.h:
-
-/usr/include/c++/11/bits/stringfwd.h:
-
-/app/include/BVH.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/time_t.h:
-
-/opt/eigen/Eigen/src/Core/SolveTriangular.h:
-
-/usr/include/c++/11/stdexcept:
-
-/usr/include/c++/11/bits/stl_map.h:
-
-/opt/eigen/Eigen/src/Core/PermutationMatrix.h:
-
-/opt/eigen/Eigen/src/Core/StableNorm.h:
-
-/usr/include/c++/11/climits:
-
-/usr/local/include/ceres/iteration_callback.h:
-
-/usr/local/include/ceres/internal/parameter_dims.h:
-
-/usr/include/c++/11/tr1/gamma.tcc:
-
-/usr/include/x86_64-linux-gnu/sys/single_threaded.h:
-
-/opt/eigen/Eigen/src/plugins/MatrixCwiseUnaryOps.h:
-
-/usr/local/include/ceres/internal/variadic_evaluate.h:
-
-/opt/eigen/Eigen/QR:
-
-/usr/include/c++/11/iterator:
-
-/opt/eigen/Eigen/src/SVD/UpperBidiagonalization.h:
-
-/opt/eigen/Eigen/src/LU/Determinant.h:
-
-/opt/eigen/Eigen/src/Core/functors/BinaryFunctors.h:
-
-/opt/eigen/Eigen/src/Core/Assign.h:
-
-/usr/include/opencv4/opencv2/core/saturate.hpp:
-
-/opt/eigen/Eigen/src/Core/CoreEvaluators.h:
-
-/opt/eigen/Eigen/src/plugins/ReshapedMethods.h:
-
-/opt/eigen/Eigen/src/Core/Transpose.h:
-
-/opt/eigen/Eigen/Householder:
-
-/usr/include/x86_64-linux-gnu/bits/timesize.h:
-
-/usr/include/c++/11/bits/uniform_int_dist.h:
-
-/app/include/ImageProcessor.h:
-
-/opt/eigen/Eigen/src/Core/CwiseUnaryView.h:
-
-/opt/eigen/Eigen/src/Core/util/IndexedViewHelper.h:
-
-/opt/eigen/Eigen/src/Core/Random.h:
-
-/usr/include/c++/11/mutex:
-
-/usr/include/nlohmann/detail/string_escape.hpp:
-
-/opt/eigen/Eigen/src/Eigenvalues/RealSchur.h:
-
-/app/include/MeshModel.h:
-
-/usr/include/x86_64-linux-gnu/bits/unistd_ext.h:
-
-/opt/eigen/Eigen/src/Core/EigenBase.h:
-
-/usr/local/include/ceres/context.h:
-
-/opt/eigen/Eigen/src/Core/GeneralProduct.h:
-
-/usr/include/opencv4/opencv2/core/version.hpp:
-
-/usr/include/c++/11/bits/range_access.h:
-
-/app/include/Optimizer.h:
-
-/opt/eigen/Eigen/src/Geometry/Umeyama.h:
-
-/usr/include/linux/limits.h:
-
-/usr/local/include/ceres/internal/port.h:
-
-/opt/eigen/Eigen/src/Core/products/SelfadjointProduct.h:
-
-/opt/eigen/Eigen/src/Core/Dot.h:
-
-/opt/eigen/Eigen/src/Core/products/GeneralMatrixMatrixTriangular.h:
-
-/usr/include/c++/11/cctype:
-
-/usr/include/c++/11/algorithm:
-
-/usr/include/c++/11/bits/enable_special_members.h:
-
-/usr/include/opencv4/opencv2/dnn/version.hpp:
-
-/usr/include/c++/11/bits/stl_set.h:
-
-/opt/eigen/Eigen/src/plugins/IndexedViewMethods.h:
-
-/opt/eigen/Eigen/src/plugins/CommonCwiseBinaryOps.h:
-
-/usr/include/c++/11/bits/forward_list.tcc:
-
-/usr/include/c++/11/bits/exception.h:
-
-/opt/eigen/Eigen/LU:
-
-/usr/include/c++/11/bits/ios_base.h:
-
-/usr/include/x86_64-linux-gnu/bits/wordsize.h:
-
-/usr/include/x86_64-linux-gnu/bits/types.h:
-
-/opt/eigen/Eigen/src/Core/util/Constants.h:
-
-/usr/local/include/sophus/types.hpp:
-
-/usr/local/include/ceres/local_parameterization.h:
-
-/usr/include/x86_64-linux-gnu/bits/uio_lim.h:
-
-/opt/eigen/Eigen/src/Core/Inverse.h:
-
-/opt/eigen/Eigen/src/Core/functors/AssignmentFunctors.h:
-
-/opt/eigen/Eigen/src/Core/products/TriangularSolverVector.h:
-
-/usr/include/c++/11/bits/specfun.h:
-
-/opt/eigen/Eigen/src/Core/ProductEvaluators.h:
-
-/usr/include/c++/11/tr1/riemann_zeta.tcc:
-
-/opt/eigen/Eigen/src/Core/Reshaped.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/struct_FILE.h:
-
-/usr/include/c++/11/bits/stl_deque.h:
-
-/opt/eigen/Eigen/src/Cholesky/LLT.h:
-
-/usr/include/nlohmann/detail/meta/cpp_future.hpp:
-
-/usr/include/c++/11/bits/stl_multimap.h:
-
-/opt/eigen/Eigen/src/Core/Block.h:
-
-/usr/local/include/ceres/autodiff_cost_function.h:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/c++locale.h:
-
-/opt/eigen/Eigen/Eigenvalues:
-
-/opt/eigen/Eigen/src/Core/functors/UnaryFunctors.h:
-
-/usr/include/c++/11/cfloat:
-
-/app/include/DatasetManager.h:
-
-/opt/eigen/Eigen/src/Core/DenseBase.h:
-
-/app/src/ImageProcessor.cpp:
-
-/usr/include/c++/11/bits/stl_function.h:
-
-/usr/include/c++/11/ext/atomicity.h:
-
-/opt/eigen/Eigen/src/Core/Swap.h:
-
-/opt/eigen/Eigen/src/Core/MapBase.h:
-
-/usr/include/c++/11/array:
-
-/usr/include/c++/11/bits/allocator.h:
-
-/opt/eigen/Eigen/src/Core/Transpositions.h:
-
-/usr/include/unistd.h:
-
-/opt/eigen/Eigen/src/Geometry/AlignedBox.h:
-
-/usr/include/c++/11/bits/cxxabi_forced.h:
-
-/opt/eigen/Eigen/src/Core/products/GeneralBlockPanelKernel.h:
-
-/opt/eigen/Eigen/src/Core/MathFunctionsImpl.h:
-
-/usr/include/opencv4/opencv2/flann.hpp:
-
-/opt/eigen/Eigen/src/Core/CwiseUnaryOp.h:
-
-/usr/include/c++/11/bits/codecvt.h:
-
-/usr/include/c++/11/sstream:
-
-/opt/eigen/Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h:
-
-/opt/eigen/Eigen/src/Core/DiagonalProduct.h:
-
-/usr/include/c++/11/bits/gslice.h:
-
-/opt/eigen/Eigen/src/Core/arch/Default/GenericPacketMathFunctions.h:
-
-/usr/include/x86_64-linux-gnu/bits/setjmp.h:
-
-/opt/eigen/Eigen/src/Core/BandMatrix.h:
-
-/usr/include/x86_64-linux-gnu/bits/time64.h:
-
-/usr/include/opencv4/opencv2/flann/random.h:
-
-/opt/eigen/Eigen/src/plugins/CommonCwiseUnaryOps.h:
-
-/usr/include/c++/11/cwchar:
-
-/usr/include/c++/11/bits/quoted_string.h:
-
-/usr/include/opencv4/opencv2/imgcodecs.hpp:
-
-/opt/eigen/Eigen/src/Core/MatrixBase.h:
-
-/opt/eigen/Eigen/src/Core/MathFunctions.h:
-
-/opt/eigen/Eigen/src/Core/SelfAdjointView.h:
-
-/opt/eigen/Eigen/src/Core/SolverBase.h:
-
-/opt/eigen/Eigen/SVD:
-
-/opt/eigen/Eigen/StdVector:
-
-/usr/include/x86_64-linux-gnu/bits/types/struct_sched_param.h:
-
-/opt/eigen/Eigen/src/plugins/ArrayCwiseBinaryOps.h:
-
-/opt/eigen/Eigen/src/plugins/ArrayCwiseUnaryOps.h:
-
-/usr/include/opencv4/opencv2/core/vsx_utils.hpp:
-
-/usr/include/c++/11/tr1/modified_bessel_func.tcc:
-
-/opt/eigen/Eigen/src/plugins/MatrixCwiseBinaryOps.h:
-
-/usr/include/c++/11/new:
-
-/usr/include/nlohmann/detail/value_t.hpp:
-
-/usr/include/c++/11/ostream:
-
-/opt/eigen/Eigen/src/Core/DiagonalMatrix.h:
-
-/opt/eigen/Eigen/src/StlSupport/details.h:
-
-/opt/eigen/Eigen/src/Geometry/arch/Geometry_SIMD.h:
-
-/usr/include/alloca.h:
-
-/opt/eigen/Eigen/src/Core/NoAlias.h:
-
-/usr/include/nlohmann/detail/iterators/iter_impl.hpp:
-
-/usr/include/c++/11/bits/valarray_array.h:
-
-/opt/eigen/Eigen/src/Core/Fuzzy.h:
-
-/usr/local/include/ceres/version.h:
-
-/usr/include/c++/11/bits/stl_queue.h:
-
-/opt/eigen/Eigen/src/Geometry/Homogeneous.h:
-
-/opt/eigen/Eigen/src/plugins/BlockMethods.h:
-
-/opt/eigen/Eigen/src/Core/GenericPacketMath.h:
-
-/usr/include/nlohmann/detail/input/lexer.hpp:
-
-/usr/include/opencv4/opencv2/stitching/detail/motion_estimators.hpp:
-
-/usr/include/opencv4/opencv2/dnn/utils/inference_engine.hpp:
-
-/opt/eigen/Eigen/src/QR/CompleteOrthogonalDecomposition.h:
-
-/opt/eigen/Eigen/src/Eigenvalues/SelfAdjointEigenSolver.h:
-
-/usr/include/nlohmann/detail/input/parser.hpp:
-
-/opt/eigen/Eigen/src/Core/ReturnByValue.h:
-
-/usr/include/c++/11/random:
-
-/opt/eigen/Eigen/src/Core/arch/SSE/PacketMath.h:
-
-/usr/include/c++/11/exception:
-
-/opt/eigen/Eigen/src/Core/CoreIterators.h:
-
-/usr/include/c++/11/pstl/execution_defs.h:
-
-/opt/eigen/Eigen/src/Core/Map.h:
-
-/opt/eigen/Eigen/src/Core/IO.h:
-
-/opt/eigen/Eigen/src/LU/InverseImpl.h:
-
-/opt/tinyobjloader/tiny_obj_loader.h:
-
-/opt/eigen/Eigen/src/QR/HouseholderQR.h:
-
-/usr/include/c++/11/filesystem:
-
-/opt/eigen/Eigen/src/Core/arch/Default/Settings.h:
-
-/usr/include/c++/11/tr1/poly_laguerre.tcc:
-
-/opt/eigen/Eigen/src/Core/products/TriangularMatrixVector.h:
-
-/opt/eigen/Eigen/src/Core/Array.h:
-
-/usr/include/c++/11/bits/unique_ptr.h:
-
-/usr/include/c++/11/queue:
-
-/opt/eigen/Eigen/src/Core/NestByValue.h:
-
-/opt/eigen/Eigen/src/Core/NumTraits.h:
-
-/opt/eigen/Eigen/src/Core/PartialReduxEvaluator.h:
-
-/opt/eigen/Eigen/src/Core/VectorwiseOp.h:
-
-/usr/include/c++/11/bits/stl_tree.h:
-
-/opt/eigen/Eigen/src/Core/PlainObjectBase.h:
-
-/opt/eigen/Eigen/src/Core/Ref.h:
-
-/opt/eigen/Eigen/src/Core/Replicate.h:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/cpu_defines.h:
-
-/opt/eigen/Eigen/src/Core/util/BlasUtil.h:
-
-/usr/include/opencv4/opencv2/flann/autotuned_index.h:
-
-/opt/eigen/Eigen/src/Core/functors/StlFunctors.h:
-
-/usr/include/opencv4/opencv2/flann/kdtree_index.h:
-
-/opt/eigen/Eigen/src/Geometry/AngleAxis.h:
-
-/usr/include/c++/11/iostream:
-
-/usr/include/strings.h:
-
-/opt/eigen/Eigen/src/Core/Solve.h:
-
-/opt/eigen/Eigen/src/Core/arch/Default/ConjHelper.h:
-
-/usr/include/c++/11/backward/auto_ptr.h:
-
-/usr/include/c++/11/numeric:
-
-/usr/include/opencv4/opencv2/core/cuda.inl.hpp:
-
-/usr/include/c++/11/backward/binders.h:
-
-/usr/include/c++/11/bits/stl_relops.h:
-
-/usr/include/c++/11/bits/algorithmfwd.h:
-
-/opt/eigen/Eigen/src/Core/util/DisableStupidWarnings.h:
-
-/usr/include/c++/11/bits/align.h:
-
-/usr/include/c++/11/bits/alloc_traits.h:
-
-/opt/eigen/Eigen/Geometry:
-
-/usr/include/c++/11/bits/allocated_ptr.h:
-
-/opt/eigen/Eigen/Jacobi:
-
-/usr/include/c++/11/bits/atomic_base.h:
-
-/usr/local/include/ceres/first_order_function.h:
-
-/usr/include/c++/11/bits/basic_string.h:
-
-/usr/include/c++/11/bits/ptr_traits.h:
-
-/usr/include/c++/11/bits/basic_string.tcc:
-
-/usr/include/c++/11/bits/char_traits.h:
-
-/usr/include/c++/11/bits/charconv.h:
-
-/usr/include/c++/11/bits/concept_check.h:
-
-/usr/include/opencv4/opencv2/flann/params.h:
-
-/usr/include/c++/11/bits/deque.tcc:
-
-/usr/include/opencv4/opencv2/flann/heap.h:
-
-/usr/include/c++/11/bits/erase_if.h:
-
-/app/include/Evaluation.h:
-
-/usr/include/c++/11/bits/exception_ptr.h:
-
-/usr/include/opencv4/opencv2/core.hpp:
-
-/usr/include/c++/11/map:
-
-/usr/include/opencv4/opencv2/core/async.hpp:
-
-/usr/include/c++/11/bits/valarray_array.tcc:
-
-/usr/include/c++/11/bits/functexcept.h:
-
-/usr/include/c++/11/initializer_list:
-
-/usr/local/include/ceres/internal/array_selector.h:
-
-/usr/include/c++/11/bits/functional_hash.h:
-
-/usr/include/opencv4/opencv2/stitching/detail/exposure_compensate.hpp:
-
-/usr/include/c++/11/math.h:
-
-/usr/include/opencv4/opencv2/flann/timer.h:
-
-/usr/include/c++/11/bits/hashtable_policy.h:
-
-/usr/include/c++/11/bits/invoke.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/struct_timeval.h:
-
-/usr/include/c++/11/bits/std_mutex.h:
-
-/usr/include/c++/11/cmath:
-
-/usr/include/c++/11/unordered_set:
-
-/usr/include/c++/11/bits/list.tcc:
-
-/usr/include/c++/11/bits/atomic_lockfree_defines.h:
-
-/usr/include/c++/11/bits/locale_classes.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/stdarg.h:
-
-/usr/include/c++/11/bits/locale_classes.tcc:
-
-/usr/include/x86_64-linux-gnu/bits/libm-simd-decl-stubs.h:
-
-/opt/eigen/Eigen/src/Core/arch/SSE/TypeCasting.h:
-
-/usr/include/c++/11/bits/locale_conv.h:
-
-/usr/include/stdlib.h:
-
-/usr/include/opencv4/opencv2/flann/kdtree_single_index.h:
-
-/usr/include/c++/11/bits/locale_facets.h:
-
-/usr/include/x86_64-linux-gnu/bits/long-double.h:
-
-/usr/include/math.h:
-
-/usr/include/opencv4/opencv2/stitching/detail/warpers.hpp:
-
-/usr/include/c++/11/bits/locale_facets.tcc:
-
-/usr/include/c++/11/bits/shared_ptr.h:
-
-/usr/include/c++/11/string:
-
-/usr/include/c++/11/bits/locale_facets_nonio.h:
-
-/usr/include/c++/11/bits/memoryfwd.h:
-
-/usr/local/include/ceres/internal/fixed_array.h:
-
-/usr/include/c++/11/bits/move.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/limits.h:
-
-/opt/eigen/Eigen/src/Core/products/SelfadjointMatrixVector.h:
-
-/usr/include/c++/11/debug/debug.h:
-
-/usr/include/c++/11/bits/stl_tempbuf.h:
-
-/usr/include/c++/11/bits/nested_exception.h:
-
-/usr/include/c++/11/bits/node_handle.h:
-
-/usr/include/c++/11/debug/assertions.h:
-
-/usr/include/c++/11/bits/ostream.tcc:
-
-/usr/include/c++/11/bits/parse_numbers.h:
-
-/opt/eigen/Eigen/src/Core/products/TriangularSolverMatrix.h:
-
-/usr/include/c++/11/bits/postypes.h:
-
-/usr/include/c++/11/cstring:
-
-/usr/include/nlohmann/detail/input/input_adapters.hpp:
-
-/usr/include/opencv4/opencv2/flann/lsh_index.h:
-
-/usr/include/c++/11/bits/predefined_ops.h:
-
-/usr/include/c++/11/tr1/ell_integral.tcc:
-
-/usr/local/include/ceres/numeric_diff_options.h:
-
-/usr/include/c++/11/bits/refwrap.h:
-
-/usr/include/c++/11/bits/shared_ptr_atomic.h:
-
-/usr/include/c++/11/bits/std_abs.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/struct_itimerspec.h:
-
-/usr/include/c++/11/bits/stl_algo.h:
-
-/usr/include/gflags/gflags_gflags.h:
-
-/usr/include/c++/11/bits/stl_heap.h:
-
-/usr/include/c++/11/valarray:
-
-/usr/include/c++/11/bits/stl_iterator_base_funcs.h:
-
-/usr/include/x86_64-linux-gnu/bits/errno.h:
-
-/usr/include/c++/11/bits/stl_iterator.h:
-
-/usr/include/c++/11/bits/stl_iterator_base_types.h:
-
-/opt/eigen/Eigen/src/LU/arch/InverseSize4.h:
-
-/opt/eigen/Eigen/src/Core/Select.h:
-
-/usr/include/c++/11/set:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/gthr.h:
-
-/usr/include/c++/11/tr1/exp_integral.tcc:
-
-/opt/eigen/Eigen/Dense:
-
-/usr/include/c++/11/bits/stl_list.h:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/c++io.h:
-
-/opt/eigen/Eigen/Core:
-
-/usr/include/c++/11/bits/vector.tcc:
-
-/usr/include/c++/11/cstddef:
-
-/usr/include/c++/11/bits/stl_multiset.h:
-
-/usr/include/c++/11/bits/stl_numeric.h:
-
-/usr/include/c++/11/bits/stl_pair.h:
-
-/usr/local/include/ceres/internal/numeric_diff.h:
-
-/usr/include/c++/11/bits/stl_raw_storage_iter.h:
-
-/usr/include/c++/11/bits/stl_uninitialized.h:
-
-/usr/include/nlohmann/detail/meta/identity_tag.hpp:
-
-/usr/include/c++/11/ext/type_traits.h:
-
-/usr/include/c++/11/bits/stl_vector.h:
-
-/usr/include/opencv4/opencv2/core/cuda_types.hpp:
-
-/usr/include/c++/11/bits/string_view.tcc:
-
-/usr/include/c++/11/bits/unordered_map.h:
-
-/usr/include/c++/11/bits/unordered_set.h:
-
-/usr/include/c++/11/bits/uses_allocator.h:
-
-/usr/include/x86_64-linux-gnu/bits/endianness.h:
-
-/usr/include/c++/11/chrono:
-
-/usr/include/x86_64-linux-gnu/bits/mathcalls.h:
-
-/usr/include/opencv4/opencv2/ml/ml.inl.hpp:
-
-/usr/include/c++/11/clocale:
-
-/usr/include/c++/11/cstdio:
-
-/usr/include/c++/11/cstdint:
-
-/usr/include/c++/11/cstdlib:
-
-/usr/include/nlohmann/adl_serializer.hpp:
-
-/usr/include/c++/11/cwctype:
-
-/usr/include/c++/11/tr1/beta_function.tcc:
-
-/usr/include/c++/11/ext/aligned_buffer.h:
-
-/usr/include/linux/close_range.h:
-
-/usr/include/c++/11/ext/alloc_traits.h:
-
-/usr/include/c++/11/ext/concurrence.h:
-
-/usr/include/c++/11/iosfwd:
-
-/usr/include/opencv4/opencv2/core/base.hpp:
-
-/usr/include/c++/11/ext/new_allocator.h:
-
-/opt/eigen/Eigen/src/misc/RealSvd2x2.h:
-
-/usr/include/c++/11/ext/numeric_traits.h:
-
-/usr/include/c++/11/bits/stl_construct.h:
-
-/usr/include/c++/11/ext/string_conversions.h:
-
-/usr/include/c++/11/bits/valarray_before.h:
-
-/usr/include/c++/11/iomanip:
-
-/usr/local/include/ceres/internal/memory.h:
-
-/usr/include/ctype.h:
-
-/opt/eigen/Eigen/src/Core/Reverse.h:
-
-/opt/eigen/Eigen/src/Core/CommaInitializer.h:
-
-/usr/include/c++/11/istream:
-
-/usr/include/opencv4/opencv2/features2d.hpp:
-
-/opt/eigen/Eigen/src/Core/SelfCwiseBinaryOp.h:
-
-/usr/include/c++/11/deque:
-
-/usr/include/endian.h:
-
-/usr/include/x86_64-linux-gnu/bits/byteswap.h:
-
-/usr/include/c++/11/list:
-
-/usr/include/c++/11/locale:
-
-/usr/include/opencv4/opencv2/flann/index_testing.h:
-
-/usr/include/c++/11/memory:
-
-/usr/include/nlohmann/detail/output/serializer.hpp:
-
-/usr/include/glog/log_severity.h:
-
-/usr/include/c++/11/pstl/glue_algorithm_defs.h:
-
-/usr/lib/gcc/x86_64-linux-gnu/11/include/stdint.h:
-
-/usr/include/x86_64-linux-gnu/bits/iscanonical.h:
-
-/usr/include/c++/11/pstl/glue_memory_defs.h:
-
-/usr/include/x86_64-linux-gnu/bits/types/sigset_t.h:
-
-/usr/include/opencv4/opencv2/flann/allocator.h:
-
-/usr/include/c++/11/pstl/glue_numeric_defs.h:
-
-/usr/include/c++/11/bits/istream.tcc:
-
-/usr/include/c++/11/ctime:
-
-/usr/include/c++/11/pstl/pstl_config.h:
-
-/usr/include/stdio.h:
-
-/usr/include/c++/11/bits/ostream_insert.h:
-
-/usr/include/c++/11/streambuf:
-
-/opt/eigen/Eigen/src/StlSupport/StdVector.h:
-
-/opt/eigen/Eigen/src/Core/Matrix.h:
-
-/usr/include/c++/11/string_view:
-
-/usr/include/c++/11/system_error:
-
-/usr/include/opencv4/opencv2/videoio.hpp:
-
-/usr/include/c++/11/tr1/bessel_function.tcc:
-
-/usr/include/c++/11/ratio:
-
-/usr/include/c++/11/tr1/poly_hermite.tcc:
-
-/usr/include/c++/11/tuple:
-
-/usr/include/c++/11/type_traits:
-
-/usr/include/c++/11/atomic:
-
-/usr/include/c++/11/typeinfo:
-
-/opt/eigen/Eigen/src/Eigenvalues/GeneralizedSelfAdjointEigenSolver.h:
-
-/usr/include/c++/11/unordered_map:
-
-/usr/include/x86_64-linux-gnu/sys/select.h:
-
-/usr/include/c++/11/utility:
-
-/usr/include/c++/11/vector:
-
-/usr/include/features-time64.h:
-
-/usr/local/include/ceres/cost_function_to_functor.h:
-
-/usr/include/features.h:
-
-/app/src/MeshModel.cpp:
-
-/usr/include/c++/11/bits/cpp_type_traits.h:
-
-/usr/include/glog/logging.h:
-
-/opt/eigen/Eigen/src/Geometry/Translation.h:
-
-/usr/include/opencv4/opencv2/calib3d.hpp:
-
-/usr/include/glog/vlog_is_on.h:
-
-/usr/include/inttypes.h:
-
-/usr/include/c++/11/bit:
-
-/usr/include/limits.h:
-
-/usr/include/linux/errno.h:
-
-/opt/eigen/Eigen/src/Core/util/Meta.h:
-
-/usr/include/locale.h:
-
-/usr/include/c++/11/bits/fs_path.h:
-
-/usr/include/opencv4/opencv2/core/affine.hpp:
-
-/usr/local/include/ceres/ordered_groups.h:
+/opt/eigen/Eigen/src/SparseCore/TriangularSolver.h:
 
 /usr/include/opencv4/opencv2/core/bufferpool.hpp:
 
-/opt/eigen/Eigen/src/Core/CwiseBinaryOp.h:
+/usr/local/include/ceres/ordered_groups.h:
+
+/usr/include/opencv4/opencv2/core/affine.hpp:
+
+/usr/include/locale.h:
+
+/usr/include/linux/errno.h:
+
+/usr/include/limits.h:
+
+/usr/include/glog/vlog_is_on.h:
+
+/opt/eigen/Eigen/src/Geometry/Translation.h:
+
+/usr/include/glog/logging.h:
+
+/app/src/MeshModel.cpp:
+
+/usr/local/include/ceres/cost_function_to_functor.h:
+
+/usr/include/c++/11/utility:
+
+/opt/eigen/Eigen/src/Eigenvalues/GeneralizedSelfAdjointEigenSolver.h:
+
+/usr/include/c++/11/atomic:
+
+/usr/include/c++/11/tuple:
+
+/usr/include/c++/11/tr1/poly_hermite.tcc:
+
+/usr/include/c++/11/tr1/bessel_function.tcc:
+
+/usr/include/c++/11/string_view:
+
+/opt/eigen/Eigen/src/Core/Matrix.h:
+
+/opt/eigen/Eigen/src/StlSupport/StdVector.h:
+
+/usr/include/c++/11/streambuf:
+
+/usr/include/c++/11/bits/ostream_insert.h:
+
+/usr/include/stdio.h:
+
+/usr/include/c++/11/pstl/pstl_config.h:
+
+/usr/include/c++/11/ctime:
+
+/usr/include/c++/11/bits/istream.tcc:
+
+/usr/include/c++/11/pstl/glue_numeric_defs.h:
+
+/usr/include/opencv4/opencv2/flann/allocator.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/sigset_t.h:
+
+/usr/include/c++/11/pstl/glue_memory_defs.h:
+
+/usr/include/x86_64-linux-gnu/bits/iscanonical.h:
+
+/opt/eigen/Eigen/src/Core/util/Meta.h:
+
+/usr/lib/gcc/x86_64-linux-gnu/11/include/stdint.h:
+
+/usr/include/c++/11/memory:
+
+/usr/include/opencv4/opencv2/flann/index_testing.h:
+
+/usr/include/c++/11/locale:
+
+/usr/include/c++/11/list:
+
+/opt/eigen/Eigen/src/SparseCore/SparseCwiseBinaryOp.h:
+
+/usr/include/ctype.h:
+
+/usr/local/include/ceres/internal/memory.h:
+
+/usr/include/c++/11/vector:
+
+/usr/include/c++/11/iomanip:
+
+/usr/include/c++/11/ext/string_conversions.h:
+
+/usr/include/c++/11/bits/stl_construct.h:
+
+/opt/eigen/Eigen/src/misc/RealSvd2x2.h:
+
+/usr/include/c++/11/ext/new_allocator.h:
+
+/usr/include/opencv4/opencv2/core/base.hpp:
+
+/usr/include/c++/11/ext/concurrence.h:
+
+/usr/include/c++/11/ext/aligned_buffer.h:
+
+/usr/include/c++/11/tr1/beta_function.tcc:
+
+/usr/include/c++/11/bits/fs_path.h:
+
+/usr/include/c++/11/cstdlib:
+
+/usr/include/c++/11/cstdint:
+
+/usr/include/c++/11/cstdio:
+
+/usr/include/c++/11/clocale:
+
+/usr/include/opencv4/opencv2/ml/ml.inl.hpp:
+
+/usr/include/c++/11/bits/uses_allocator.h:
+
+/usr/include/c++/11/bits/unordered_set.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseProduct.h:
+
+/usr/include/c++/11/bits/unordered_map.h:
+
+/usr/include/opencv4/opencv2/core/cuda_types.hpp:
+
+/usr/include/c++/11/bits/stl_vector.h:
+
+/usr/include/c++/11/bits/stl_uninitialized.h:
+
+/usr/include/c++/11/bits/stl_raw_storage_iter.h:
+
+/usr/local/include/ceres/internal/numeric_diff.h:
+
+/usr/include/c++/11/bits/stl_pair.h:
+
+/usr/include/c++/11/bits/stl_numeric.h:
+
+/usr/include/c++/11/bits/stl_multiset.h:
+
+/usr/include/c++/11/cstddef:
+
+/opt/eigen/Eigen/Core:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/c++io.h:
+
+/usr/include/c++/11/bits/stl_list.h:
+
+/usr/include/c++/11/tr1/exp_integral.tcc:
+
+/usr/include/c++/11/set:
+
+/opt/eigen/Eigen/src/Core/Select.h:
+
+/usr/include/c++/11/bits/stl_iterator_base_types.h:
+
+/usr/include/c++/11/bits/stl_iterator.h:
+
+/usr/include/x86_64-linux-gnu/bits/errno.h:
+
+/usr/include/c++/11/bits/stl_iterator_base_funcs.h:
+
+/usr/include/c++/11/valarray:
+
+/opt/eigen/Eigen/src/Core/SelfCwiseBinaryOp.h:
+
+/usr/include/c++/11/bits/stl_algo.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct_itimerspec.h:
+
+/usr/include/c++/11/bits/std_abs.h:
+
+/usr/include/c++/11/bits/refwrap.h:
+
+/usr/local/include/ceres/numeric_diff_options.h:
+
+/usr/include/c++/11/tr1/ell_integral.tcc:
+
+/usr/include/c++/11/bits/predefined_ops.h:
+
+/opt/eigen/Eigen/src/Core/products/TriangularSolverMatrix.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseView.h:
+
+/usr/include/c++/11/debug/assertions.h:
+
+/usr/include/c++/11/bits/node_handle.h:
+
+/usr/include/c++/11/bits/string_view.tcc:
+
+/usr/include/c++/11/bits/nested_exception.h:
+
+/usr/include/c++/11/bits/stl_tempbuf.h:
+
+/usr/lib/gcc/x86_64-linux-gnu/11/include/limits.h:
+
+/usr/include/c++/11/bits/move.h:
+
+/usr/local/include/ceres/internal/fixed_array.h:
+
+/usr/include/c++/11/bits/locale_facets_nonio.h:
+
+/usr/include/c++/11/string:
+
+/usr/include/c++/11/bits/shared_ptr.h:
+
+/usr/include/opencv4/opencv2/stitching/detail/warpers.hpp:
+
+/usr/include/opencv4/opencv2/flann/kdtree_single_index.h:
+
+/usr/include/stdlib.h:
+
+/usr/include/c++/11/bits/locale_conv.h:
+
+/opt/eigen/Eigen/src/Core/arch/SSE/TypeCasting.h:
+
+/usr/include/c++/11/bits/invoke.h:
+
+/usr/include/x86_64-linux-gnu/bits/long-double.h:
+
+/usr/include/opencv4/opencv2/flann/timer.h:
+
+/usr/include/c++/11/math.h:
+
+/opt/eigen/Eigen/SparseQR:
+
+/usr/include/c++/11/bits/functional_hash.h:
+
+/usr/local/include/ceres/internal/array_selector.h:
 
 /usr/include/opencv4/opencv2/core/cuda.hpp:
+
+/usr/include/c++/11/initializer_list:
+
+/usr/include/c++/11/bits/valarray_array.tcc:
+
+/usr/include/opencv4/opencv2/core/async.hpp:
+
+/usr/include/c++/11/bits/locale_facets.tcc:
+
+/usr/include/c++/11/map:
+
+/usr/include/c++/11/bits/exception_ptr.h:
+
+/app/include/Evaluation.h:
+
+/opt/eigen/Eigen/SparseCholesky:
+
+/usr/include/c++/11/bits/erase_if.h:
+
+/usr/include/opencv4/opencv2/flann/heap.h:
+
+/usr/include/c++/11/bit:
+
+/usr/include/c++/11/bits/deque.tcc:
+
+/usr/include/c++/11/bits/stl_heap.h:
+
+/usr/include/opencv4/opencv2/flann/params.h:
+
+/usr/include/c++/11/bits/concept_check.h:
+
+/usr/include/c++/11/bits/charconv.h:
+
+/usr/include/c++/11/bits/char_traits.h:
+
+/usr/include/c++/11/bits/basic_string.tcc:
+
+/usr/include/c++/11/bits/basic_string.h:
+
+/usr/include/c++/11/bits/atomic_base.h:
+
+/opt/eigen/Eigen/Jacobi:
+
+/opt/eigen/Eigen/Geometry:
+
+/usr/include/c++/11/bits/alloc_traits.h:
+
+/usr/include/c++/11/bits/align.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseTranspose.h:
+
+/usr/include/c++/11/bits/algorithmfwd.h:
+
+/usr/include/c++/11/bits/stl_relops.h:
+
+/usr/include/c++/11/bits/memoryfwd.h:
+
+/usr/include/c++/11/backward/binders.h:
+
+/usr/include/opencv4/opencv2/core/cuda.inl.hpp:
+
+/opt/eigen/Eigen/src/SparseCore/SparseUtil.h:
+
+/opt/eigen/Eigen/src/Core/Solve.h:
+
+/usr/include/strings.h:
+
+/usr/include/c++/11/iostream:
+
+/usr/include/opencv4/opencv2/stitching/detail/exposure_compensate.hpp:
+
+/usr/include/opencv4/opencv2/flann/autotuned_index.h:
+
+/opt/eigen/Eigen/src/Core/util/BlasUtil.h:
+
+/opt/eigen/Eigen/src/Core/Replicate.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseVector.h:
+
+/usr/include/c++/11/unordered_map:
+
+/opt/eigen/Eigen/src/Core/Ref.h:
+
+/usr/include/c++/11/bits/stl_tree.h:
+
+/opt/eigen/Eigen/src/Core/VectorwiseOp.h:
+
+/opt/eigen/Eigen/src/Core/PartialReduxEvaluator.h:
+
+/opt/eigen/Eigen/src/Core/NestByValue.h:
+
+/usr/include/c++/11/queue:
+
+/usr/include/c++/11/bits/unique_ptr.h:
+
+/opt/eigen/Eigen/src/IterativeLinearSolvers/BiCGSTAB.h:
+
+/opt/eigen/Eigen/src/Core/Array.h:
+
+/usr/include/c++/11/tr1/poly_laguerre.tcc:
+
+/opt/tinyobjloader/tiny_obj_loader.h:
+
+/opt/eigen/Eigen/src/LU/InverseImpl.h:
+
+/usr/local/include/ceres/first_order_function.h:
+
+/opt/eigen/Eigen/src/Core/IO.h:
+
+/usr/include/glog/log_severity.h:
+
+/opt/eigen/Eigen/src/Core/Map.h:
+
+/opt/eigen/Eigen/src/Core/CommaInitializer.h:
+
+/usr/include/c++/11/pstl/execution_defs.h:
+
+/opt/eigen/Eigen/src/Core/CoreIterators.h:
+
+/usr/include/c++/11/exception:
+
+/usr/include/c++/11/random:
+
+/opt/eigen/Eigen/src/Core/ReturnByValue.h:
+
+/usr/include/nlohmann/detail/input/parser.hpp:
+
+/opt/eigen/Eigen/src/QR/CompleteOrthogonalDecomposition.h:
+
+/usr/include/nlohmann/detail/input/input_adapters.hpp:
+
+/usr/include/opencv4/opencv2/stitching/detail/motion_estimators.hpp:
+
+/opt/eigen/Eigen/src/Core/GenericPacketMath.h:
+
+/opt/eigen/Eigen/src/plugins/BlockMethods.h:
+
+/opt/eigen/Eigen/src/Geometry/Homogeneous.h:
+
+/usr/include/c++/11/bits/stl_queue.h:
+
+/usr/local/include/ceres/version.h:
+
+/opt/eigen/Eigen/src/Core/Fuzzy.h:
+
+/usr/include/c++/11/bits/valarray_array.h:
+
+/usr/include/nlohmann/detail/iterators/iter_impl.hpp:
+
+/usr/include/opencv4/opencv2/calib3d.hpp:
+
+/opt/eigen/Eigen/src/Core/NoAlias.h:
+
+/usr/include/alloca.h:
+
+/opt/eigen/Eigen/src/Geometry/arch/Geometry_SIMD.h:
+
+/opt/eigen/Eigen/src/StlSupport/details.h:
+
+/opt/eigen/Eigen/src/IterativeLinearSolvers/LeastSquareConjugateGradient.h:
+
+/usr/include/c++/11/ostream:
+
+/usr/include/c++/11/new:
+
+/usr/include/c++/11/tr1/modified_bessel_func.tcc:
+
+/usr/include/opencv4/opencv2/core/vsx_utils.hpp:
+
+/opt/eigen/Eigen/src/plugins/ArrayCwiseUnaryOps.h:
+
+/opt/eigen/Eigen/src/plugins/ArrayCwiseBinaryOps.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct_sched_param.h:
+
+/opt/eigen/Eigen/StdVector:
+
+/opt/eigen/Eigen/SVD:
+
+/opt/eigen/Eigen/src/Core/SolverBase.h:
+
+/opt/eigen/Eigen/src/Core/SelfAdjointView.h:
+
+/usr/include/opencv4/opencv2/imgcodecs.hpp:
+
+/usr/include/c++/11/bits/quoted_string.h:
+
+/opt/eigen/Eigen/src/plugins/CommonCwiseUnaryOps.h:
+
+/usr/include/opencv4/opencv2/flann/random.h:
+
+/opt/eigen/Eigen/src/Core/BandMatrix.h:
+
+/opt/eigen/Eigen/src/Core/arch/Default/GenericPacketMathFunctions.h:
+
+/usr/include/c++/11/bits/gslice.h:
+
+/opt/eigen/Eigen/src/Core/DiagonalProduct.h:
+
+/opt/eigen/Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h:
+
+/usr/include/c++/11/sstream:
+
+/usr/include/c++/11/bits/codecvt.h:
+
+/opt/eigen/Eigen/src/Core/CwiseUnaryOp.h:
+
+/usr/include/opencv4/opencv2/flann.hpp:
+
+/opt/eigen/Eigen/src/Core/MathFunctionsImpl.h:
+
+/opt/eigen/Eigen/src/Core/products/GeneralBlockPanelKernel.h:
+
+/usr/include/c++/11/bits/cxxabi_forced.h:
+
+/usr/include/linux/close_range.h:
+
+/opt/eigen/Eigen/Sparse:
+
+/opt/eigen/Eigen/src/Geometry/AlignedBox.h:
+
+/usr/include/unistd.h:
+
+/opt/eigen/Eigen/src/Core/Transpositions.h:
+
+/usr/include/c++/11/bits/allocator.h:
+
+/usr/include/c++/11/array:
+
+/opt/eigen/Eigen/src/Core/Swap.h:
+
+/usr/include/c++/11/ext/atomicity.h:
+
+/usr/include/inttypes.h:
+
+/usr/include/c++/11/bits/stl_function.h:
+
+/app/src/ImageProcessor.cpp:
+
+/opt/eigen/Eigen/SparseLU:
+
+/app/include/DatasetManager.h:
+
+/usr/include/c++/11/cfloat:
+
+/opt/eigen/Eigen/src/SparseCore/ConservativeSparseSparseProduct.h:
+
+/opt/eigen/Eigen/Eigenvalues:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/c++locale.h:
+
+/usr/include/c++/11/filesystem:
+
+/usr/local/include/ceres/autodiff_cost_function.h:
+
+/opt/eigen/Eigen/src/SparseLU/SparseLU_panel_dfs.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparsePermutation.h:
+
+/usr/include/nlohmann/detail/meta/cpp_future.hpp:
+
+/opt/eigen/Eigen/src/Cholesky/LLT.h:
+
+/usr/include/c++/11/bits/stl_deque.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct_FILE.h:
+
+/opt/eigen/Eigen/src/Core/Reshaped.h:
+
+/usr/include/c++/11/tr1/riemann_zeta.tcc:
+
+/opt/eigen/Eigen/src/Core/ProductEvaluators.h:
+
+/usr/include/c++/11/bits/specfun.h:
+
+/opt/eigen/Eigen/src/Core/products/TriangularSolverVector.h:
+
+/opt/eigen/Eigen/src/Core/Inverse.h:
+
+/usr/include/x86_64-linux-gnu/bits/uio_lim.h:
+
+/usr/local/include/ceres/local_parameterization.h:
+
+/usr/local/include/sophus/types.hpp:
+
+/opt/eigen/Eigen/src/Core/util/Constants.h:
+
+/usr/include/c++/11/bits/ios_base.h:
+
+/opt/eigen/Eigen/src/LU/arch/InverseSize4.h:
+
+/opt/eigen/Eigen/LU:
+
+/usr/include/c++/11/bits/exception.h:
+
+/usr/include/c++/11/bits/forward_list.tcc:
+
+/opt/eigen/Eigen/src/plugins/CommonCwiseBinaryOps.h:
+
+/opt/eigen/Eigen/src/plugins/IndexedViewMethods.h:
+
+/usr/include/c++/11/bits/stl_set.h:
+
+/usr/include/opencv4/opencv2/dnn/version.hpp:
+
+/usr/include/c++/11/algorithm:
+
+/usr/include/c++/11/cctype:
+
+/opt/eigen/Eigen/src/OrderingMethods/Ordering.h:
+
+/opt/eigen/Eigen/src/Core/products/GeneralMatrixMatrixTriangular.h:
+
+/opt/eigen/Eigen/src/Core/Dot.h:
+
+/opt/eigen/Eigen/src/Core/products/SelfadjointProduct.h:
+
+/opt/eigen/Eigen/src/Core/PlainObjectBase.h:
+
+/usr/include/linux/limits.h:
+
+/opt/eigen/Eigen/src/Geometry/Umeyama.h:
+
+/usr/include/c++/11/ext/type_traits.h:
+
+/app/include/Optimizer.h:
+
+/usr/include/c++/11/bits/range_access.h:
+
+/opt/eigen/Eigen/src/Core/GeneralProduct.h:
+
+/opt/eigen/Eigen/src/plugins/MatrixCwiseBinaryOps.h:
+
+/usr/local/include/ceres/context.h:
+
+/opt/eigen/Eigen/src/Core/EigenBase.h:
+
+/opt/eigen/Eigen/src/SparseCholesky/SimplicialCholesky.h:
+
+/app/include/MeshModel.h:
+
+/opt/eigen/Eigen/src/Eigenvalues/RealSchur.h:
+
+/usr/include/nlohmann/detail/string_escape.hpp:
+
+/usr/include/c++/11/mutex:
+
+/opt/eigen/Eigen/src/Core/Random.h:
+
+/opt/eigen/Eigen/src/Core/util/IndexedViewHelper.h:
+
+/opt/eigen/Eigen/src/Core/CwiseUnaryView.h:
+
+/app/include/ImageProcessor.h:
+
+/usr/include/c++/11/bits/uniform_int_dist.h:
+
+/usr/include/x86_64-linux-gnu/bits/timesize.h:
+
+/usr/include/nlohmann/detail/output/serializer.hpp:
+
+/opt/eigen/Eigen/Householder:
+
+/opt/eigen/Eigen/src/Core/Transpose.h:
+
+/opt/eigen/Eigen/src/plugins/ReshapedMethods.h:
+
+/opt/eigen/Eigen/src/Core/CoreEvaluators.h:
+
+/usr/include/opencv4/opencv2/core/saturate.hpp:
+
+/opt/eigen/Eigen/src/Core/Assign.h:
+
+/opt/eigen/Eigen/src/Core/functors/BinaryFunctors.h:
+
+/opt/eigen/Eigen/src/SparseQR/SparseQR.h:
+
+/opt/eigen/Eigen/src/SVD/UpperBidiagonalization.h:
+
+/usr/include/c++/11/iterator:
+
+/opt/eigen/Eigen/src/Geometry/AngleAxis.h:
+
+/opt/eigen/Eigen/QR:
+
+/usr/include/c++/11/ratio:
+
+/usr/local/include/ceres/internal/variadic_evaluate.h:
+
+/usr/local/include/ceres/internal/port.h:
+
+/usr/include/x86_64-linux-gnu/sys/single_threaded.h:
+
+/usr/include/c++/11/tr1/gamma.tcc:
+
+/usr/local/include/ceres/iteration_callback.h:
+
+/usr/include/c++/11/climits:
+
+/opt/eigen/Eigen/src/SparseLU/SparseLU_Memory.h:
+
+/opt/eigen/Eigen/src/Core/StableNorm.h:
+
+/opt/eigen/Eigen/src/Core/PermutationMatrix.h:
+
+/usr/include/c++/11/bits/stl_map.h:
+
+/opt/eigen/Eigen/src/Core/MathFunctions.h:
+
+/usr/include/c++/11/stdexcept:
+
+/opt/eigen/Eigen/src/Core/SolveTriangular.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/time_t.h:
+
+/app/include/BVH.h:
+
+/usr/include/c++/11/bits/stringfwd.h:
+
+/usr/local/include/ceres/conditioned_cost_function.h:
+
+/usr/include/c++/11/complex:
+
+/opt/eigen/Eigen/src/Eigenvalues/ComplexSchur.h:
+
+/usr/local/include/ceres/crs_matrix.h:
+
+/opt/eigen/Eigen/src/Core/Stride.h:
+
+/usr/include/x86_64-linux-gnu/sys/select.h:
+
+/opt/eigen/Eigen/src/misc/Image.h:
+
+/usr/include/libintl.h:
+
+/usr/include/c++/11/cerrno:
+
+/usr/local/include/ceres/solver.h:
+
+/usr/include/c++/11/bits/streambuf_iterator.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseDot.h:
+
+/opt/eigen/Eigen/src/Core/Redux.h:
+
+/opt/eigen/Eigen/src/Core/util/IntegralConstant.h:
+
+/usr/include/opencv4/opencv2/video/background_segm.hpp:
+
+/usr/include/c++/11/bits/locale_facets_nonio.tcc:
+
+/usr/local/include/ceres/autodiff_manifold.h:
+
+/opt/eigen/Eigen/Cholesky:
+
+/opt/eigen/Eigen/src/Core/products/TriangularMatrixVector.h:
+
+/usr/local/include/ceres/internal/sphere_manifold_functions.h:
+
+/opt/eigen/Eigen/src/IterativeLinearSolvers/ConjugateGradient.h:
+
+/opt/eigen/Eigen/src/Geometry/Transform.h:
+
+/opt/eigen/Eigen/src/Householder/Householder.h:
+
+/usr/include/gflags/gflags_declare.h:
+
+/opt/eigen/Eigen/src/Core/CwiseTernaryOp.h:
+
+/opt/eigen/Eigen/src/Core/TriangularMatrix.h:
+
+/usr/local/include/ceres/internal/integer_sequence_algorithm.h:
+
+/opt/eigen/Eigen/src/Core/CwiseNullaryOp.h:
+
+/opt/eigen/Eigen/src/SVD/JacobiSVD.h:
+
+/opt/eigen/Eigen/src/Core/Reverse.h:
+
+/usr/include/nlohmann/detail/json_ref.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h:
+
+/opt/eigen/Eigen/src/Eigenvalues/GeneralizedEigenSolver.h:
+
+/app/main.cpp:
+
+/usr/include/c++/11/optional:
+
+/usr/local/include/sophus/se3.hpp:
+
+/usr/include/c++/11/bits/exception_defines.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseTriangularView.h:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/gthr.h:
+
+/opt/eigen/Eigen/src/Core/ConditionEstimator.h:
+
+/usr/include/c++/11/bits/unique_lock.h:
+
+/usr/include/opencv4/opencv2/core/hal/interface.h:
+
+/usr/include/c++/11/limits:
+
+/usr/include/c++/11/bits/localefwd.h:
+
+/usr/include/opencv4/opencv2/photo.hpp:
+
+/usr/include/c++/11/bits/vector.tcc:
+
+/usr/include/opencv4/opencv2/core/check.hpp:
+
+/opt/eigen/Eigen/src/Core/AssignEvaluator.h:
+
+/usr/lib/gcc/x86_64-linux-gnu/11/include/mm_malloc.h:
+
+/usr/local/include/ceres/loss_function.h:
+
+/usr/include/nlohmann/ordered_map.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/unistd_ext.h:
+
+/opt/eigen/Eigen/src/Core/Diagonal.h:
+
+/usr/include/opencv4/opencv2/flann/nn_index.h:
+
+/usr/include/opencv4/opencv2/core.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/wordsize.h:
+
+/opt/eigen/Eigen/src/Core/ArithmeticSequence.h:
+
+/usr/include/c++/11/bits/indirect_array.h:
+
+/usr/include/math.h:
+
+/opt/eigen/Eigen/src/Eigenvalues/Tridiagonalization.h:
+
+/usr/include/c++/11/tr1/hypergeometric.tcc:
+
+/usr/include/features.h:
+
+/usr/include/c++/11/debug/debug.h:
+
+/opt/eigen/Eigen/src/Core/VectorBlock.h:
+
+/opt/eigen/Eigen/src/Core/functors/TernaryFunctors.h:
+
+/opt/eigen/Eigen/src/Core/util/StaticAssert.h:
+
+/usr/local/include/ceres/evaluation_callback.h:
+
+/opt/eigen/Eigen/src/IterativeLinearSolvers/SolveWithGuess.h:
+
+/opt/eigen/Eigen/src/Core/Visitor.h:
+
+/usr/include/x86_64-linux-gnu/bits/floatn-common.h:
+
+/opt/eigen/Eigen/src/SparseLU/SparseLU_relax_snode.h:
+
+/opt/eigen/Eigen/src/Core/arch/Default/GenericPacketMathFunctionsFwd.h:
+
+/usr/include/opencv4/opencv2/imgproc.hpp:
+
+/opt/eigen/Eigen/src/Core/arch/Default/Half.h:
+
+/usr/include/c++/11/bits/basic_ios.tcc:
+
+/opt/eigen/Eigen/src/Core/arch/Default/TypeCasting.h:
+
+/opt/eigen/Eigen/src/Geometry/ParametrizedLine.h:
+
+/opt/eigen/Eigen/src/Core/arch/SSE/Complex.h:
+
+/usr/include/c++/11/bits/shared_ptr_base.h:
+
+/opt/eigen/Eigen/src/Core/arch/SSE/MathFunctions.h:
+
+/opt/eigen/Eigen/src/Eigenvalues/HessenbergDecomposition.h:
+
+/usr/include/c++/11/bits/locale_facets.h:
+
+/usr/include/nlohmann/detail/conversions/from_json.hpp:
+
+/opt/eigen/Eigen/src/Geometry/EulerAngles.h:
+
+/opt/eigen/Eigen/src/Core/functors/NullaryFunctors.h:
+
+/usr/include/opencv4/opencv2/flann/flann_base.hpp:
+
+/opt/eigen/Eigen/src/Core/util/SymbolicIndex.h:
+
+/usr/local/include/ceres/types.h:
+
+/usr/include/c++/11/bits/std_mutex.h:
+
+/opt/eigen/Eigen/src/Core/Product.h:
+
+/usr/include/x86_64-linux-gnu/bits/local_lim.h:
+
+/opt/eigen/Eigen/src/Core/DenseStorage.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseDiagonalProduct.h:
+
+/opt/eigen/Eigen/src/Cholesky/LDLT.h:
+
+/usr/include/c++/11/fstream:
+
+/opt/eigen/Eigen/src/Core/util/ReshapedHelper.h:
+
+/usr/include/c++/11/ios:
+
+/opt/eigen/Eigen/src/Core/products/GeneralMatrixMatrix.h:
+
+/usr/include/c++/11/bits/valarray_before.h:
+
+/opt/eigen/Eigen/src/SVD/SVDBase.h:
+
+/opt/eigen/Eigen/src/Core/MapBase.h:
+
+/usr/include/x86_64-linux-gnu/bits/typesizes.h:
+
+/usr/include/c++/11/tr1/special_function_util.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct___jmp_buf_tag.h:
+
+/usr/include/c++/11/deque:
+
+/usr/include/c++/11/bits/locale_classes.h:
+
+/opt/eigen/Eigen/src/Core/products/GeneralMatrixVector.h:
+
+/usr/include/c++/11/bits/postypes.h:
+
+/opt/eigen/Eigen/src/Core/functors/UnaryFunctors.h:
+
+/usr/local/include/ceres/internal/parameter_dims.h:
+
+/opt/eigen/Eigen/src/Core/BooleanRedux.h:
+
+/usr/include/nlohmann/detail/meta/detected.hpp:
+
+/usr/include/c++/11/bits/basic_ios.h:
+
+/usr/local/include/ceres/dynamic_autodiff_cost_function.h:
+
+/opt/eigen/Eigen/src/Core/util/ForwardDeclarations.h:
+
+/opt/eigen/Eigen/src/LU/PartialPivLU.h:
+
+/app/include/CostFunctions.h:
+
+/opt/eigen/Eigen/src/Geometry/Rotation2D.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseCompressedBase.h:
+
+/opt/eigen/Eigen/src/Core/products/Parallelizer.h:
+
+/usr/include/c++/11/istream:
+
+/usr/lib/gcc/x86_64-linux-gnu/11/include/mmintrin.h:
+
+/usr/include/nlohmann/detail/conversions/to_chars.hpp:
+
+/usr/include/c++/11/bits/hashtable.h:
+
+/opt/eigen/Eigen/src/Core/DenseCoeffsBase.h:
+
+/opt/eigen/Eigen/src/Core/products/TriangularMatrixMatrix.h:
+
+/usr/include/c++/11/bits/std_function.h:
+
+/usr/local/include/ceres/internal/eigen.h:
+
+/usr/include/c++/11/bits/enable_special_members.h:
+
+/opt/eigen/Eigen/src/Core/util/ConfigureVectorization.h:
+
+/usr/include/c++/11/bits/stl_algobase.h:
+
+/usr/include/x86_64-linux-gnu/bits/time64.h:
+
+/usr/include/c++/11/bits/valarray_after.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseRedux.h:
+
+/opt/eigen/Eigen/src/Core/util/MKL_support.h:
+
+/opt/eigen/Eigen/src/Geometry/RotationBase.h:
+
+/usr/include/x86_64-linux-gnu/bits/math-vector.h:
+
+/opt/eigen/Eigen/src/Core/util/ReenableStupidWarnings.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseFuzzy.h:
+
+/opt/eigen/Eigen/src/Core/util/XprHelper.h:
+
+/opt/eigen/Eigen/src/Eigenvalues/ComplexEigenSolver.h:
+
+/usr/include/features-time64.h:
+
+/opt/eigen/Eigen/src/QR/FullPivHouseholderQR.h:
+
+/usr/include/nlohmann/detail/hash.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/stdlib-float.h:
+
+/opt/eigen/Eigen/src/Eigenvalues/EigenSolver.h:
+
+/usr/include/c++/11/cassert:
+
+/usr/include/c++/11/bits/cxxabi_init_exception.h:
+
+/usr/include/opencv4/opencv2/flann/lsh_table.h:
+
+/usr/include/c++/11/bits/sstream.tcc:
+
+/usr/include/opencv4/opencv2/video/tracking.hpp:
+
+/opt/eigen/Eigen/src/Eigenvalues/RealQZ.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/error_t.h:
+
+/usr/include/c++/11/functional:
+
+/usr/include/c++/11/chrono:
+
+/usr/local/include/ceres/product_manifold.h:
+
+/usr/include/c++/11/bits/stl_bvector.h:
+
+/opt/eigen/Eigen/src/Geometry/OrthoMethods.h:
+
+/opt/eigen/Eigen/src/Core/ArrayBase.h:
+
+/opt/eigen/Eigen/src/Geometry/Quaternion.h:
+
+/app/src/Optimizer.cpp:
+
+/opt/eigen/Eigen/src/Core/util/Macros.h:
+
+/opt/eigen/Eigen/src/Geometry/Scaling.h:
+
+/usr/include/c++/11/unordered_set:
+
+/opt/eigen/Eigen/src/Core/DiagonalMatrix.h:
+
+/usr/include/asm-generic/errno-base.h:
+
+/usr/include/c++/11/tr1/legendre_function.tcc:
+
+/usr/include/c++/11/cmath:
+
+/opt/eigen/Eigen/src/Householder/HouseholderSequence.h:
+
+/opt/eigen/Eigen/src/Jacobi/Jacobi.h:
+
+/usr/include/nlohmann/detail/macro_scope.hpp:
+
+/usr/include/errno.h:
+
+/opt/eigen/Eigen/src/LU/FullPivLU.h:
+
+/opt/eigen/Eigen/src/Core/ArrayWrapper.h:
+
+/usr/include/c++/11/iosfwd:
+
+/usr/include/gflags/gflags.h:
+
+/opt/eigen/Eigen/src/SVD/BDCSVD.h:
+
+/usr/include/opencv4/opencv2/stitching/detail/util.hpp:
+
+/opt/eigen/Eigen/src/Core/GlobalFunctions.h:
+
+/opt/eigen/Eigen/OrderingMethods:
+
+/opt/eigen/Eigen/src/SparseCore/MappedSparseMatrix.h:
+
+/opt/eigen/Eigen/src/misc/Kernel.h:
+
+/usr/include/opencv4/opencv2/core/cv_cpu_dispatch.h:
+
+/usr/include/x86_64-linux-gnu/bits/unistd.h:
+
+/usr/include/opencv4/opencv2/core/cvdef.h:
+
+/usr/include/string.h:
+
+/usr/include/opencv4/opencv2/flann/lsh_index.h:
+
+/usr/include/opencv4/opencv2/core/cvstd.hpp:
+
+/usr/include/opencv4/opencv2/core/cvstd.inl.hpp:
+
+/usr/include/nlohmann/detail/iterators/iteration_proxy.hpp:
+
+/usr/include/opencv4/opencv2/core/fast_math.hpp:
+
+/opt/eigen/Eigen/src/Core/util/DisableStupidWarnings.h:
+
+/usr/include/opencv4/opencv2/core/mat.hpp:
+
+/usr/include/opencv4/opencv2/core/mat.inl.hpp:
+
+/usr/include/opencv4/opencv2/core/matx.hpp:
+
+/usr/include/opencv4/opencv2/core/operations.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/types/wint_t.h:
+
+/usr/include/opencv4/opencv2/core/optim.hpp:
+
+/opt/eigen/Eigen/src/Core/IndexedView.h:
+
+/usr/include/opencv4/opencv2/flann/sampling.h:
+
+/usr/include/opencv4/opencv2/core/ovx.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/endianness.h:
+
+/usr/include/c++/11/bits/forward_list.h:
+
+/usr/include/opencv4/opencv2/core/traits.hpp:
+
+/usr/include/opencv4/opencv2/core/types.hpp:
+
+/usr/include/nlohmann/json.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/flt-eval-method.h:
+
+/usr/include/opencv4/opencv2/core/utility.hpp:
+
+/usr/include/opencv4/opencv2/flann/config.h:
+
+/usr/include/opencv4/opencv2/core/persistence.hpp:
+
+/usr/include/opencv4/opencv2/dnn.hpp:
+
+/usr/include/opencv4/opencv2/dnn/dict.hpp:
+
+/usr/include/opencv4/opencv2/dnn/dnn.inl.hpp:
+
+/usr/include/opencv4/opencv2/flann/all_indices.h:
+
+/opt/eigen/Eigen/src/Core/functors/AssignmentFunctors.h:
+
+/usr/include/opencv4/opencv2/flann/any.h:
+
+/usr/include/assert.h:
+
+/usr/include/opencv4/opencv2/flann/composite_index.h:
+
+/usr/include/c++/11/bits/allocated_ptr.h:
+
+/usr/include/opencv4/opencv2/flann/defines.h:
+
+/usr/include/opencv4/opencv2/flann/dist.h:
+
+/usr/include/opencv4/opencv2/flann/dynamic_bitset.h:
+
+/usr/include/opencv4/opencv2/flann/general.h:
+
+/usr/include/c++/11/bits/fs_fwd.h:
+
+/usr/include/opencv4/opencv2/flann/ground_truth.h:
+
+/usr/include/x86_64-linux-gnu/bits/select.h:
+
+/usr/include/opencv4/opencv2/flann/hierarchical_clustering_index.h:
+
+/usr/local/include/ceres/problem.h:
+
+/usr/include/opencv4/opencv2/flann/linear_index.h:
+
+/opt/eigen/Eigen/src/Core/arch/Default/Settings.h:
+
+/usr/include/opencv4/opencv2/flann/logger.h:
+
+/usr/include/opencv4/opencv2/flann/matrix.h:
+
+/usr/include/c++/11/typeinfo:
+
+/usr/include/opencv4/opencv2/flann/miniflann.hpp:
+
+/usr/include/opencv4/opencv2/flann/result_set.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/__sigset_t.h:
+
+/usr/include/opencv4/opencv2/flann/saving.h:
+
+/usr/include/c++/11/cwctype:
+
+/usr/local/include/ceres/autodiff_first_order_function.h:
+
+/usr/include/opencv4/opencv2/highgui.hpp:
+
+/usr/include/nlohmann/detail/meta/identity_tag.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/endian.h:
+
+/usr/include/opencv4/opencv2/imgproc/segmentation.hpp:
+
+/usr/include/opencv4/opencv2/objdetect.hpp:
+
+/app/src/CostFunctions.cpp:
+
+/opt/eigen/Eigen/src/Core/functors/StlFunctors.h:
+
+/usr/include/opencv4/opencv2/objdetect/face.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/types/__FILE.h:
+
+/usr/local/include/ceres/line_manifold.h:
+
+/usr/include/opencv4/opencv2/opencv.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/wctype-wchar.h:
+
+/usr/include/opencv4/opencv2/stitching.hpp:
+
+/opt/eigen/Eigen/src/Core/CwiseBinaryOp.h:
+
+/usr/include/opencv4/opencv2/stitching/detail/blenders.hpp:
+
+/usr/include/opencv4/opencv2/stitching/detail/camera.hpp:
+
+/usr/include/opencv4/opencv2/ml.hpp:
+
+/usr/local/include/ceres/internal/autodiff.h:
+
+/usr/include/opencv4/opencv2/stitching/detail/matchers.hpp:
+
+/usr/include/opencv4/opencv2/stitching/detail/seam_finders.hpp:
+
+/usr/include/opencv4/opencv2/stitching/detail/warpers_inl.hpp:
+
+/usr/include/opencv4/opencv2/stitching/warpers.hpp:
+
+/usr/include/opencv4/opencv2/video.hpp:
+
+/usr/include/c++/11/bits/hash_bytes.h:
+
+/usr/include/pthread.h:
+
+/usr/include/x86_64-linux-gnu/bits/setjmp.h:
+
+/usr/include/sched.h:
+
+/usr/include/stdc-predef.h:
+
+/usr/lib/gcc/x86_64-linux-gnu/11/include/stdarg.h:
+
+/usr/include/opencv4/opencv2/opencv_modules.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h:
+
+/usr/include/stdint.h:
+
+/usr/include/wchar.h:
+
+/usr/include/wctype.h:
+
+/usr/include/x86_64-linux-gnu/asm/errno.h:
+
+/usr/local/include/ceres/internal/config.h:
+
+/usr/include/x86_64-linux-gnu/bits/atomic_wide_counter.h:
+
+/usr/include/x86_64-linux-gnu/bits/strings_fortified.h:
+
+/opt/eigen/Eigen/src/Core/products/SelfadjointRank2Update.h:
+
+/usr/include/x86_64-linux-gnu/bits/waitflags.h:
+
+/usr/include/opencv4/opencv2/core/cvstd_wrapper.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/confname.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/FILE.h:
+
+/opt/eigen/Eigen/src/Core/StlIterators.h:
+
+/usr/include/nlohmann/json_fwd.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/cpu-set.h:
+
+/opt/eigen/Eigen/src/plugins/MatrixCwiseUnaryOps.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseColEtree.h:
+
+/usr/include/x86_64-linux-gnu/bits/environments.h:
+
+/opt/eigen/Eigen/src/LU/Determinant.h:
+
+/usr/include/x86_64-linux-gnu/bits/floatn.h:
+
+/opt/eigen/Eigen/src/SparseCore/AmbiVector.h:
+
+/usr/include/x86_64-linux-gnu/bits/libm-simd-decl-stubs.h:
+
+/usr/include/x86_64-linux-gnu/bits/fp-fast.h:
+
+/usr/include/x86_64-linux-gnu/bits/fp-logb.h:
+
+/usr/include/opencv4/opencv2/flann/kmeans_index.h:
+
+/usr/include/opencv4/opencv2/stitching/detail/util_inl.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/getopt_core.h:
+
+/usr/include/x86_64-linux-gnu/bits/getopt_posix.h:
+
+/usr/include/c++/11/bits/shared_ptr_atomic.h:
+
+/usr/include/x86_64-linux-gnu/bits/libc-header-start.h:
+
+/usr/include/x86_64-linux-gnu/bits/locale.h:
+
+/usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/__fpos_t.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct_tm.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseRef.h:
+
+/usr/include/x86_64-linux-gnu/bits/posix2_lim.h:
+
+/opt/eigen/Eigen/src/Geometry/Hyperplane.h:
+
+/usr/include/x86_64-linux-gnu/bits/posix_opt.h:
+
+/usr/include/c++/11/pstl/glue_algorithm_defs.h:
+
+/usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h:
+
+/usr/include/x86_64-linux-gnu/bits/pthreadtypes.h:
+
+/usr/include/x86_64-linux-gnu/bits/uintn-identity.h:
+
+/usr/include/x86_64-linux-gnu/bits/sched.h:
+
+/usr/include/x86_64-linux-gnu/bits/select2.h:
+
+/usr/include/opencv4/opencv2/dnn/dnn.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/stdint-intn.h:
+
+/usr/include/x86_64-linux-gnu/bits/stdint-uintn.h:
+
+/usr/include/time.h:
+
+/usr/include/x86_64-linux-gnu/bits/stdio.h:
+
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:
+
+/usr/include/c++/11/ext/alloc_traits.h:
+
+/opt/eigen/Eigen/src/QR/ColPivHouseholderQR.h:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/c++config.h:
+
+/usr/include/x86_64-linux-gnu/bits/stdlib.h:
+
+/usr/include/x86_64-linux-gnu/bits/mathcalls.h:
+
+/usr/lib/gcc/x86_64-linux-gnu/11/include/xmmintrin.h:
+
+/usr/include/x86_64-linux-gnu/bits/string_fortified.h:
+
+/usr/include/x86_64-linux-gnu/bits/struct_mutex.h:
+
+/usr/include/x86_64-linux-gnu/bits/struct_rwlock.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct_timespec.h:
+
+/usr/local/include/ceres/internal/disable_warnings.h:
+
+/opt/eigen/Eigen/SparseCore:
+
+/usr/include/x86_64-linux-gnu/bits/thread-shared-types.h:
+
+/usr/include/x86_64-linux-gnu/bits/time.h:
+
+/opt/eigen/Eigen/src/Householder/BlockHouseholder.h:
+
+/usr/include/x86_64-linux-gnu/bits/timex.h:
+
+/usr/include/c++/11/stdlib.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/__fpos64_t.h:
+
+/usr/include/gflags/gflags_gflags.h:
+
+/opt/eigen/Eigen/src/Eigenvalues/SelfAdjointEigenSolver.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/clock_t.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/clockid_t.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/locale_t.h:
+
+/usr/include/nlohmann/detail/meta/is_sax.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/types/mbstate_t.h:
+
+/usr/include/x86_64-linux-gnu/bits/mathcalls-narrow.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/timer_t.h:
+
+/usr/include/x86_64-linux-gnu/bits/waitstatus.h:
+
+/usr/include/x86_64-linux-gnu/bits/wchar.h:
+
+/usr/include/x86_64-linux-gnu/bits/wchar2.h:
+
+/usr/include/c++/11/backward/auto_ptr.h:
+
+/usr/include/x86_64-linux-gnu/bits/xopen_lim.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseSparseProductWithPruning.h:
+
+/usr/include/nlohmann/detail/output/binary_writer.hpp:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/ctype_base.h:
+
+/opt/eigen/Eigen/src/Core/Block.h:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/ctype_inline.h:
+
+/opt/eigen/Eigen/src/Core/DenseBase.h:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/error_constants.h:
+
+/usr/include/endian.h:
+
+/opt/eigen/Eigen/src/IterativeLinearSolvers/IterativeSolverBase.h:
+
+/usr/include/c++/11/bits/stl_multimap.h:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/gthr-default.h:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/messages_members.h:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/os_defines.h:
+
+/opt/eigen/Eigen/src/Core/arch/Default/ConjHelper.h:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/cpu_defines.h:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/c++allocator.h:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/time_members.h:
+
+/usr/include/c++/11/type_traits:
+
+/usr/include/nlohmann/detail/value_t.hpp:
+
+/usr/include/x86_64-linux-gnu/gnu/stubs-64.h:
+
+/usr/local/include/ceres/sized_cost_function.h:
+
+/usr/include/x86_64-linux-gnu/bits/types.h:
+
+/usr/include/x86_64-linux-gnu/gnu/stubs.h:
+
+/usr/include/c++/11/bits/cpp_type_traits.h:
+
+/opt/eigen/Eigen/Dense:
+
+/usr/include/x86_64-linux-gnu/sys/cdefs.h:
+
+/usr/include/asm-generic/errno.h:
+
+/usr/lib/gcc/x86_64-linux-gnu/11/include/emmintrin.h:
+
+/usr/lib/gcc/x86_64-linux-gnu/11/include/float.h:
+
+/usr/lib/gcc/x86_64-linux-gnu/11/include/stddef.h:
+
+/usr/lib/gcc/x86_64-linux-gnu/11/include/syslimits.h:
+
+/usr/local/include/ceres/autodiff_local_parameterization.h:
+
+/usr/local/include/ceres/ceres.h:
+
+/opt/eigen/Eigen/src/IterativeLinearSolvers/IncompleteCholesky.h:
+
+/usr/include/opencv4/opencv2/dnn/layer.hpp:
+
+/usr/local/include/ceres/cost_function.h:
+
+/usr/local/include/ceres/covariance.h:
+
+/usr/include/nlohmann/detail/input/lexer.hpp:
+
+/usr/local/include/ceres/dynamic_cost_function.h:
+
+/usr/local/include/ceres/dynamic_cost_function_to_functor.h:
+
+/usr/local/include/ceres/gradient_checker.h:
+
+/usr/local/include/ceres/gradient_problem.h:
+
+/usr/local/include/ceres/gradient_problem_solver.h:
+
+/usr/local/include/ceres/internal/export.h:
+
+/usr/include/c++/11/bits/fstream.tcc:
+
+/opt/eigen/Eigen/src/Core/util/Memory.h:
+
+/usr/local/include/ceres/internal/householder_vector.h:
+
+/usr/include/c++/11/bits/locale_classes.tcc:
+
+/usr/local/include/ceres/dynamic_numeric_diff_cost_function.h:
+
+/usr/local/include/ceres/internal/jet_traits.h:
+
+/usr/local/include/ceres/internal/line_parameterization.h:
+
+/usr/include/c++/11/bits/streambuf.tcc:
+
+/usr/local/include/ceres/internal/reenable_warnings.h:
+
+/opt/eigen/Eigen/src/Core/arch/Default/BFloat16.h:
+
+/usr/local/include/ceres/jet.h:
+
+/usr/include/c++/11/bits/hashtable_policy.h:
+
+/usr/local/include/ceres/manifold.h:
+
+/usr/local/include/ceres/jet_fwd.h:
+
+/usr/local/include/ceres/numeric_diff_cost_function.h:
+
+/usr/local/include/ceres/numeric_diff_first_order_function.h:
+
+/usr/local/include/ceres/sphere_manifold.h:
+
+/usr/include/c++/11/bits/ostream.tcc:
+
+/app/src/BVH.cpp:
+
+/usr/include/c++/11/bits/ptr_traits.h:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/opt_random.h:
+
+/app/include/Projection.h:
+
+/usr/include/opencv4/opencv2/videoio.hpp:
+
+/usr/include/c++/11/bits/random.h:
+
+/opt/eigen/Eigen/src/Core/products/SelfadjointMatrixMatrix.h:
+
+/usr/include/c++/11/bits/random.tcc:
+
+/usr/local/include/sophus/common.hpp:
+
+/usr/local/include/sophus/rotation_matrix.hpp:
+
+/usr/lib/gcc/x86_64-linux-gnu/11/include/omp.h:
+
+/usr/include/x86_64-linux-gnu/bits/types/__locale_t.h:
+
+/usr/local/include/sophus/so2.hpp:
+
+/usr/include/opencv4/opencv2/core/version.hpp:
+
+/usr/local/include/sophus/so3.hpp:
+
+/usr/include/c++/11/system_error:
+
+/usr/include/x86_64-linux-gnu/bits/stdio_lim.h:
+
+/app/src/DatasetManager.cpp:
+
+/usr/include/c++/11/bits/fs_dir.h:
+
+/app/src/Evaluation.cpp:
+
+/usr/include/c++/11/bits/fs_ops.h:
+
+/usr/include/c++/11/bits/gslice_array.h:
+
+/usr/include/x86_64-linux-gnu/bits/byteswap.h:
+
+/usr/include/opencv4/opencv2/dnn/utils/inference_engine.hpp:
+
+/usr/include/c++/11/bits/mask_array.h:
+
+/usr/include/c++/11/bits/slice_array.h:
+
+/usr/include/c++/11/bits/stream_iterator.h:
+
+/usr/include/c++/11/codecvt:
+
+/usr/include/x86_64-linux-gnu/bits/posix1_lim.h:
+
+/usr/include/c++/11/forward_list:
+
+/usr/include/nlohmann/byte_container_with_subtype.hpp:
+
+/usr/include/c++/11/bits/parse_numbers.h:
+
+/usr/include/nlohmann/detail/conversions/to_json.hpp:
+
+/usr/include/opencv4/opencv2/flann/kdtree_index.h:
+
+/usr/include/c++/11/cwchar:
+
+/usr/include/nlohmann/detail/exceptions.hpp:
+
+/usr/include/nlohmann/detail/input/binary_reader.hpp:
+
+/usr/include/nlohmann/detail/input/json_sax.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/types/struct_timeval.h:
+
+/usr/include/c++/11/numeric:
+
+/usr/include/nlohmann/detail/input/position_t.hpp:
+
+/opt/eigen/Eigen/src/Core/NumTraits.h:
+
+/opt/eigen/Eigen/src/QR/HouseholderQR.h:
+
+/usr/include/nlohmann/detail/iterators/internal_iterator.hpp:
+
+/usr/include/opencv4/opencv2/objdetect/detection_based_tracker.hpp:
+
+/usr/include/nlohmann/detail/iterators/iterator_traits.hpp:
+
+/usr/include/nlohmann/detail/iterators/json_reverse_iterator.hpp:
+
+/usr/include/nlohmann/detail/iterators/primitive_iterator.hpp:
+
+/usr/include/opencv4/opencv2/features2d.hpp:
+
+/usr/include/c++/11/bits/atomic_lockfree_defines.h:
+
+/usr/include/nlohmann/detail/json_pointer.hpp:
+
+/usr/include/nlohmann/detail/macro_unscope.hpp:
+
+/usr/include/nlohmann/detail/meta/call_std/begin.hpp:
+
+/usr/include/nlohmann/detail/meta/call_std/end.hpp:
+
+/usr/include/nlohmann/detail/meta/type_traits.hpp:
+
+/usr/include/nlohmann/detail/meta/void_t.hpp:
+
+/usr/include/nlohmann/detail/output/output_adapters.hpp:
+
+/usr/include/c++/11/ext/numeric_traits.h:
+
+/usr/include/nlohmann/thirdparty/hedley/hedley.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/types/cookie_io_functions_t.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseBlock.h:
+
+/usr/include/nlohmann/adl_serializer.hpp:
+
+/usr/include/nlohmann/thirdparty/hedley/hedley_undef.hpp:
+
+/opt/eigen/Eigen/src/Core/MatrixBase.h:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/basic_file.h:
+
+/opt/eigen/Eigen/IterativeLinearSolvers:
+
+/opt/eigen/Eigen/src/IterativeLinearSolvers/BasicPreconditioners.h:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/atomic_word.h:
+
+/opt/eigen/Eigen/src/IterativeLinearSolvers/IncompleteLUT.h:
+
+/opt/eigen/Eigen/src/OrderingMethods/Amd.h:
+
+/opt/eigen/Eigen/src/OrderingMethods/Eigen_Colamd.h:
+
+/opt/eigen/Eigen/src/Core/arch/SSE/PacketMath.h:
+
+/opt/eigen/Eigen/src/SparseCholesky/SimplicialCholesky_impl.h:
+
+/opt/eigen/Eigen/src/Core/products/SelfadjointMatrixVector.h:
+
+/opt/eigen/Eigen/src/SparseCore/CompressedStorage.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseAssign.h:
+
+/usr/include/c++/11/bits/list.tcc:
+
+/usr/include/c++/11/bits/functexcept.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseCwiseUnaryOp.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseDenseProduct.h:
+
+/usr/include/x86_64-linux-gnu/sys/types.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseMap.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseMatrix.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseMatrixBase.h:
+
+/opt/eigen/Eigen/src/SparseCore/SparseSelfAdjointView.h:
+
+/usr/include/c++/11/cstring:
+
+/usr/include/opencv4/opencv2/core/neon_utils.hpp:
+
+/opt/eigen/Eigen/src/SparseCore/SparseSolverBase.h:

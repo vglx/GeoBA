@@ -1,6 +1,7 @@
 CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
  /usr/include/stdc-predef.h /app/include/Optimizer.h \
- /usr/include/c++/11/vector /usr/include/c++/11/bits/stl_algobase.h \
+ /app/include/MeshModel.h /usr/include/c++/11/vector \
+ /usr/include/c++/11/bits/stl_algobase.h \
  /usr/include/x86_64-linux-gnu/c++/11/bits/c++config.h \
  /usr/include/x86_64-linux-gnu/c++/11/bits/os_defines.h \
  /usr/include/features.h /usr/include/features-time64.h \
@@ -339,6 +340,59 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
  /opt/eigen/Eigen/src/Core/StlIterators.h \
  /opt/eigen/Eigen/src/Core/GlobalFunctions.h \
  /opt/eigen/Eigen/src/Core/util/ReenableStupidWarnings.h \
+ /app/include/BVH.h /opt/eigen/Eigen/Dense /opt/eigen/Eigen/Core \
+ /opt/eigen/Eigen/LU /opt/eigen/Eigen/src/misc/Kernel.h \
+ /opt/eigen/Eigen/src/misc/Image.h /opt/eigen/Eigen/src/LU/FullPivLU.h \
+ /opt/eigen/Eigen/src/LU/PartialPivLU.h \
+ /opt/eigen/Eigen/src/LU/Determinant.h \
+ /opt/eigen/Eigen/src/LU/InverseImpl.h \
+ /opt/eigen/Eigen/src/LU/arch/InverseSize4.h /opt/eigen/Eigen/Cholesky \
+ /opt/eigen/Eigen/Jacobi /opt/eigen/Eigen/src/Jacobi/Jacobi.h \
+ /opt/eigen/Eigen/src/Cholesky/LLT.h /opt/eigen/Eigen/src/Cholesky/LDLT.h \
+ /opt/eigen/Eigen/QR /opt/eigen/Eigen/Householder \
+ /opt/eigen/Eigen/src/Householder/Householder.h \
+ /opt/eigen/Eigen/src/Householder/HouseholderSequence.h \
+ /opt/eigen/Eigen/src/Householder/BlockHouseholder.h \
+ /opt/eigen/Eigen/src/QR/HouseholderQR.h \
+ /opt/eigen/Eigen/src/QR/FullPivHouseholderQR.h \
+ /opt/eigen/Eigen/src/QR/ColPivHouseholderQR.h \
+ /opt/eigen/Eigen/src/QR/CompleteOrthogonalDecomposition.h \
+ /opt/eigen/Eigen/SVD /opt/eigen/Eigen/src/misc/RealSvd2x2.h \
+ /opt/eigen/Eigen/src/SVD/UpperBidiagonalization.h \
+ /opt/eigen/Eigen/src/SVD/SVDBase.h /opt/eigen/Eigen/src/SVD/JacobiSVD.h \
+ /opt/eigen/Eigen/src/SVD/BDCSVD.h /opt/eigen/Eigen/Geometry \
+ /opt/eigen/Eigen/src/Geometry/OrthoMethods.h \
+ /opt/eigen/Eigen/src/Geometry/EulerAngles.h \
+ /opt/eigen/Eigen/src/Geometry/Homogeneous.h \
+ /opt/eigen/Eigen/src/Geometry/RotationBase.h \
+ /opt/eigen/Eigen/src/Geometry/Rotation2D.h \
+ /opt/eigen/Eigen/src/Geometry/Quaternion.h \
+ /opt/eigen/Eigen/src/Geometry/AngleAxis.h \
+ /opt/eigen/Eigen/src/Geometry/Transform.h \
+ /opt/eigen/Eigen/src/Geometry/Translation.h \
+ /opt/eigen/Eigen/src/Geometry/Scaling.h \
+ /opt/eigen/Eigen/src/Geometry/Hyperplane.h \
+ /opt/eigen/Eigen/src/Geometry/ParametrizedLine.h \
+ /opt/eigen/Eigen/src/Geometry/AlignedBox.h \
+ /opt/eigen/Eigen/src/Geometry/Umeyama.h \
+ /opt/eigen/Eigen/src/Geometry/arch/Geometry_SIMD.h \
+ /opt/eigen/Eigen/Eigenvalues \
+ /opt/eigen/Eigen/src/Eigenvalues/Tridiagonalization.h \
+ /opt/eigen/Eigen/src/Eigenvalues/RealSchur.h \
+ /opt/eigen/Eigen/src/Eigenvalues/./HessenbergDecomposition.h \
+ /opt/eigen/Eigen/src/Eigenvalues/EigenSolver.h \
+ /opt/eigen/Eigen/src/Eigenvalues/./RealSchur.h \
+ /opt/eigen/Eigen/src/Eigenvalues/SelfAdjointEigenSolver.h \
+ /opt/eigen/Eigen/src/Eigenvalues/./Tridiagonalization.h \
+ /opt/eigen/Eigen/src/Eigenvalues/GeneralizedSelfAdjointEigenSolver.h \
+ /opt/eigen/Eigen/src/Eigenvalues/HessenbergDecomposition.h \
+ /opt/eigen/Eigen/src/Eigenvalues/ComplexSchur.h \
+ /opt/eigen/Eigen/src/Eigenvalues/ComplexEigenSolver.h \
+ /opt/eigen/Eigen/src/Eigenvalues/./ComplexSchur.h \
+ /opt/eigen/Eigen/src/Eigenvalues/RealQZ.h \
+ /opt/eigen/Eigen/src/Eigenvalues/GeneralizedEigenSolver.h \
+ /opt/eigen/Eigen/src/Eigenvalues/./RealQZ.h \
+ /opt/eigen/Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h \
  /usr/include/opencv4/opencv2/opencv.hpp \
  /usr/include/opencv4/opencv2/opencv_modules.hpp \
  /usr/include/opencv4/opencv2/core.hpp \
@@ -477,138 +531,86 @@ CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
  /usr/include/opencv4/opencv2/video.hpp \
  /usr/include/opencv4/opencv2/video/tracking.hpp \
  /usr/include/opencv4/opencv2/video/background_segm.hpp \
- /usr/local/include/ceres/ceres.h \
- /usr/local/include/ceres/autodiff_cost_function.h \
- /usr/local/include/ceres/internal/autodiff.h \
- /usr/local/include/ceres/internal/array_selector.h \
- /usr/local/include/ceres/internal/fixed_array.h \
- /usr/local/include/ceres/internal/memory.h /usr/include/glog/logging.h \
- /usr/include/unistd.h /usr/include/x86_64-linux-gnu/bits/posix_opt.h \
- /usr/include/x86_64-linux-gnu/bits/environments.h \
- /usr/include/x86_64-linux-gnu/bits/confname.h \
- /usr/include/x86_64-linux-gnu/bits/getopt_posix.h \
- /usr/include/x86_64-linux-gnu/bits/getopt_core.h \
- /usr/include/x86_64-linux-gnu/bits/unistd.h \
- /usr/include/x86_64-linux-gnu/bits/unistd_ext.h \
- /usr/include/linux/close_range.h /usr/include/inttypes.h \
- /usr/include/gflags/gflags.h /usr/include/gflags/gflags_declare.h \
- /usr/include/gflags/gflags_gflags.h /usr/include/glog/log_severity.h \
- /usr/include/glog/vlog_is_on.h /usr/local/include/ceres/types.h \
- /usr/local/include/ceres/internal/disable_warnings.h \
- /usr/local/include/ceres/internal/export.h \
- /usr/local/include/ceres/internal/reenable_warnings.h \
- /usr/local/include/ceres/internal/eigen.h \
- /usr/local/include/ceres/internal/parameter_dims.h \
- /usr/local/include/ceres/internal/integer_sequence_algorithm.h \
- /usr/local/include/ceres/jet_fwd.h \
- /usr/local/include/ceres/internal/variadic_evaluate.h \
- /usr/local/include/ceres/cost_function.h /usr/local/include/ceres/jet.h \
- /usr/include/c++/11/numeric /usr/include/c++/11/bits/stl_numeric.h \
- /usr/include/c++/11/pstl/glue_numeric_defs.h \
- /usr/local/include/ceres/internal/jet_traits.h \
- /usr/local/include/ceres/internal/port.h \
- /usr/local/include/ceres/sized_cost_function.h \
- /usr/local/include/ceres/internal/parameter_dims.h \
- /usr/local/include/ceres/autodiff_first_order_function.h \
- /usr/local/include/ceres/first_order_function.h \
- /usr/local/include/ceres/autodiff_local_parameterization.h \
- /usr/local/include/ceres/local_parameterization.h \
- /usr/local/include/ceres/internal/line_parameterization.h \
- /usr/local/include/ceres/internal/householder_vector.h \
- /usr/local/include/ceres/autodiff_manifold.h \
- /usr/local/include/ceres/manifold.h \
- /usr/local/include/ceres/conditioned_cost_function.h \
- /usr/local/include/ceres/context.h \
- /usr/local/include/ceres/cost_function_to_functor.h \
- /usr/local/include/ceres/dynamic_cost_function_to_functor.h \
- /usr/local/include/ceres/dynamic_cost_function.h \
- /usr/local/include/ceres/covariance.h \
- /usr/local/include/ceres/internal/config.h \
- /usr/local/include/ceres/crs_matrix.h \
- /usr/local/include/ceres/dynamic_autodiff_cost_function.h \
- /usr/local/include/ceres/dynamic_numeric_diff_cost_function.h \
- /usr/local/include/ceres/internal/numeric_diff.h /opt/eigen/Eigen/Dense \
- /opt/eigen/Eigen/Core /opt/eigen/Eigen/LU \
- /opt/eigen/Eigen/src/misc/Kernel.h /opt/eigen/Eigen/src/misc/Image.h \
- /opt/eigen/Eigen/src/LU/FullPivLU.h \
- /opt/eigen/Eigen/src/LU/PartialPivLU.h \
- /opt/eigen/Eigen/src/LU/Determinant.h \
- /opt/eigen/Eigen/src/LU/InverseImpl.h \
- /opt/eigen/Eigen/src/LU/arch/InverseSize4.h /opt/eigen/Eigen/Cholesky \
- /opt/eigen/Eigen/Jacobi /opt/eigen/Eigen/src/Jacobi/Jacobi.h \
- /opt/eigen/Eigen/src/Cholesky/LLT.h /opt/eigen/Eigen/src/Cholesky/LDLT.h \
- /opt/eigen/Eigen/QR /opt/eigen/Eigen/Householder \
- /opt/eigen/Eigen/src/Householder/Householder.h \
- /opt/eigen/Eigen/src/Householder/HouseholderSequence.h \
- /opt/eigen/Eigen/src/Householder/BlockHouseholder.h \
- /opt/eigen/Eigen/src/QR/HouseholderQR.h \
- /opt/eigen/Eigen/src/QR/FullPivHouseholderQR.h \
- /opt/eigen/Eigen/src/QR/ColPivHouseholderQR.h \
- /opt/eigen/Eigen/src/QR/CompleteOrthogonalDecomposition.h \
- /opt/eigen/Eigen/SVD /opt/eigen/Eigen/src/misc/RealSvd2x2.h \
- /opt/eigen/Eigen/src/SVD/UpperBidiagonalization.h \
- /opt/eigen/Eigen/src/SVD/SVDBase.h /opt/eigen/Eigen/src/SVD/JacobiSVD.h \
- /opt/eigen/Eigen/src/SVD/BDCSVD.h /opt/eigen/Eigen/Geometry \
- /opt/eigen/Eigen/src/Geometry/OrthoMethods.h \
- /opt/eigen/Eigen/src/Geometry/EulerAngles.h \
- /opt/eigen/Eigen/src/Geometry/Homogeneous.h \
- /opt/eigen/Eigen/src/Geometry/RotationBase.h \
- /opt/eigen/Eigen/src/Geometry/Rotation2D.h \
- /opt/eigen/Eigen/src/Geometry/Quaternion.h \
- /opt/eigen/Eigen/src/Geometry/AngleAxis.h \
- /opt/eigen/Eigen/src/Geometry/Transform.h \
- /opt/eigen/Eigen/src/Geometry/Translation.h \
- /opt/eigen/Eigen/src/Geometry/Scaling.h \
- /opt/eigen/Eigen/src/Geometry/Hyperplane.h \
- /opt/eigen/Eigen/src/Geometry/ParametrizedLine.h \
- /opt/eigen/Eigen/src/Geometry/AlignedBox.h \
- /opt/eigen/Eigen/src/Geometry/Umeyama.h \
- /opt/eigen/Eigen/src/Geometry/arch/Geometry_SIMD.h \
- /opt/eigen/Eigen/Eigenvalues \
- /opt/eigen/Eigen/src/Eigenvalues/Tridiagonalization.h \
- /opt/eigen/Eigen/src/Eigenvalues/RealSchur.h \
- /opt/eigen/Eigen/src/Eigenvalues/HessenbergDecomposition.h \
- /opt/eigen/Eigen/src/Eigenvalues/EigenSolver.h \
- /opt/eigen/Eigen/src/Eigenvalues/RealSchur.h \
- /opt/eigen/Eigen/src/Eigenvalues/SelfAdjointEigenSolver.h \
- /opt/eigen/Eigen/src/Eigenvalues/Tridiagonalization.h \
- /opt/eigen/Eigen/src/Eigenvalues/GeneralizedSelfAdjointEigenSolver.h \
- /opt/eigen/Eigen/src/Eigenvalues/HessenbergDecomposition.h \
- /opt/eigen/Eigen/src/Eigenvalues/ComplexSchur.h \
- /opt/eigen/Eigen/src/Eigenvalues/ComplexEigenSolver.h \
- /opt/eigen/Eigen/src/Eigenvalues/ComplexSchur.h \
- /opt/eigen/Eigen/src/Eigenvalues/RealQZ.h \
- /opt/eigen/Eigen/src/Eigenvalues/GeneralizedEigenSolver.h \
- /opt/eigen/Eigen/src/Eigenvalues/RealQZ.h \
- /opt/eigen/Eigen/src/Eigenvalues/MatrixBaseEigenvalues.h \
- /opt/eigen/Eigen/StdVector /opt/eigen/Eigen/src/StlSupport/StdVector.h \
- /opt/eigen/Eigen/src/StlSupport/details.h \
- /usr/local/include/ceres/numeric_diff_options.h \
- /usr/local/include/ceres/evaluation_callback.h \
- /usr/local/include/ceres/gradient_checker.h \
- /usr/local/include/ceres/gradient_problem.h \
- /usr/local/include/ceres/gradient_problem_solver.h \
- /usr/local/include/ceres/iteration_callback.h \
- /usr/local/include/ceres/line_manifold.h \
- /usr/local/include/ceres/internal/householder_vector.h \
- /usr/local/include/ceres/internal/sphere_manifold_functions.h \
- /usr/local/include/ceres/loss_function.h \
- /usr/local/include/ceres/numeric_diff_cost_function.h \
- /usr/local/include/ceres/numeric_diff_first_order_function.h \
- /usr/local/include/ceres/ordered_groups.h \
- /usr/local/include/ceres/problem.h \
- /usr/local/include/ceres/product_manifold.h \
- /usr/local/include/ceres/solver.h /usr/include/c++/11/unordered_set \
- /usr/include/c++/11/bits/unordered_set.h \
- /usr/local/include/ceres/sphere_manifold.h \
- /usr/local/include/ceres/version.h /app/include/MeshModel.h \
- /app/include/BVH.h /app/include/CostFunctions.h \
- /app/include/Projection.h /app/include/BVH.h \
+ /app/include/CostFunctions.h /app/include/Projection.h \
+ /app/include/BVH.h /opt/eigen/Eigen/Sparse /opt/eigen/Eigen/SparseCore \
+ /opt/eigen/Eigen/src/SparseCore/SparseUtil.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseMatrixBase.h \
+ /opt/eigen/Eigen/src/SparseCore/../plugins/CommonCwiseUnaryOps.h \
+ /opt/eigen/Eigen/src/SparseCore/../plugins/CommonCwiseBinaryOps.h \
+ /opt/eigen/Eigen/src/SparseCore/../plugins/MatrixCwiseUnaryOps.h \
+ /opt/eigen/Eigen/src/SparseCore/../plugins/MatrixCwiseBinaryOps.h \
+ /opt/eigen/Eigen/src/SparseCore/../plugins/BlockMethods.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseAssign.h \
+ /opt/eigen/Eigen/src/SparseCore/CompressedStorage.h \
+ /opt/eigen/Eigen/src/SparseCore/AmbiVector.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseCompressedBase.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseMatrix.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseMap.h \
+ /opt/eigen/Eigen/src/SparseCore/MappedSparseMatrix.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseVector.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseRef.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseCwiseUnaryOp.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseCwiseBinaryOp.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseTranspose.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseBlock.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseDot.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseRedux.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseView.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseDiagonalProduct.h \
+ /opt/eigen/Eigen/src/SparseCore/ConservativeSparseSparseProduct.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseSparseProductWithPruning.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseProduct.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseDenseProduct.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseSelfAdjointView.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseTriangularView.h \
+ /opt/eigen/Eigen/src/SparseCore/TriangularSolver.h \
+ /opt/eigen/Eigen/src/SparseCore/SparsePermutation.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseFuzzy.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseSolverBase.h \
+ /opt/eigen/Eigen/OrderingMethods \
+ /opt/eigen/Eigen/src/OrderingMethods/Amd.h \
+ /opt/eigen/Eigen/src/OrderingMethods/Ordering.h \
+ /opt/eigen/Eigen/src/OrderingMethods/Eigen_Colamd.h \
+ /opt/eigen/Eigen/SparseCholesky \
+ /opt/eigen/Eigen/src/SparseCholesky/SimplicialCholesky.h \
+ /opt/eigen/Eigen/src/SparseCholesky/SimplicialCholesky_impl.h \
+ /opt/eigen/Eigen/SparseLU \
+ /opt/eigen/Eigen/src/SparseLU/SparseLU_gemm_kernel.h \
+ /opt/eigen/Eigen/src/SparseLU/SparseLU_Structs.h \
+ /opt/eigen/Eigen/src/SparseLU/SparseLU_SupernodalMatrix.h \
+ /opt/eigen/Eigen/src/SparseLU/SparseLUImpl.h \
+ /opt/eigen/Eigen/src/SparseCore/SparseColEtree.h \
+ /opt/eigen/Eigen/src/SparseLU/SparseLU_Memory.h \
+ /opt/eigen/Eigen/src/SparseLU/SparseLU_heap_relax_snode.h \
+ /opt/eigen/Eigen/src/SparseLU/SparseLU_relax_snode.h \
+ /opt/eigen/Eigen/src/SparseLU/SparseLU_pivotL.h \
+ /opt/eigen/Eigen/src/SparseLU/SparseLU_panel_dfs.h \
+ /opt/eigen/Eigen/src/SparseLU/SparseLU_kernel_bmod.h \
+ /opt/eigen/Eigen/src/SparseLU/SparseLU_panel_bmod.h \
+ /opt/eigen/Eigen/src/SparseLU/SparseLU_column_dfs.h \
+ /opt/eigen/Eigen/src/SparseLU/SparseLU_column_bmod.h \
+ /opt/eigen/Eigen/src/SparseLU/SparseLU_copy_to_ucol.h \
+ /opt/eigen/Eigen/src/SparseLU/SparseLU_pruneL.h \
+ /opt/eigen/Eigen/src/SparseLU/SparseLU_Utils.h \
+ /opt/eigen/Eigen/src/SparseLU/SparseLU.h /opt/eigen/Eigen/SparseQR \
+ /opt/eigen/Eigen/src/SparseQR/SparseQR.h \
+ /opt/eigen/Eigen/IterativeLinearSolvers \
+ /opt/eigen/Eigen/src/IterativeLinearSolvers/SolveWithGuess.h \
+ /opt/eigen/Eigen/src/IterativeLinearSolvers/IterativeSolverBase.h \
+ /opt/eigen/Eigen/src/IterativeLinearSolvers/BasicPreconditioners.h \
+ /opt/eigen/Eigen/src/IterativeLinearSolvers/ConjugateGradient.h \
+ /opt/eigen/Eigen/src/IterativeLinearSolvers/LeastSquareConjugateGradient.h \
+ /opt/eigen/Eigen/src/IterativeLinearSolvers/BiCGSTAB.h \
+ /opt/eigen/Eigen/src/IterativeLinearSolvers/IncompleteLUT.h \
+ /opt/eigen/Eigen/src/IterativeLinearSolvers/IncompleteCholesky.h \
  /usr/local/include/sophus/se3.hpp /usr/local/include/sophus/so3.hpp \
  /usr/local/include/sophus/rotation_matrix.hpp /opt/eigen/Eigen/SVD \
  /usr/local/include/sophus/types.hpp /usr/local/include/sophus/common.hpp \
  /usr/include/c++/11/optional /usr/include/c++/11/random \
  /usr/include/c++/11/bits/random.h \
  /usr/include/x86_64-linux-gnu/c++/11/bits/opt_random.h \
- /usr/include/c++/11/bits/random.tcc /usr/local/include/sophus/so2.hpp \
- /opt/eigen/Eigen/LU /opt/eigen/Eigen/Geometry
+ /usr/include/c++/11/bits/random.tcc /usr/include/c++/11/numeric \
+ /usr/include/c++/11/bits/stl_numeric.h \
+ /usr/include/c++/11/pstl/glue_numeric_defs.h \
+ /usr/local/include/sophus/so2.hpp /opt/eigen/Eigen/LU \
+ /opt/eigen/Eigen/Geometry
