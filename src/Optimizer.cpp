@@ -105,7 +105,7 @@ void Optimizer::optimize(
         // 对每个顶点和每帧构造残差项
         for (size_t i = 0; i < vertex_count; i++) {
             if (x2_counts[i] == 0) continue;  // 跳过所有帧均不可见的顶点
-
+            std::cout << rowIndex << std::endl;
             for (size_t j = 0; j < frame_count; j++) {
                 Eigen::Matrix<double, 6, 1> se3 = X.segment<6>(j*6);
                 Sophus::SE3d T = Sophus::SE3d::exp(se3);
@@ -138,6 +138,8 @@ void Optimizer::optimize(
             }
         }
 
+        // std::cout << "111111111111111" << std::endl;
+
         Eigen::VectorXd F = Eigen::Map<Eigen::VectorXd>(residuals.data(), residuals.size());
         Eigen::SparseMatrix<double> J(rowIndex, stateDim);
         J.setFromTriplets(triplets.begin(), triplets.end());
@@ -159,6 +161,11 @@ void Optimizer::optimize(
         Eigen::MatrixXd U_dense = Eigen::MatrixXd(U);
         Eigen::MatrixXd W_dense = Eigen::MatrixXd(W);
         Eigen::MatrixXd V_dense = Eigen::MatrixXd(V);
+
+        // std::cout << "111111111111111" << std::endl;
+
+        double lambda = 1e-6; // 根据情况调整
+        V_dense += lambda * Eigen::MatrixXd::Identity(V_dense.rows(), V_dense.cols());
         Eigen::MatrixXd V_inv = V_dense.inverse();
 
         Eigen::MatrixXd Schur = U_dense - W_dense * V_inv * W_dense.transpose();
@@ -168,6 +175,9 @@ void Optimizer::optimize(
         Eigen::VectorXd delta(stateDim);
         delta.head(poseDim) = delta_pose;
         delta.tail(intensityDim) = delta_intensity;
+
+        // 固定第一帧：将第一帧的 6 个参数更新置零
+        delta.segment(0, 6).setZero();
 
         X += delta;
         double deltaNorm = delta.norm();

@@ -9,8 +9,8 @@ int main() {
     std::cout << "GeoBA System Starting with Dataset...\n";
 
     // **1. 初始化数据集管理器**
-    // DatasetManager dataset_manager("../data/Triplettest/");
-    DatasetManager dataset_manager("../data/sim_rectum/");
+    DatasetManager dataset_manager("../data/Triplettest/");
+    // DatasetManager dataset_manager("../data/sim_rectum/");
 
     std::vector<cv::Mat> rgb_images;
     // std::vector<cv::Mat> depth_images;
@@ -56,7 +56,7 @@ int main() {
     }
 
     // **5. 加载相机位姿**
-    if (!dataset_manager.loadPoses(camera_poses, "poses_gt")) {
+    if (!dataset_manager.loadPoses(camera_poses, "poses_init")) {
         std::cerr << "Failed to load initialized poses.\n";
         return -1;
     }
