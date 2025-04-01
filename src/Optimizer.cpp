@@ -98,50 +98,91 @@ void Optimizer::optimize(
 
     // Gauss-Newton 优化迭代
     for (int iter = 0; iter < maxIterations_; iter++) {
-        std::vector<double> residuals;
-        std::vector<Eigen::Triplet<double>> triplets;
-        int rowIndex = 0;
 
         // 对每个顶点和每帧构造残差项
-        for (size_t i = 0; i < vertex_count; i++) {
-            if (x2_counts[i] == 0) continue;  // 跳过所有帧均不可见的顶点
-            std::cout << rowIndex << std::endl;
-            for (size_t j = 0; j < frame_count; j++) {
+        // 统计每个顶点可见帧数，预估每个顶点会生成多少残差项
+        std::vector<int> residuals_per_vertex(vertex_count, 0);
+        for (size_t i = 0; i < vertex_count; ++i) {
+            if (x2_counts[i] == 0) continue;
+            for (size_t j = 0; j < frame_count; ++j) {
                 Eigen::Matrix<double, 6, 1> se3 = X.segment<6>(j*6);
                 Sophus::SE3d T = Sophus::SE3d::exp(se3);
                 Eigen::Matrix3d R = T.rotationMatrix();
                 Eigen::Vector3d t = T.translation();
                 const cv::Mat& image = observed_images_gray[j];
 
-                if (!Projection::isVertexVisible(mesh_vertices[i], camera_intrinsics, R, t,
-                                                 bvh, image.cols, image.rows)) {
-                    continue;
+                if (Projection::isVertexVisible(mesh_vertices[i], camera_intrinsics, R, t,
+                                                bvh, image.cols, image.rows)) {
+                    residuals_per_vertex[i]++;
                 }
-
-                PhotometricError costFunc(mesh_vertices[i], mesh_triangles,
-                                          camera_intrinsics, image, bvh, weight_);
-                double r = 0.0;
-                Eigen::Matrix<double, 1, 6> J_pose;
-                double J_intensity = 0.0;
-                double intensity = X(poseDim + i);
-
-                costFunc.Evaluate(se3, intensity, r, &J_pose, &J_intensity);
-                residuals.push_back(r);
-
-                // 当前观测对应雅可比行：
-                // 对应列：帧 j 的位姿 (j*6 到 j*6+5) 和顶点 i 的光度 (poseDim + i)
-                for (int k = 0; k < 6; k++) {
-                    triplets.push_back(Eigen::Triplet<double>(rowIndex, j*6 + k, J_pose(k)));
-                }
-                triplets.push_back(Eigen::Triplet<double>(rowIndex, poseDim + i, J_intensity));
-                rowIndex++;
             }
         }
 
-        // std::cout << "111111111111111" << std::endl;
+        // 计算每个顶点在 residuals 和 triplets 中的起始行号偏移
+        std::vector<int> row_offset(vertex_count, 0);
+        int total_rows = 0;
+        for (size_t i = 0; i < vertex_count; ++i) {
+            row_offset[i] = total_rows;
+            total_rows += residuals_per_vertex[i];
+        }
+
+        // 多线程安全版本
+        // 分配全局残差向量（线程共享）
+        std::vector<double> residuals(total_rows);
+
+        // 每线程独立 triplets 缓冲区
+        int num_threads = omp_get_max_threads();
+        std::vector<std::vector<Eigen::Triplet<double>>> triplets_per_thread(num_threads);
+
+        #pragma omp parallel
+        {
+            int tid = omp_get_thread_num();
+            auto& local_triplets = triplets_per_thread[tid];
+
+            #pragma omp for
+            for (size_t i = 0; i < vertex_count; ++i) {
+                if (x2_counts[i] == 0) continue;
+
+                int local_rowIndex = row_offset[i];
+                for (size_t j = 0; j < frame_count; ++j) {
+                    Eigen::Matrix<double, 6, 1> se3 = X.segment<6>(j * 6);
+                    Sophus::SE3d T = Sophus::SE3d::exp(se3);
+                    Eigen::Matrix3d R = T.rotationMatrix();
+                    Eigen::Vector3d t = T.translation();
+                    const cv::Mat& image = observed_images_gray[j];
+
+                    if (!Projection::isVertexVisible(mesh_vertices[i], camera_intrinsics, R, t,
+                                                    bvh, image.cols, image.rows)) {
+                        continue;
+                    }
+
+                    PhotometricError costFunc(mesh_vertices[i], mesh_triangles,
+                                            camera_intrinsics, image, bvh, weight_);
+                    double r = 0.0;
+                    Eigen::Matrix<double, 1, 6> J_pose;
+                    double J_intensity = 0.0;
+                    double intensity = X(poseDim + i);
+
+                    costFunc.Evaluate(se3, intensity, r, &J_pose, &J_intensity);
+                    residuals[local_rowIndex] = r;
+
+                    for (int k = 0; k < 6; ++k) {
+                        local_triplets.emplace_back(local_rowIndex, j * 6 + k, J_pose(k));
+                    }
+                    local_triplets.emplace_back(local_rowIndex, poseDim + i, J_intensity);
+                    local_rowIndex++;
+                }
+            }
+        }
+
+        // 合并所有线程 triplets
+        std::vector<Eigen::Triplet<double>> triplets;
+        for (const auto& vec : triplets_per_thread) {
+            triplets.insert(triplets.end(), vec.begin(), vec.end());
+        }
 
         Eigen::VectorXd F = Eigen::Map<Eigen::VectorXd>(residuals.data(), residuals.size());
-        Eigen::SparseMatrix<double> J(rowIndex, stateDim);
+        Eigen::SparseMatrix<double> J(total_rows, stateDim);
         J.setFromTriplets(triplets.begin(), triplets.end());
 
         // 计算当前 cost 和梯度
@@ -150,31 +191,47 @@ void Optimizer::optimize(
         Eigen::VectorXd g = -J.transpose() * F;
         double gradNorm = g.norm();
 
-        // 将 H 分块：前 poseDim 为相机位姿，后 intensityDim 为光度
-        Eigen::SparseMatrix<double> U = H.block(0, 0, poseDim, poseDim);
-        Eigen::SparseMatrix<double> W = H.block(0, poseDim, poseDim, intensityDim);
-        Eigen::SparseMatrix<double> V = H.block(poseDim, poseDim, intensityDim, intensityDim);
-        Eigen::VectorXd bp = g.segment(0, poseDim);
-        Eigen::VectorXd bf = g.segment(poseDim, intensityDim);
+        // // 将 H 分块：前 poseDim 为相机位姿，后 intensityDim 为光度
+        // Eigen::SparseMatrix<double> U = H.block(0, 0, poseDim, poseDim);
+        // Eigen::SparseMatrix<double> W = H.block(0, poseDim, poseDim, intensityDim);
+        // Eigen::SparseMatrix<double> V = H.block(poseDim, poseDim, intensityDim, intensityDim);
+        // Eigen::VectorXd bp = g.segment(0, poseDim);
+        // Eigen::VectorXd bf = g.segment(poseDim, intensityDim);
 
-        // 这里转换为 dense 求解 Schur 补（实际可用稀疏求解器提高效率）
-        Eigen::MatrixXd U_dense = Eigen::MatrixXd(U);
-        Eigen::MatrixXd W_dense = Eigen::MatrixXd(W);
-        Eigen::MatrixXd V_dense = Eigen::MatrixXd(V);
+        // // 这里转换为 dense 求解 Schur 补（实际可用稀疏求解器提高效率）
+        // Eigen::MatrixXd U_dense = Eigen::MatrixXd(U);
+        // Eigen::MatrixXd W_dense = Eigen::MatrixXd(W);
+        // Eigen::MatrixXd V_dense = Eigen::MatrixXd(V);
 
-        // std::cout << "111111111111111" << std::endl;
+        // double lambda = 1e-6; // 根据情况调整
+        // V_dense += lambda * Eigen::MatrixXd::Identity(V_dense.rows(), V_dense.cols());
+        // Eigen::MatrixXd V_inv = V_dense.inverse();
 
-        double lambda = 1e-6; // 根据情况调整
-        V_dense += lambda * Eigen::MatrixXd::Identity(V_dense.rows(), V_dense.cols());
-        Eigen::MatrixXd V_inv = V_dense.inverse();
+        // Eigen::MatrixXd Schur = U_dense - W_dense * V_inv * W_dense.transpose();
+        // Eigen::VectorXd delta_pose = Schur.ldlt().solve(bp - W_dense * V_inv * bf);
+        // Eigen::VectorXd delta_intensity = V_inv * (bf - W_dense.transpose() * delta_pose);
 
-        Eigen::MatrixXd Schur = U_dense - W_dense * V_inv * W_dense.transpose();
-        Eigen::VectorXd delta_pose = Schur.ldlt().solve(bp - W_dense * V_inv * bf);
-        Eigen::VectorXd delta_intensity = V_inv * (bf - W_dense.transpose() * delta_pose);
+        // Eigen::VectorXd delta(stateDim);
+        // delta.head(poseDim) = delta_pose;
+        // delta.tail(intensityDim) = delta_intensity;
 
-        Eigen::VectorXd delta(stateDim);
-        delta.head(poseDim) = delta_pose;
-        delta.tail(intensityDim) = delta_intensity;
+        // 可选 damping
+        double lambda = 1e-6;
+        H += lambda * Eigen::MatrixXd::Identity(H.rows(), H.cols()).sparseView();
+
+        Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
+        solver.compute(H);
+
+        if (solver.info() != Eigen::Success) {
+            std::cerr << "H decomposition failed!" << std::endl;
+            continue;
+        }
+
+        Eigen::VectorXd delta = solver.solve(g);
+        if (solver.info() != Eigen::Success) {
+            std::cerr << "Linear solve failed!" << std::endl;
+            continue;
+        }
 
         // 固定第一帧：将第一帧的 6 个参数更新置零
         delta.segment(0, 6).setZero();
