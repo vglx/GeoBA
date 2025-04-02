@@ -104,6 +104,7 @@ void Optimizer::optimize(
         std::vector<int> residuals_per_vertex(vertex_count, 0);
         for (size_t i = 0; i < vertex_count; ++i) {
             if (x2_counts[i] == 0) continue;
+
             for (size_t j = 0; j < frame_count; ++j) {
                 Eigen::Matrix<double, 6, 1> se3 = X.segment<6>(j*6);
                 Sophus::SE3d T = Sophus::SE3d::exp(se3);
@@ -184,6 +185,7 @@ void Optimizer::optimize(
         Eigen::VectorXd F = Eigen::Map<Eigen::VectorXd>(residuals.data(), residuals.size());
         Eigen::SparseMatrix<double> J(total_rows, stateDim);
         J.setFromTriplets(triplets.begin(), triplets.end());
+        J = J.rightCols(stateDim - 6);
 
         // 计算当前 cost 和梯度
         double cost = F.squaredNorm();
@@ -233,11 +235,13 @@ void Optimizer::optimize(
             continue;
         }
 
-        // 固定第一帧：将第一帧的 6 个参数更新置零
-        delta.segment(0, 6).setZero();
+        // // 固定第一帧：将第一帧的 6 个参数更新置零
+        // delta.segment(0, 6).setZero();
 
-        X += delta;
-        double deltaNorm = delta.norm();
+        // X += delta;
+        // double deltaNorm = delta.norm();
+
+        X.segment(6, stateDim - 6) += delta;
 
         // 打印当前迭代信息：cost, 梯度范数, 更新量范数
         std::cout << "Iteration " << iter

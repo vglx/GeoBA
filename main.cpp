@@ -9,8 +9,8 @@ int main() {
     std::cout << "GeoBA System Starting with Dataset...\n";
 
     // **1. 初始化数据集管理器**
-    DatasetManager dataset_manager("../data/Triplettest/");
-    // DatasetManager dataset_manager("../data/sim_rectum/");
+    // DatasetManager dataset_manager("../data/Triplettest/");
+    DatasetManager dataset_manager("../data/sim_rectum/");
 
     std::vector<cv::Mat> rgb_images;
     // std::vector<cv::Mat> depth_images;
