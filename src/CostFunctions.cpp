@@ -51,7 +51,7 @@ bool PhotometricError::Evaluate(const Eigen::Matrix<double, 6, 1>& se3,
     }
 
     // 获取图像像素值（假设图像为 CV_32F 类型）
-    float pixel_value = getBilinearInterpolatedIntensity(current_image_, proj(0), proj(1));
+    float pixel_value = ImageProcessor::getBilinearInterpolatedIntensity(current_image_, proj(0), proj(1));
     double sqrt_weight = std::sqrt(weight_);
     residual = sqrt_weight * (pixel_value - intensity);
 

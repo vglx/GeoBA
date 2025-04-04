@@ -9,6 +9,7 @@
 #include <Eigen/Dense>
 #include <sophus/se3.hpp>
 #include <omp.h>
+#include "ImageProcessor.h"
 
 Optimizer::Optimizer(double weight, int maxIterations)
     : weight_(weight), maxIterations_(maxIterations) {
@@ -74,7 +75,7 @@ void Optimizer::optimize(
 
                 if (u >= 0 && u < observed_images_gray[j].cols &&
                     v >= 0 && v < observed_images_gray[j].rows) {
-                    float intensity = getBilinearInterpolatedIntensity(observed_images_gray[j], proj(0), proj(1));
+                    float intensity = ImageProcessor::getBilinearInterpolatedIntensity(observed_images_gray[j], proj(0), proj(1));
                     sum_intensity += intensity;
                     count++;
                     #pragma omp atomic
