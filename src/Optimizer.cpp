@@ -242,6 +242,7 @@ void Optimizer::optimize(
         // double deltaNorm = delta.norm();
 
         X.segment(6, stateDim - 6) += delta;
+        double deltaNorm = delta.norm();
 
         // 打印当前迭代信息：cost, 梯度范数, 更新量范数
         std::cout << "Iteration " << iter
