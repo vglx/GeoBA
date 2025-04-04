@@ -136,7 +136,7 @@ Eigen::Matrix<double, 1, 6> PhotometricError::computeNumericalJacobian(const Eig
     }
 
     // 获取当前像素值（假设图像为 CV_32F 类型）
-    float pixel_value = current_image_.at<float>(v, u);
+    float pixel_value = pixel_value = ImageProcessor::getBilinearInterpolatedIntensity(current_image_, proj(0), proj(1));;
     double error0 = sqrt_weight * (pixel_value - intensity);
 
     // 数值雅可比
@@ -163,7 +163,7 @@ Eigen::Matrix<double, 1, 6> PhotometricError::computeNumericalJacobian(const Eig
             continue;
         }
 
-        float pixel_value_perturbed = current_image_.at<float>(v_pert, u_pert);
+        float pixel_value_perturbed = ImageProcessor::getBilinearInterpolatedIntensity(current_image_, proj_perturbed(0), proj_perturbed(1));
         double error_perturbed = sqrt_weight * (pixel_value_perturbed - intensity);
 
         // 计算有限差分
