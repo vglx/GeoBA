@@ -57,7 +57,8 @@ bool PhotometricError::Evaluate(const Eigen::Matrix<double, 6, 1>& se3,
 
     // 计算雅可比：调用 computeJacobian 封装函数
     if (jacobian_pose || jacobian_intensity) {
-        Eigen::Matrix<double, 1, 6> J_total = computeJacobian(vertex_, intrinsics_, R, t, current_image_, u, v);
+        // Eigen::Matrix<double, 1, 6> J_total = computeJacobian(vertex_, intrinsics_, R, t, current_image_, u, v);
+        Eigen::Matrix<double, 1, 6> J_total = computeNumericalJacobian(se3, intensity);
         if (jacobian_pose) {
             *jacobian_pose = sqrt_weight * J_total;
         }
@@ -69,12 +70,12 @@ bool PhotometricError::Evaluate(const Eigen::Matrix<double, 6, 1>& se3,
     return true;
 }
 
-Eigen::Matrix<double, 1, 6> PhotometricError::computeJacobian(const MeshModel::Vertex& vertex,
-                                                                const Eigen::Matrix3d& intrinsics,
-                                                                const Eigen::Matrix3d& R,
-                                                                const Eigen::Vector3d& t,
-                                                                const cv::Mat& image,
-                                                                int u, int v) const {
+Eigen::Matrix<double, 1, 6> PhotometricError::computeAnalyticalJacobian(const MeshModel::Vertex& vertex,
+                                                                        const Eigen::Matrix3d& intrinsics,
+                                                                        const Eigen::Matrix3d& R,
+                                                                        const Eigen::Vector3d& t,
+                                                                        const cv::Mat& image,
+                                                                        int u, int v) const {
     Eigen::Matrix<double, 1, 6> J;
     J.setZero();
 
@@ -109,4 +110,64 @@ Eigen::Matrix<double, 1, 6> PhotometricError::computeJacobian(const MeshModel::V
     // 最终雅可比为链式法则相乘
     J = J_grad * J_proj * J_se3;
     return J;
+}
+
+Eigen::Matrix<double, 1, 6> PhotometricError::computeNumericalJacobian(const Eigen::Matrix<double, 6, 1>& se3,
+                                                                        double intensity) const {
+    double epsilon = 1e-6;
+    double sqrt_weight = std::sqrt(weight_);
+    
+    // 先计算当前 se3 参数下的光度误差 error0
+    Sophus::SE3d transform = Sophus::SE3d::exp(se3);
+    Eigen::Matrix3d R = transform.rotationMatrix();
+    Eigen::Vector3d t = transform.translation();
+
+    // 检查顶点是否可见
+    if (!Projection::isVertexVisible(vertex_, intrinsics_, R, t, bvh_, current_image_.cols, current_image_.rows)) {
+        return Eigen::Matrix<double, 1, 6>::Zero();
+    }
+
+    // 投影计算
+    Eigen::Vector2d proj = Projection::projectPoint(vertex_, intrinsics_, R, t);
+    int u = static_cast<int>(proj(0));
+    int v = static_cast<int>(proj(1));
+    if (u < 0 || u >= current_image_.cols || v < 0 || v >= current_image_.rows) {
+        return Eigen::Matrix<double, 1, 6>::Zero();
+    }
+
+    // 获取当前像素值（假设图像为 CV_32F 类型）
+    float pixel_value = current_image_.at<float>(v, u);
+    double error0 = sqrt_weight * (pixel_value - intensity);
+
+    // 数值雅可比
+    Eigen::Matrix<double, 1, 6> J_num;
+    J_num.setZero();
+
+    // 对 se3 中的每个自由度施加微小扰动，计算有限差分
+    for (int i = 0; i < 6; ++i) {
+        Eigen::Matrix<double, 6, 1> se3_perturbed = se3;
+        se3_perturbed(i) += epsilon;
+
+        Sophus::SE3d transform_perturbed = Sophus::SE3d::exp(se3_perturbed);
+        Eigen::Matrix3d R_perturbed = transform_perturbed.rotationMatrix();
+        Eigen::Vector3d t_perturbed = transform_perturbed.translation();
+
+        // 检查扰动后的顶点是否可见
+        if (!Projection::isVertexVisible(vertex_, intrinsics_, R_perturbed, t_perturbed, bvh_, current_image_.cols, current_image_.rows)) {
+            continue;
+        }
+        Eigen::Vector2d proj_perturbed = Projection::projectPoint(vertex_, intrinsics_, R_perturbed, t_perturbed);
+        int u_pert = static_cast<int>(proj_perturbed(0));
+        int v_pert = static_cast<int>(proj_perturbed(1));
+        if (u_pert < 0 || u_pert >= current_image_.cols || v_pert < 0 || v_pert >= current_image_.rows) {
+            continue;
+        }
+
+        float pixel_value_perturbed = current_image_.at<float>(v_pert, u_pert);
+        double error_perturbed = sqrt_weight * (pixel_value_perturbed - intensity);
+
+        // 计算有限差分
+        J_num(i) = (error_perturbed - error0) / epsilon;
+    }
+    return J_num;
 }

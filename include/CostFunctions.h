@@ -36,12 +36,15 @@ private:
     double weight_;
 
     // 计算雅可比：封装图像梯度、投影雅可比和 SE3 导数的计算
-    Eigen::Matrix<double, 1, 6> computeJacobian(const MeshModel::Vertex& vertex,
+    Eigen::Matrix<double, 1, 6> computeAnalyticalJacobian(const MeshModel::Vertex& vertex,
                                                 const Eigen::Matrix3d& intrinsics,
                                                 const Eigen::Matrix3d& R,
                                                 const Eigen::Vector3d& t,
                                                 const cv::Mat& image,
                                                 int u, int v) const;
+
+    Eigen::Matrix<double, 1, 6> computeNumericalJacobian(const Eigen::Matrix<double, 6, 1>& se3,
+                                                                           double intensity) const;                                                
 
 };
 
