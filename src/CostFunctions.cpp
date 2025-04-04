@@ -128,9 +128,12 @@ Eigen::Matrix<double,1,6> MultiViewPhotometricError::computeJacobian(
               0, fy / P_c3, -fy * P_c2 / (P_c3 * P_c3);
 
     Eigen::Matrix<double,3,6> J_se3;
-    J_se3 << -R.transpose()(0,0), -R.transpose()(0,1), -R.transpose()(0,2),  0,         -Z,  Y,
-             -R.transpose()(1,0), -R.transpose()(1,1), -R.transpose()(1,2),  Z,  0,         -X,
-             -R.transpose()(2,0), -R.transpose()(2,1), -R.transpose()(2,2), -Y,  X,  0;
+    Eigen::Vector3d p_diff = point_world - t;  // p_w - t
+    Eigen::Matrix3d skew;
+    skew << 0,           -p_diff(2),  p_diff(1),
+            p_diff(2),    0,         -p_diff(0),
+            -p_diff(1),   p_diff(0),   0;
+    J_se3 << R.transpose() * skew, -R.transpose();
 
     Eigen::Matrix<double,1,6> J_current = J_grad * J_proj * J_se3;
     J = J_current;

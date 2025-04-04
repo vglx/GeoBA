@@ -12,7 +12,7 @@ Optimizer::Optimizer(double weight)
     options_.linear_solver_type = ceres::SPARSE_SCHUR;
     options_.minimizer_progress_to_stdout = true;
     options_.trust_region_strategy_type = ceres::DOGLEG;
-    options_.max_num_iterations = 100;
+    options_.max_num_iterations = 20;
     options_.num_threads = 4;
 }
 
@@ -108,32 +108,32 @@ void Optimizer::optimize(
                 );
 
                 // **添加到 Ceres 优化问题**
-                // problem.AddResidualBlock(photometric_cf, nullptr, &poses[j * 6], &x2_values[i]);
+                problem.AddResidualBlock(photometric_cf, nullptr, &poses[j * 6], &x2_values[i]);
                 // ceres::LossFunction* loss = new ceres::HuberLoss(1.0);
                 // problem.AddResidualBlock(photometric_cf, loss, &poses[j * 6], &x2_values[i]);
 
-                ceres::CostFunction* numeric_cf =
-                new ceres::NumericDiffCostFunction<
-                    MultiViewPhotometricError, 
-                    ceres::CENTRAL, 
-                    1,    // residual dimension
-                    6,    // pose
-                    1     // intensity
-                    >( new MultiViewPhotometricError(
-                            mesh_vertices[i],
-                            mesh_triangles,
-                            camera_intrinsics,
-                            observed_images_gray[j],
-                            bvh,
-                            weight_
-                        ) );
+                // ceres::CostFunction* numeric_cf =
+                // new ceres::NumericDiffCostFunction<
+                //     MultiViewPhotometricError, 
+                //     ceres::CENTRAL, 
+                //     1,    // residual dimension
+                //     6,    // pose
+                //     1     // intensity
+                //     >( new MultiViewPhotometricError(
+                //             mesh_vertices[i],
+                //             mesh_triangles,
+                //             camera_intrinsics,
+                //             observed_images_gray[j],
+                //             bvh,
+                //             weight_
+                //         ) );
 
-                problem.AddResidualBlock(
-                    numeric_cf,
-                    nullptr,
-                    &poses[j * 6],
-                    &x2_values[i]
-                );
+                // problem.AddResidualBlock(
+                //     numeric_cf,
+                //     nullptr,
+                //     &poses[j * 6],
+                //     &x2_values[i]
+                // );
             }
         }
     }
