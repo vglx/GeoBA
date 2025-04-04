@@ -192,3 +192,31 @@ Eigen::Vector3d ImageProcessor::computeNormal(int u, int v, const cv::Mat& depth
     normal.normalize();
     return normal;
 }
+
+float ImageProcessor::getBilinearInterpolatedIntensity(const cv::Mat& image, double u, double v) {
+    // 获取整数坐标
+    int u0 = static_cast<int>(std::floor(u));
+    int v0 = static_cast<int>(std::floor(v));
+    int u1 = u0 + 1;
+    int v1 = v0 + 1;
+
+    // 判断边界
+    if (u0 < 0 || u1 >= image.cols || v0 < 0 || v1 >= image.rows) {
+        return 0.f; // 或者返回其他适当的值
+    }
+
+    // 计算插值权重
+    double du = u - u0;
+    double dv = v - v0;
+    float I00 = image.at<float>(v0, u0);
+    float I01 = image.at<float>(v0, u1);
+    float I10 = image.at<float>(v1, u0);
+    float I11 = image.at<float>(v1, u1);
+
+    // 双线性插值
+    float intensity = (1 - du) * (1 - dv) * I00 +
+                      du * (1 - dv) * I01 +
+                      (1 - du) * dv * I10 +
+                      du * dv * I11;
+    return intensity;
+}
