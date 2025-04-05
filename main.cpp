@@ -100,7 +100,8 @@ int main() {
 
     std::cout << "Optimization complete.\n";
 
-    Evaluation::ComputeRMSE(gt_camera_poses, camera_poses, opt_camera_poses);
+    // Evaluation::ComputeRMSE(gt_camera_poses, camera_poses, opt_camera_poses);
+    Evaluation::ComputeEulerRMSE(gt_camera_poses, camera_poses, opt_camera_poses);
 
     return 0;
 }
