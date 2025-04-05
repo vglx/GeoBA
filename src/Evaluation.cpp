@@ -124,6 +124,6 @@ void Evaluation::ComputeEulerRMSE(const std::vector<Eigen::Matrix4d>& gt,
 void Evaluation::ComputeEulerRMSE(const std::vector<Eigen::Matrix4d>& ground_truth,
                                   const std::vector<Eigen::Matrix4d>& initial_poses,
                                   const std::vector<Eigen::Matrix4d>& optimized_poses) {
-    ComputeEulerTranslationRMSE(ground_truth, initial_poses, "Initial Pose Error");
-    ComputeEulerTranslationRMSE(ground_truth, optimized_poses, "Optimized Pose Error");
+    ComputeEulerRMSE(ground_truth, initial_poses, "Initial Pose Error");
+    ComputeEulerRMSE(ground_truth, optimized_poses, "Optimized Pose Error");
 }
