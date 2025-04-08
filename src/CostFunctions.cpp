@@ -21,7 +21,6 @@ MultiViewPhotometricError::MultiViewPhotometricError(
 
     set_num_residuals(1);
     mutable_parameter_block_sizes()->push_back(6);
-    mutable_parameter_block_sizes()->push_back(1);
 }
 
 bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
@@ -29,7 +28,6 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
                                          double** jacobians) const {
 
     Eigen::Map<const Eigen::Matrix<double,6,1>> se3_current(parameters[0]); // 访问 x1（相机位姿）
-    double intensity_avg = parameters[1][0]; // 访问 x2（光度均值） 
 
     Sophus::SE3d transform_current = Sophus::SE3d::exp(se3_current);
     Eigen::Matrix3d R_current = transform_current.rotationMatrix();
@@ -50,9 +48,6 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
         if (jacobians) {
             if (jacobians[0]) { 
                 std::fill(jacobians[0], jacobians[0] + 6, 0.0);
-            }
-            if (jacobians[1]) { 
-                jacobians[1][0] = 0.0;
             }
         }
         
@@ -75,19 +70,23 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
         return true;
     }
 
+    // 顶点坐标从 struct 转换成 Eigen 向量
+    Eigen::Vector3d Pw(vertex_.x, vertex_.y, vertex_.z);
+
+    // 转换到相机坐标系：Pc = R^T * (Pw - t)
+    Eigen::Vector3d Pc = R_current.transpose() * (Pw - t_current);  // 等效于世界到相机坐标系
+    float depth = static_cast<float>(Pc.z());
+
     float I_proj = ImageProcessor::getBilinearInterpolatedValue(current_image_, proj(0), proj(1));
-    residuals[0] = sqrt_weight * (I_proj - intensity_avg);
+    residuals[0] = sqrt_weight * (I_proj - depth);
 
     if (jacobians) {
-        Eigen::Matrix<double,1,6> J_current = computeNumericalJacobian(se3_current, intensity_avg);
+        Eigen::Matrix<double,1,6> J_current = computeNumericalJacobian(se3_current, depth);
 
         if (jacobians[0]) { // 6D 位姿的 Jacobian
             for (int j = 0; j < 6; ++j) {
                 jacobians[0][j] = sqrt_weight * J_current(j);
             }
-        }
-        if (jacobians[1]) { // 1D 光度的 Jacobian
-            jacobians[1][0] = -sqrt_weight; // ✅ 正确
         }
     }
 
