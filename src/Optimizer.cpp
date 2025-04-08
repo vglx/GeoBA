@@ -6,6 +6,7 @@
 #include <sophus/se3.hpp>
 #include <omp.h>
 #include <ceres/numeric_diff_cost_function.h>
+#include "ImageProcessor.h"
 
 Optimizer::Optimizer(double weight)
     : weight_(weight) {
@@ -74,7 +75,8 @@ void Optimizer::optimize(
                 int v = static_cast<int>(proj(1));
 
                 if (u >= 0 && u < observed_images_gray[j].cols && v >= 0 && v < observed_images_gray[j].rows) {
-                    sum_intensity += observed_images_gray[j].at<float>(v, u);
+                    float intensity = ImageProcessor::getBilinearInterpolatedValue(observed_images_gray[j], proj(0), proj(1));
+                    sum_intensity += intensity;
                     count++;
 
                     #pragma omp atomic

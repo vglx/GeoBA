@@ -4006,6 +4006,7 @@ CMakeFiles/GeoBA.dir/src/MeshModel.cpp.o: /app/src/MeshModel.cpp \
 CMakeFiles/GeoBA.dir/src/Optimizer.cpp.o: /app/src/Optimizer.cpp \
   /app/include/BVH.h \
   /app/include/CostFunctions.h \
+  /app/include/ImageProcessor.h \
   /app/include/MeshModel.h \
   /app/include/Optimizer.h \
   /app/include/Projection.h \

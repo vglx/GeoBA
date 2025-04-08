@@ -75,15 +75,12 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
         return true;
     }
 
-    float I_proj = current_image_.at<float>(v, u);
+    float I_proj = ImageProcessor::getBilinearInterpolatedValue(current_image_, proj(0), proj(1));
     residuals[0] = sqrt_weight * (I_proj - intensity_avg);
 
     if (jacobians) {
-        Eigen::Matrix<double,1,6> J_current = computeJacobian(
-            vertex_, camera_intrinsics_,
-            transform_current.rotationMatrix(), t_current,
-            current_image_, u, v
-        );
+        Eigen::Matrix<double,1,6> J_current = computeNumericalJacobian(se3_current, intensity_avg);
+
         if (jacobians[0]) { // 6D 位姿的 Jacobian
             for (int j = 0; j < 6; ++j) {
                 jacobians[0][j] = sqrt_weight * J_current(j);
@@ -138,6 +135,66 @@ Eigen::Matrix<double,1,6> MultiViewPhotometricError::computeJacobian(
     Eigen::Matrix<double,1,6> J_current = J_grad * J_proj * J_se3;
     J = J_current;
     return J;
+}
+
+Eigen::Matrix<double, 1, 6> MultiViewPhotometricError::computeNumericalJacobian(const Eigen::Matrix<double, 6, 1>& se3,
+                                                                        double intensity) const {
+    double epsilon = 1e-6;
+    double sqrt_weight = std::sqrt(weight_photometric_);
+    
+    // 先计算当前 se3 参数下的光度误差 error0
+    Sophus::SE3d transform = Sophus::SE3d::exp(se3);
+    Eigen::Matrix3d R = transform.rotationMatrix();
+    Eigen::Vector3d t = transform.translation();
+
+    // 检查顶点是否可见
+    if (!Projection::isVertexVisible(vertex_, camera_intrinsics_, R, t, bvh_, current_image_.cols, current_image_.rows)) {
+        return Eigen::Matrix<double, 1, 6>::Zero();
+    }
+
+    // 投影计算
+    Eigen::Vector2d proj = Projection::projectPoint(vertex_, camera_intrinsics_, R, t);
+    int u = static_cast<int>(proj(0));
+    int v = static_cast<int>(proj(1));
+    if (u < 0 || u >= current_image_.cols || v < 0 || v >= current_image_.rows) {
+        return Eigen::Matrix<double, 1, 6>::Zero();
+    }
+
+    // 获取当前像素值（假设图像为 CV_32F 类型）
+    float pixel_value = pixel_value = ImageProcessor::getBilinearInterpolatedValue(current_image_, proj(0), proj(1));;
+    double error0 = sqrt_weight * (pixel_value - intensity);
+
+    // 数值雅可比
+    Eigen::Matrix<double, 1, 6> J_num;
+    J_num.setZero();
+
+    // 对 se3 中的每个自由度施加微小扰动，计算有限差分
+    for (int i = 0; i < 6; ++i) {
+        Eigen::Matrix<double, 6, 1> se3_perturbed = se3;
+        se3_perturbed(i) += epsilon;
+
+        Sophus::SE3d transform_perturbed = Sophus::SE3d::exp(se3_perturbed);
+        Eigen::Matrix3d R_perturbed = transform_perturbed.rotationMatrix();
+        Eigen::Vector3d t_perturbed = transform_perturbed.translation();
+
+        // 检查扰动后的顶点是否可见
+        if (!Projection::isVertexVisible(vertex_, camera_intrinsics_, R_perturbed, t_perturbed, bvh_, current_image_.cols, current_image_.rows)) {
+            continue;
+        }
+        Eigen::Vector2d proj_perturbed = Projection::projectPoint(vertex_, camera_intrinsics_, R_perturbed, t_perturbed);
+        int u_pert = static_cast<int>(proj_perturbed(0));
+        int v_pert = static_cast<int>(proj_perturbed(1));
+        if (u_pert < 0 || u_pert >= current_image_.cols || v_pert < 0 || v_pert >= current_image_.rows) {
+            continue;
+        }
+
+        float pixel_value_perturbed = ImageProcessor::getBilinearInterpolatedValue(current_image_, proj_perturbed(0), proj_perturbed(1));
+        double error_perturbed = sqrt_weight * (pixel_value_perturbed - intensity);
+
+        // 计算有限差分
+        J_num(i) = (error_perturbed - error0) / epsilon;
+    }
+    return J_num;
 }
 
 ceres::CostFunction* MultiViewPhotometricError::Create(
