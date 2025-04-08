@@ -193,7 +193,7 @@ Eigen::Vector3d ImageProcessor::computeNormal(int u, int v, const cv::Mat& depth
     return normal;
 }
 
-float ImageProcessor::getBilinearInterpolatedIntensity(const cv::Mat& image, double u, double v) {
+float ImageProcessor::getBilinearInterpolatedValue(const cv::Mat& image, double u, double v) {
     // 获取整数坐标
     int u0 = static_cast<int>(std::floor(u));
     int v0 = static_cast<int>(std::floor(v));

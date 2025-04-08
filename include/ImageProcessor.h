@@ -24,7 +24,7 @@ public:
 
     static Eigen::Vector3d computeNormal(int u, int v, const cv::Mat& depthMap, const Eigen::Matrix3d& camera_intrinsics);
 
-    static float getBilinearInterpolatedIntensity(const cv::Mat& image, double u, double v);
+    static float getBilinearInterpolatedValue(const cv::Mat& image, double u, double v);
 
 private:
     // 构建金字塔

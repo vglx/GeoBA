@@ -6,36 +6,36 @@
 #include <sophus/se3.hpp>
 #include <cmath>
 
-PhotometricError::PhotometricError(const MeshModel::Vertex& vertex,
+DepthError::DepthError(const MeshModel::Vertex& vertex,
                                    const std::vector<MeshModel::Triangle>& triangles,
                                    const Eigen::Matrix3d& intrinsics,
-                                   const cv::Mat& current_image,
+                                   const cv::Mat& depth_image,
                                    const BVH& bvh,
                                    double weight)
     : vertex_(vertex),
       triangles_(triangles),
       intrinsics_(intrinsics),
-      current_image_(current_image),
+      depth_image_(depth_image),
       bvh_(bvh),
       weight_(weight) {
     // 可在此进行一些预处理
 }
 
-bool PhotometricError::Evaluate(const Eigen::Matrix<double, 6, 1>& se3,
-                                double intensity,
+bool DepthError::Evaluate(const Eigen::Matrix<double, 6, 1>& se3,
+                                double depth,
                                 double& residual,
                                 Eigen::Matrix<double, 1, 6>* jacobian_pose,
-                                double* jacobian_intensity) const {
+                                double* jacobian_depth) const {
     // 将 se3 转换为 SE3 变换
     Sophus::SE3d transform = Sophus::SE3d::exp(se3);
     Eigen::Matrix3d R = transform.rotationMatrix();
     Eigen::Vector3d t = transform.translation();
 
     // 判断顶点是否可见：直接调用 Projection::isVertexVisible
-    if (!Projection::isVertexVisible(vertex_, intrinsics_, R, t, bvh_, current_image_.cols, current_image_.rows)) {
+    if (!Projection::isVertexVisible(vertex_, intrinsics_, R, t, bvh_, depth_image_.cols, depth_image_.rows)) {
         residual = 0.0;
         if (jacobian_pose) jacobian_pose->setZero();
-        if (jacobian_intensity) *jacobian_intensity = 0.0;
+        if (jacobian_depth) *jacobian_depth = 0.0;
         return true;
     }
 
@@ -43,34 +43,34 @@ bool PhotometricError::Evaluate(const Eigen::Matrix<double, 6, 1>& se3,
     Eigen::Vector2d proj = Projection::projectPoint(vertex_, intrinsics_, R, t);
     int u = static_cast<int>(proj(0));
     int v = static_cast<int>(proj(1));
-    if (u < 0 || u >= current_image_.cols || v < 0 || v >= current_image_.rows) {
+    if (u < 0 || u >= depth_image_.cols || v < 0 || v >= depth_image_.rows) {
         residual = 0.0;
         if (jacobian_pose) jacobian_pose->setZero();
-        if (jacobian_intensity) *jacobian_intensity = 0.0;
+        if (jacobian_depth) *jacobian_depth = 0.0;
         return true;
     }
 
     // 获取图像像素值（假设图像为 CV_32F 类型）
-    float pixel_value = ImageProcessor::getBilinearInterpolatedIntensity(current_image_, proj(0), proj(1));
+    float pixel_value = ImageProcessor::getBilinearInterpolatedValue(depth_image_, proj(0), proj(1));
     double sqrt_weight = std::sqrt(weight_);
-    residual = sqrt_weight * (pixel_value - intensity);
+    residual = sqrt_weight * (pixel_value - depth);
 
     // 计算雅可比：调用 computeJacobian 封装函数
-    if (jacobian_pose || jacobian_intensity) {
+    if (jacobian_pose || jacobian_depth) {
         // Eigen::Matrix<double, 1, 6> J_total = computeJacobian(vertex_, intrinsics_, R, t, current_image_, u, v);
-        Eigen::Matrix<double, 1, 6> J_total = computeNumericalJacobian(se3, intensity);
+        Eigen::Matrix<double, 1, 6> J_total = computeNumericalJacobian(se3, depth);
         if (jacobian_pose) {
             *jacobian_pose = sqrt_weight * J_total;
         }
-        if (jacobian_intensity) {
-            *jacobian_intensity = -sqrt_weight;
+        if (jacobian_depth) {
+            *jacobian_depth = -sqrt_weight;
         }
     }
 
     return true;
 }
 
-Eigen::Matrix<double, 1, 6> PhotometricError::computeAnalyticalJacobian(const MeshModel::Vertex& vertex,
+Eigen::Matrix<double, 1, 6> DepthError::computeAnalyticalJacobian(const MeshModel::Vertex& vertex,
                                                                         const Eigen::Matrix3d& intrinsics,
                                                                         const Eigen::Matrix3d& R,
                                                                         const Eigen::Vector3d& t,
@@ -112,8 +112,8 @@ Eigen::Matrix<double, 1, 6> PhotometricError::computeAnalyticalJacobian(const Me
     return J;
 }
 
-Eigen::Matrix<double, 1, 6> PhotometricError::computeNumericalJacobian(const Eigen::Matrix<double, 6, 1>& se3,
-                                                                        double intensity) const {
+Eigen::Matrix<double, 1, 6> DepthError::computeNumericalJacobian(const Eigen::Matrix<double, 6, 1>& se3,
+                                                                        double depth) const {
     double epsilon = 1e-6;
     double sqrt_weight = std::sqrt(weight_);
     
@@ -123,7 +123,7 @@ Eigen::Matrix<double, 1, 6> PhotometricError::computeNumericalJacobian(const Eig
     Eigen::Vector3d t = transform.translation();
 
     // 检查顶点是否可见
-    if (!Projection::isVertexVisible(vertex_, intrinsics_, R, t, bvh_, current_image_.cols, current_image_.rows)) {
+    if (!Projection::isVertexVisible(vertex_, intrinsics_, R, t, bvh_, depth_image__.cols, depth_image__.rows)) {
         return Eigen::Matrix<double, 1, 6>::Zero();
     }
 
@@ -131,13 +131,13 @@ Eigen::Matrix<double, 1, 6> PhotometricError::computeNumericalJacobian(const Eig
     Eigen::Vector2d proj = Projection::projectPoint(vertex_, intrinsics_, R, t);
     int u = static_cast<int>(proj(0));
     int v = static_cast<int>(proj(1));
-    if (u < 0 || u >= current_image_.cols || v < 0 || v >= current_image_.rows) {
+    if (u < 0 || u >= depth_image_.cols || v < 0 || v >= depth_image_.rows) {
         return Eigen::Matrix<double, 1, 6>::Zero();
     }
 
     // 获取当前像素值（假设图像为 CV_32F 类型）
-    float pixel_value = pixel_value = ImageProcessor::getBilinearInterpolatedIntensity(current_image_, proj(0), proj(1));;
-    double error0 = sqrt_weight * (pixel_value - intensity);
+    float pixel_value = pixel_value = ImageProcessor::getBilinearInterpolatedValue(depth_image_, proj(0), proj(1));;
+    double error0 = sqrt_weight * (pixel_value - depth);
 
     // 数值雅可比
     Eigen::Matrix<double, 1, 6> J_num;
@@ -153,18 +153,18 @@ Eigen::Matrix<double, 1, 6> PhotometricError::computeNumericalJacobian(const Eig
         Eigen::Vector3d t_perturbed = transform_perturbed.translation();
 
         // 检查扰动后的顶点是否可见
-        if (!Projection::isVertexVisible(vertex_, intrinsics_, R_perturbed, t_perturbed, bvh_, current_image_.cols, current_image_.rows)) {
+        if (!Projection::isVertexVisible(vertex_, intrinsics_, R_perturbed, t_perturbed, bvh_, depth_image_.cols, depth_image_.rows)) {
             continue;
         }
         Eigen::Vector2d proj_perturbed = Projection::projectPoint(vertex_, intrinsics_, R_perturbed, t_perturbed);
         int u_pert = static_cast<int>(proj_perturbed(0));
         int v_pert = static_cast<int>(proj_perturbed(1));
-        if (u_pert < 0 || u_pert >= current_image_.cols || v_pert < 0 || v_pert >= current_image_.rows) {
+        if (u_pert < 0 || u_pert >= depth_image_.cols || v_pert < 0 || v_pert >= depth_image_.rows) {
             continue;
         }
 
-        float pixel_value_perturbed = ImageProcessor::getBilinearInterpolatedIntensity(current_image_, proj_perturbed(0), proj_perturbed(1));
-        double error_perturbed = sqrt_weight * (pixel_value_perturbed - intensity);
+        float pixel_value_perturbed = ImageProcessor::getBilinearInterpolatedValue(depth_image_, proj_perturbed(0), proj_perturbed(1));
+        double error_perturbed = sqrt_weight * (pixel_value_perturbed - depth);
 
         // 计算有限差分
         J_num(i) = (error_perturbed - error0) / epsilon;
