@@ -75,9 +75,37 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
 
     // 转换到相机坐标系：Pc = R^T * (Pw - t)
     Eigen::Vector3d Pc = R_current.transpose() * (Pw - t_current);  // 等效于世界到相机坐标系
+
+    if (!std::isfinite(Pc.z())) {
+        residuals[0] = 0.0;
+        if (jacobians && jacobians[0]) {
+            std::fill(jacobians[0], jacobians[0] + 6, 0.0);
+        }
+        return true;
+    }
+
     float depth = static_cast<float>(Pc.z());
 
     float I_proj = ImageProcessor::getBilinearInterpolatedValue(current_image_, proj(0), proj(1));
+
+    if (!std::isfinite(I_proj)) {
+        residuals[0] = 0.0;
+        if (jacobians && jacobians[0]) {
+            std::fill(jacobians[0], jacobians[0] + 6, 0.0);
+        }
+        return true;
+    }
+
+    // std::cout << "I_proj: " << I_proj << " Depth: " << depth << std::endl;
+
+    // if (I_proj < 10.0f || I_proj > 70.0f || depth < 5.0f || depth > 100.0f) {
+    //     residuals[0] = 0.0;
+    //     if (jacobians && jacobians[0]) {
+    //         std::fill(jacobians[0], jacobians[0] + 6, 0.0);
+    //     }
+    //     return true;
+    // }
+
     residuals[0] = sqrt_weight * (I_proj - depth);
 
     if (jacobians) {

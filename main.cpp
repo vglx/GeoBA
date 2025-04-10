@@ -9,11 +9,11 @@ int main() {
     std::cout << "GeoBA System Starting with Dataset...\n";
 
     // **1. 初始化数据集管理器**
-    // DatasetManager dataset_manager("../data/Triplettest/");
-    DatasetManager dataset_manager("../data/sim_rectum/");
+    DatasetManager dataset_manager("../data/test/");
+    // DatasetManager dataset_manager("../data/sim_rectum/");
 
     std::vector<cv::Mat> rgb_images;
-    // std::vector<cv::Mat> depth_images;
+    std::vector<cv::Mat> depth_images;
     std::vector<Eigen::Matrix4d> gt_camera_poses;
     std::vector<Eigen::Matrix4d> camera_poses;
     std::vector<Eigen::Matrix4d> opt_camera_poses;
@@ -30,14 +30,14 @@ int main() {
               << mesh_model.getTriangles().size() << " triangles.\n";
 
     // **3. 加载 RGB 和深度图像**
-    // if (!dataset_manager.loadAllRGBImages(rgb_images) || !dataset_manager.loadAllDepthImages(depth_images)) {
-    //     std::cerr << "Failed to load RGB or depth images.\n";
-    //     return -1;
-    // }
-    if (!dataset_manager.loadAllRGBImages(rgb_images)) {
-        std::cerr << "Failed to load RGB images.\n";
+    if (!dataset_manager.loadAllRGBImages(rgb_images) || !dataset_manager.loadAllDepthImages(depth_images)) {
+        std::cerr << "Failed to load RGB or depth images.\n";
         return -1;
     }
+    // if (!dataset_manager.loadAllRGBImages(rgb_images)) {
+    //     std::cerr << "Failed to load RGB images.\n";
+    //     return -1;
+    // }
 
     // double minVal1, maxVal1;
     // cv::minMaxLoc(depth_images[2], &minVal1, &maxVal1);
@@ -74,17 +74,17 @@ int main() {
     std::cout << "Loaded " << rgb_images.size() << " frames from dataset.\n";
 
     // **7. 预处理深度图**
-    // std::vector<Eigen::MatrixXf> depth_normals;
-    // for (size_t i = 0; i < depth_images.size(); ++i) {
-    //     // 过滤无效深度值
-    //     image_processor.filterInvalidDepth(depth_images[i], 0.1f, 100.0f);
-    //     // 计算深度图法向量
-    //     Eigen::MatrixXf normals = image_processor.computeDepthNormals(
-    //         depth_images[i], camera_intrinsics(0, 0), camera_intrinsics(1, 1), camera_intrinsics(0, 2), camera_intrinsics(1, 2));
-    //     depth_normals.push_back(normals);
-    //     double minVal1, maxVal1;
-    //     cv::minMaxLoc(depth_images[i], &minVal1, &maxVal1);
-    // }
+    std::vector<Eigen::MatrixXf> depth_normals;
+    for (size_t i = 0; i < depth_images.size(); ++i) {
+        // 过滤无效深度值
+        image_processor.filterInvalidDepth(depth_images[i], 0.1f, 100.0f);
+        // 计算深度图法向量
+        // Eigen::MatrixXf normals = image_processor.computeDepthNormals(
+        //     depth_images[i], camera_intrinsics(0, 0), camera_intrinsics(1, 1), camera_intrinsics(0, 2), camera_intrinsics(1, 2));
+        // depth_normals.push_back(normals);
+        // double minVal1, maxVal1;
+        // cv::minMaxLoc(depth_images[i], &minVal1, &maxVal1);
+    }
     // std::cout << "Computed depth map normals for " << depth_normals.size() << " frames.\n";
 
     // **8. 计算网格顶点法向量**
@@ -96,7 +96,7 @@ int main() {
     // **9. 运行优化**
     std::cout << "Start optimization.\n";
     Optimizer optimizer(1);  // 传入误差权重（可调节）
-    optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, rgb_images, opt_camera_poses);
+    optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, depth_images, opt_camera_poses);
 
     std::cout << "Optimization completed.\n";
 

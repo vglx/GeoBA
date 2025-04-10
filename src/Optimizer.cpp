@@ -13,7 +13,7 @@ Optimizer::Optimizer(double weight)
     options_.linear_solver_type = ceres::SPARSE_SCHUR;
     options_.minimizer_progress_to_stdout = true;
     options_.trust_region_strategy_type = ceres::DOGLEG;
-    options_.max_num_iterations = 20;
+    options_.max_num_iterations = 100;
     options_.num_threads = 4;
 }
 
