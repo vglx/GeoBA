@@ -57,3 +57,16 @@ bool Projection::isVertexVisible(
     // const double epsilon = 1.0; // mm 级别容差
     // return !hit || std::abs(tHit - distance) < epsilon;
 }
+
+double Projection::getDepth(
+    const MeshModel::Vertex& vertex,
+    const Eigen::Matrix3d& rotation,
+    const Eigen::Vector3d& translation) {
+
+    // 将点从世界坐标系转换到相机坐标系
+    Eigen::Vector3d point(vertex.x, vertex.y, vertex.z);
+    Eigen::Vector3d cameraPoint = rotation.transpose() * (point - translation);
+
+    // 返回深度（Z 值）
+    return cameraPoint.z();
+}

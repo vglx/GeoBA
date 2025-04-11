@@ -22,6 +22,11 @@ public:
         const BVH& bvh,
         int imageWidth,
         int imageHeight);
+
+    static double getDepth(
+        const MeshModel::Vertex& vertex,
+        const Eigen::Matrix3d& rotation,
+        const Eigen::Vector3d& translation);
 };
 
 #endif // PROJECTION_H

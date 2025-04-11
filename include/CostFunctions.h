@@ -47,7 +47,7 @@ private:
         int u, int v) const;
 
     Eigen::Matrix<double, 1, 6> computeNumericalJacobian(const Eigen::Matrix<double, 6, 1>& se3,
-                                                         double intensity) const;  
+                                                         double depth) const;  
 };
 
 #endif // COST_FUNCTIONS_H

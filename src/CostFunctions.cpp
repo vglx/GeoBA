@@ -29,7 +29,7 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
                                          double** jacobians) const {
 
     Eigen::Map<const Eigen::Matrix<double,6,1>> se3_current(parameters[0]); // 访问 x1（相机位姿）
-    double intensity_avg = parameters[1][0]; // 访问 x2（光度均值） 
+    double depth_value = parameters[1][0]; // 访问 x2（光度均值） 
 
     Sophus::SE3d transform_current = Sophus::SE3d::exp(se3_current);
     Eigen::Matrix3d R_current = transform_current.rotationMatrix();
@@ -40,7 +40,7 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
     // 先检查顶点可见性
     bool visible = Projection::isVertexVisible(
         vertex_, camera_intrinsics_,
-        transform_current.rotationMatrix(), t_current,
+        R_current, t_current,
         bvh_, current_image_.cols, current_image_.rows
     );
 
@@ -62,7 +62,7 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
     // 计算投影误差
     Eigen::Vector2d proj = Projection::projectPoint(
         vertex_, camera_intrinsics_, 
-        transform_current.rotationMatrix(), t_current
+        R_current, t_current
     );
     int u = static_cast<int>(proj(0));
     int v = static_cast<int>(proj(1));
@@ -75,11 +75,11 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
         return true;
     }
 
-    float I_proj = ImageProcessor::getBilinearInterpolatedValue(current_image_, proj(0), proj(1));
-    residuals[0] = sqrt_weight * (I_proj - intensity_avg);
+    double D_proj = Projection::getDepth(vertex_, R_current, t_current);
+    residuals[0] = sqrt_weight * (D_proj - depth_value);
 
     if (jacobians) {
-        Eigen::Matrix<double,1,6> J_current = computeNumericalJacobian(se3_current, intensity_avg);
+        Eigen::Matrix<double,1,6> J_current = computeNumericalJacobian(se3_current, depth_value);
 
         if (jacobians[0]) { // 6D 位姿的 Jacobian
             for (int j = 0; j < 6; ++j) {
@@ -138,7 +138,7 @@ Eigen::Matrix<double,1,6> MultiViewPhotometricError::computeJacobian(
 }
 
 Eigen::Matrix<double, 1, 6> MultiViewPhotometricError::computeNumericalJacobian(const Eigen::Matrix<double, 6, 1>& se3,
-                                                                        double intensity) const {
+                                                                                double depth) const {
     double epsilon = 1e-6;
     double sqrt_weight = std::sqrt(weight_photometric_);
     
@@ -161,8 +161,8 @@ Eigen::Matrix<double, 1, 6> MultiViewPhotometricError::computeNumericalJacobian(
     }
 
     // 获取当前像素值（假设图像为 CV_32F 类型）
-    float pixel_value = pixel_value = ImageProcessor::getBilinearInterpolatedValue(current_image_, proj(0), proj(1));;
-    double error0 = sqrt_weight * (pixel_value - intensity);
+    double D_proj = Projection::getDepth(vertex_, R_current, t_current);
+    double error0 = sqrt_weight * (D_proj - depth);
 
     // 数值雅可比
     Eigen::Matrix<double, 1, 6> J_num;
@@ -188,8 +188,8 @@ Eigen::Matrix<double, 1, 6> MultiViewPhotometricError::computeNumericalJacobian(
             continue;
         }
 
-        float pixel_value_perturbed = ImageProcessor::getBilinearInterpolatedValue(current_image_, proj_perturbed(0), proj_perturbed(1));
-        double error_perturbed = sqrt_weight * (pixel_value_perturbed - intensity);
+        double D_proj_perturbed = Projection::getDepth(vertex_, R_perturbed, t_perturbed);
+        double error_perturbed = sqrt_weight * (D_proj_perturbed - depth);
 
         // 计算有限差分
         J_num(i) = (error_perturbed - error0) / epsilon;
