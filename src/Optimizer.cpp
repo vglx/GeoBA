@@ -13,7 +13,7 @@ Optimizer::Optimizer(double weight)
     options_.linear_solver_type = ceres::SPARSE_SCHUR;
     options_.minimizer_progress_to_stdout = true;
     options_.trust_region_strategy_type = ceres::DOGLEG;
-    options_.max_num_iterations = 20;
+    options_.max_num_iterations = 100;
     options_.num_threads = 4;
 }
 
@@ -41,6 +41,8 @@ void Optimizer::optimize(
         }
     }
 
+    std::vector<double> depth_params(vertex_count * frame_count, 0.0);
+
     // **添加残差项**
     for (size_t i = 0; i < vertex_count; ++i) {
         for (size_t j = 0; j < frame_count; ++j) {
@@ -56,10 +58,12 @@ void Optimizer::optimize(
                 Eigen::Vector2d proj = Projection::projectPoint(mesh_vertices[i], camera_intrinsics,
                     camera_poses[j].block<3,3>(0,0), camera_poses[j].block<3,1>(0,3));
                 
-                float depth_value = ImageProcessor::getBilinearInterpolatedValue(depth_images[j], proj(0), proj(1));
-
+                double& depth_value = depth_params[i * frame_count + j];
+                depth_value = ImageProcessor::getBilinearInterpolatedValue(depth_images[j], proj(0), proj(1));
+                // if (depth_value < 1.0) continue;
                 // **添加到 Ceres 优化问题**
                 problem.AddResidualBlock(photometric_cf, nullptr, &poses[j * 6], &depth_value);
+
                 // ceres::LossFunction* loss = new ceres::HuberLoss(1.0);
                 // problem.AddResidualBlock(photometric_cf, loss, &poses[j * 6], &x2_values[i]);
 

@@ -76,6 +76,17 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
     }
 
     double D_proj = Projection::getDepth(vertex_, R_current, t_current);
+
+    std::cout << "depth_value: " << depth_value << " D_proj: " << D_proj << std::endl;
+
+    if (depth_value < 1.0f || D_proj < 1.0f) {
+        residuals[0] = 0.0;
+        if (jacobians && jacobians[0]) {
+            std::fill(jacobians[0], jacobians[0] + 6, 0.0);
+        }
+        return true;
+    }
+
     residuals[0] = sqrt_weight * (D_proj - depth_value);
 
     if (jacobians) {
@@ -87,7 +98,8 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
             }
         }
         if (jacobians[1]) { // 1D 光度的 Jacobian
-            jacobians[1][0] = -sqrt_weight; // ✅ 正确
+            // jacobians[1][0] = -sqrt_weight;
+            jacobians[1][0] = 0;
         }
     }
 
@@ -161,7 +173,7 @@ Eigen::Matrix<double, 1, 6> MultiViewPhotometricError::computeNumericalJacobian(
     }
 
     // 获取当前像素值（假设图像为 CV_32F 类型）
-    double D_proj = Projection::getDepth(vertex_, R_current, t_current);
+    double D_proj = Projection::getDepth(vertex_, R, t);
     double error0 = sqrt_weight * (D_proj - depth);
 
     // 数值雅可比

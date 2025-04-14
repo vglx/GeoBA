@@ -71,8 +71,10 @@ bool DatasetManager::loadAllDepthImages(std::vector<cv::Mat>& depth_images) {
             return false;
         }
         cv::Mat depth_in_mm;
-        // 假设这里你想把 0~65535 的深度值线性缩放到 0~100mm
-        image.convertTo(depth_in_mm, CV_32F, 100.0 / 65535.0);
+        
+        // image.convertTo(depth_in_mm, CV_32F, 100.0 / 65535.0);
+
+        image.convertTo(depth_in_mm, CV_32F, 1.0);
 
         depth_images.push_back(depth_in_mm);
     }
