@@ -71,10 +71,7 @@ void Optimizer::optimize(
                 Eigen::Vector2d proj = Projection::projectPoint(mesh_vertices[i], camera_intrinsics,
                     camera_poses[j].block<3,3>(0,0), camera_poses[j].block<3,1>(0,3));
 
-                int u = static_cast<int>(proj(0));
-                int v = static_cast<int>(proj(1));
-
-                if (u >= 0 && u < observed_images_gray[j].cols && v >= 0 && v < observed_images_gray[j].rows) {
+                if (proj(0) >= 0 && proj(0) < observed_images_gray[j].cols && proj(1) >= 0 && proj(1) < observed_images_gray[j].rows) {
                     float intensity = ImageProcessor::getBilinearInterpolatedValue(observed_images_gray[j], proj(0), proj(1));
                     sum_intensity += intensity;
                     count++;
