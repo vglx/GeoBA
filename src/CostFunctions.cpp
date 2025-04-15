@@ -57,8 +57,8 @@ bool PhotometricError::Evaluate(const Eigen::Matrix<double, 6, 1>& se3,
 
     // 计算雅可比：调用 computeJacobian 封装函数
     if (jacobian_pose || jacobian_intensity) {
-        // Eigen::Matrix<double, 1, 6> J_total = computeJacobian(vertex_, intrinsics_, R, t, current_image_, u, v);
-        Eigen::Matrix<double, 1, 6> J_total = computeNumericalJacobian(se3, intensity);
+        Eigen::Matrix<double, 1, 6> J_total = computeAnalyticalJacobian(vertex_, intrinsics_, R, t, current_image_, u, v);
+        // Eigen::Matrix<double, 1, 6> J_total = computeNumericalJacobian(se3, intensity);
         if (jacobian_pose) {
             *jacobian_pose = sqrt_weight * J_total;
         }
@@ -90,12 +90,11 @@ Eigen::Matrix<double, 1, 6> PhotometricError::computeAnalyticalJacobian(const Me
     Eigen::Vector3d point_cam = R.transpose() * (point_world - t);
     double X = point_cam(0), Y = point_cam(1), Z = point_cam(2);
     double fx = intrinsics(0, 0), fy = intrinsics(1, 1);
-    double P_c1 = X / Z, P_c2 = Y / Z, P_c3 = Z;
 
     // 计算投影雅可比，参考相机模型导数公式
     Eigen::Matrix<double, 2, 3> J_proj;
-    J_proj << fx / P_c3,      0, -fx * P_c1 / (P_c3 * P_c3),
-                  0,    fy / P_c3, -fy * P_c2 / (P_c3 * P_c3);
+    J_proj << fx / Z,      0, -fx * X / (Z * Z),
+              0,    fy / Z, -fy * Y / (Z * Z);
 
     // 计算 SE3 对投影点的影响（基于李代数求导）
     // 此处采用与之前 MultiViewPhotometricError::computeJacobian 类似的实现
