@@ -1,0 +1,3 @@
+/app/testJ/build/CMakeFiles/testJ.dir
+/app/testJ/build/CMakeFiles/edit_cache.dir
+/app/testJ/build/CMakeFiles/rebuild_cache.dir

@@ -5,8 +5,8 @@
 #include <iostream>
 #include <sophus/se3.hpp>
 #include <omp.h>
-#include <ceres/numeric_diff_cost_function.h>
 #include "ImageProcessor.h"
+#include <ceres/local_parameterization.h>
 
 Optimizer::Optimizer(double weight)
     : weight_(weight) {

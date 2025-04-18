@@ -81,7 +81,8 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
         // Eigen::Matrix<double, 1, 6> J_current = computeJacobian(R_current, t_current, proj(0), proj(1));
         // Eigen::Matrix<double,1,6> J_1 = computeNumericalJacobian(se3_current, intensity_avg);
         
-        // std::cout << "Analytic: " << J_current << " Numerical: " << J_1 << std::endl;
+        // std::cout << "Analytic: " << J_current << std::endl;
+        // std::cout << "Numerical: " << J_1 << std::endl;
 
         if (jacobians[0]) { // 6D 位姿的 Jacobian
             for (int j = 0; j < 6; ++j) {
@@ -121,22 +122,23 @@ Eigen::Matrix<double,1,6> MultiViewPhotometricError::computeJacobian(
               0, fy / Z, -fy * Y / (Z * Z);
 
     Eigen::Matrix<double,3,6> J_se3;
-    Eigen::Vector3d p_diff = point_world - t;  // p_w - t
+    Eigen::Vector3d p_diff = R.transpose() * (point_world - t);  // p_w - t
     Eigen::Matrix3d skew;
     skew << 0,           -p_diff(2),  p_diff(1),
             p_diff(2),    0,         -p_diff(0),
             -p_diff(1),   p_diff(0),   0;
-    J_se3 << R.transpose() * skew, -R.transpose();
+    // J_se3 << R.transpose() * skew, -R.transpose();
+    J_se3 << -Eigen::Matrix<double, 3, 3>::Identity(), skew;
 
     Eigen::Matrix<double,1,6> J_current = J_grad * J_proj * J_se3;
-    std::cout << "J_grad: " << J_grad << " J_proj: " << J_proj << " J_se3: "<< J_se3 << std::endl;
+    // std::cout << "J_grad: " << J_grad << " J_proj: " << J_proj << " J_se3: "<< J_se3 << std::endl;
     J = J_current;
     return J;
 }
 
 Eigen::Matrix<double, 1, 6> MultiViewPhotometricError::computeNumericalJacobian(const Eigen::Matrix<double, 6, 1>& se3,
                                                                         double intensity) const {
-    double epsilon = 1e-6;
+    double epsilon = 1e-7;
     double sqrt_weight = std::sqrt(weight_photometric_);
     
     // 先计算当前 se3 参数下的光度误差 error0
@@ -165,10 +167,15 @@ Eigen::Matrix<double, 1, 6> MultiViewPhotometricError::computeNumericalJacobian(
 
     // 对 se3 中的每个自由度施加微小扰动，计算有限差分
     for (int i = 0; i < 6; ++i) {
-        Eigen::Matrix<double, 6, 1> se3_perturbed = se3;
-        se3_perturbed(i) += epsilon;
+        // Eigen::Matrix<double, 6, 1> se3_perturbed = se3;
+        // se3_perturbed(i) += epsilon;
+        // Sophus::SE3d transform_perturbed = Sophus::SE3d::exp(se3_perturbed);
 
-        Sophus::SE3d transform_perturbed = Sophus::SE3d::exp(se3_perturbed);
+        Eigen::Matrix<double, 6, 1> delta = Eigen::Matrix<double, 6, 1>::Zero();
+        delta(i) = epsilon;
+        Sophus::SE3d transform_perturbed = transform * Sophus::SE3d::exp(delta);
+        // Sophus::SE3d transform_perturbed = Sophus::SE3d::exp(delta) * transform;
+
         Eigen::Matrix3d R_perturbed = transform_perturbed.rotationMatrix();
         Eigen::Vector3d t_perturbed = transform_perturbed.translation();
 
