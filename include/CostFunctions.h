@@ -41,7 +41,7 @@ private:
                                                 const Eigen::Matrix3d& R,
                                                 const Eigen::Vector3d& t,
                                                 const cv::Mat& image,
-                                                int u, int v) const;
+                                                double u, double v) const;
 
     Eigen::Matrix<double, 1, 6> computeNumericalJacobian(const Eigen::Matrix<double, 6, 1>& se3,
                                                                            double intensity) const;                                                
