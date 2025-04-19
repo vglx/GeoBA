@@ -34,20 +34,18 @@ void ImageProcessor::computeGradients(const cv::Mat& depthImage, cv::Mat& gradX,
     cv::Sobel(depthImage, gradY, CV_32F, 0, 1, 3);
 }
 
-std::pair<float, float> ImageProcessor::computeGradient(const cv::Mat& image, int u, int v) {
-    // **检查边界**
-    if (u <= 0 || u >= image.cols - 1 || v <= 0 || v >= image.rows - 1) return {0.0f, 0.0f};
+std::pair<float, float> ImageProcessor::computeGradient(const cv::Mat& image, double u, double v) {
+    const double eps = 1e-4;
 
-    // **计算 Sobel 梯度**
-    cv::Mat grad_x, grad_y;
-    cv::Sobel(image, grad_x, CV_32F, 1, 0, 3);  // x 方向梯度
-    cv::Sobel(image, grad_y, CV_32F, 0, 1, 3);  // y 方向梯度
+    float Ix1 = getBilinearInterpolatedIntensity(image, u + eps, v);
+    float Ix2 = getBilinearInterpolatedIntensity(image, u - eps, v);
+    float Iy1 = getBilinearInterpolatedIntensity(image, u, v + eps);
+    float Iy2 = getBilinearInterpolatedIntensity(image, u, v - eps);
 
-    // **取 (u, v) 处梯度值**
-    float dx = grad_x.at<float>(v, u);  // ∂Z/∂u
-    float dy = grad_y.at<float>(v, u);  // ∂Z/∂v
+    float grad_u = (Ix1 - Ix2) / (2 * eps);
+    float grad_v = (Iy1 - Iy2) / (2 * eps);
 
-    return {dx, dy};  // 返回水平和垂直梯度
+    return {grad_u, grad_v};
 }
 
 Eigen::MatrixXf ImageProcessor::computeDepthNormals(const cv::Mat& depthImage, float fx, float fy, float cx, float cy) {

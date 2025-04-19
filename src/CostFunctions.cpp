@@ -41,9 +41,7 @@ bool PhotometricError::Evaluate(const Eigen::Matrix<double, 6, 1>& se3,
 
     // 投影计算：直接调用 Projection::projectPoint
     Eigen::Vector2d proj = Projection::projectPoint(vertex_, intrinsics_, R, t);
-    int u = static_cast<int>(proj(0));
-    int v = static_cast<int>(proj(1));
-    if (u < 0 || u >= current_image_.cols || v < 0 || v >= current_image_.rows) {
+    if (proj(0) < 0 || proj(0) >= current_image_.cols || proj(1) < 0 || proj(1) >= current_image_.rows) {
         residual = 0.0;
         if (jacobian_pose) jacobian_pose->setZero();
         if (jacobian_intensity) *jacobian_intensity = 0.0;
@@ -57,7 +55,7 @@ bool PhotometricError::Evaluate(const Eigen::Matrix<double, 6, 1>& se3,
 
     // 计算雅可比：调用 computeJacobian 封装函数
     if (jacobian_pose || jacobian_intensity) {
-        Eigen::Matrix<double, 1, 6> J_total = computeAnalyticalJacobian(vertex_, intrinsics_, R, t, current_image_, u, v);
+        Eigen::Matrix<double, 1, 6> J_total = computeAnalyticalJacobian(vertex_, intrinsics_, R, t, current_image_, proj(0), proj(1));
         // Eigen::Matrix<double, 1, 6> J_total = computeNumericalJacobian(se3, intensity);
         if (jacobian_pose) {
             *jacobian_pose = sqrt_weight * J_total;
@@ -104,7 +102,7 @@ Eigen::Matrix<double, 1, 6> PhotometricError::computeAnalyticalJacobian(const Me
     skew << 0,           -p_diff(2),  p_diff(1),
             p_diff(2),    0,         -p_diff(0),
             -p_diff(1),   p_diff(0),   0;
-    J_se3 << R.transpose() * skew, -R.transpose();
+    J_se3 << -R.transpose(), R.transpose() * skew;
 
     // 最终雅可比为链式法则相乘
     J = J_grad * J_proj * J_se3;
@@ -128,9 +126,7 @@ Eigen::Matrix<double, 1, 6> PhotometricError::computeNumericalJacobian(const Eig
 
     // 投影计算
     Eigen::Vector2d proj = Projection::projectPoint(vertex_, intrinsics_, R, t);
-    int u = static_cast<int>(proj(0));
-    int v = static_cast<int>(proj(1));
-    if (u < 0 || u >= current_image_.cols || v < 0 || v >= current_image_.rows) {
+    if (proj(0) < 0 || proj(0) >= current_image_.cols || proj(1) < 0 || proj(1) >= current_image_.rows) {
         return Eigen::Matrix<double, 1, 6>::Zero();
     }
 
@@ -144,10 +140,15 @@ Eigen::Matrix<double, 1, 6> PhotometricError::computeNumericalJacobian(const Eig
 
     // 对 se3 中的每个自由度施加微小扰动，计算有限差分
     for (int i = 0; i < 6; ++i) {
-        Eigen::Matrix<double, 6, 1> se3_perturbed = se3;
-        se3_perturbed(i) += epsilon;
+        // Eigen::Matrix<double, 6, 1> se3_perturbed = se3;
+        // se3_perturbed(i) += epsilon;
+        // Sophus::SE3d transform_perturbed = Sophus::SE3d::exp(se3_perturbed);
 
-        Sophus::SE3d transform_perturbed = Sophus::SE3d::exp(se3_perturbed);
+        Eigen::Matrix<double, 6, 1> delta = Eigen::Matrix<double, 6, 1>::Zero();
+        delta(i) = epsilon;
+        // Sophus::SE3d transform_perturbed = transform * Sophus::SE3d::exp(delta);
+        Sophus::SE3d transform_perturbed = Sophus::SE3d::exp(delta) * transform;
+
         Eigen::Matrix3d R_perturbed = transform_perturbed.rotationMatrix();
         Eigen::Vector3d t_perturbed = transform_perturbed.translation();
 
@@ -156,9 +157,7 @@ Eigen::Matrix<double, 1, 6> PhotometricError::computeNumericalJacobian(const Eig
             continue;
         }
         Eigen::Vector2d proj_perturbed = Projection::projectPoint(vertex_, intrinsics_, R_perturbed, t_perturbed);
-        int u_pert = static_cast<int>(proj_perturbed(0));
-        int v_pert = static_cast<int>(proj_perturbed(1));
-        if (u_pert < 0 || u_pert >= current_image_.cols || v_pert < 0 || v_pert >= current_image_.rows) {
+        if (proj_perturbed(0) < 0 || proj_perturbed(0) >= current_image_.cols || proj_perturbed(1) < 0 || proj_perturbed(1) >= current_image_.rows) {
             continue;
         }
 

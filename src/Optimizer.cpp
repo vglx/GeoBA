@@ -70,11 +70,9 @@ void Optimizer::optimize(
 
                 Eigen::Vector2d proj = Projection::projectPoint(mesh_vertices[i], camera_intrinsics,
                     camera_poses[j].block<3,3>(0,0), camera_poses[j].block<3,1>(0,3));
-                int u = static_cast<int>(proj(0));
-                int v = static_cast<int>(proj(1));
 
-                if (u >= 0 && u < observed_images_gray[j].cols &&
-                    v >= 0 && v < observed_images_gray[j].rows) {
+                if (proj(0) >= 0 && proj(0) < observed_images_gray[j].cols &&
+                    proj(1) >= 0 && proj(1) < observed_images_gray[j].rows) {
                     float intensity = ImageProcessor::getBilinearInterpolatedIntensity(observed_images_gray[j], proj(0), proj(1));
                     sum_intensity += intensity;
                     count++;
@@ -243,7 +241,19 @@ void Optimizer::optimize(
         // X += delta;
         // double deltaNorm = delta.norm();
 
-        X.segment(6, stateDim - 6) += delta;
+        // X.segment(6, stateDim - 6) += delta;
+
+        // 1. 位姿更新
+        for (size_t j = 1; j < frame_count; ++j) {
+        // 取 delta 对应于第 j 帧的扰动要用 (j-1)*6
+            Eigen::Matrix<double,6,1> d = delta.segment<6>((j-1)*6);
+            Sophus::SE3d T = Sophus::SE3d::exp(X.segment<6>(j*6));
+            Sophus::SE3d T_up = Sophus::SE3d::exp(d) * T;
+            X.segment<6>(j*6) = T_up.log();
+        }
+        // 光度同理，delta.tail(intensityDim) 仍然对齐
+        X.segment(poseDim, intensityDim) += delta.tail(intensityDim);
+
         double deltaNorm = delta.norm();
 
         // 打印当前迭代信息：cost, 梯度范数, 更新量范数
