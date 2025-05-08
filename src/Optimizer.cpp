@@ -193,30 +193,6 @@ void Optimizer::optimize(
         Eigen::VectorXd g = -J.transpose() * F;
         double gradNorm = g.norm();
 
-        // // 将 H 分块：前 poseDim 为相机位姿，后 intensityDim 为光度
-        // Eigen::SparseMatrix<double> U = H.block(0, 0, poseDim, poseDim);
-        // Eigen::SparseMatrix<double> W = H.block(0, poseDim, poseDim, intensityDim);
-        // Eigen::SparseMatrix<double> V = H.block(poseDim, poseDim, intensityDim, intensityDim);
-        // Eigen::VectorXd bp = g.segment(0, poseDim);
-        // Eigen::VectorXd bf = g.segment(poseDim, intensityDim);
-
-        // // 这里转换为 dense 求解 Schur 补（实际可用稀疏求解器提高效率）
-        // Eigen::MatrixXd U_dense = Eigen::MatrixXd(U);
-        // Eigen::MatrixXd W_dense = Eigen::MatrixXd(W);
-        // Eigen::MatrixXd V_dense = Eigen::MatrixXd(V);
-
-        // double lambda = 1e-6; // 根据情况调整
-        // V_dense += lambda * Eigen::MatrixXd::Identity(V_dense.rows(), V_dense.cols());
-        // Eigen::MatrixXd V_inv = V_dense.inverse();
-
-        // Eigen::MatrixXd Schur = U_dense - W_dense * V_inv * W_dense.transpose();
-        // Eigen::VectorXd delta_pose = Schur.ldlt().solve(bp - W_dense * V_inv * bf);
-        // Eigen::VectorXd delta_intensity = V_inv * (bf - W_dense.transpose() * delta_pose);
-
-        // Eigen::VectorXd delta(stateDim);
-        // delta.head(poseDim) = delta_pose;
-        // delta.tail(intensityDim) = delta_intensity;
-
         // 可选 damping
         double lambda = 1e-6;
         H += lambda * Eigen::MatrixXd::Identity(H.rows(), H.cols()).sparseView();
