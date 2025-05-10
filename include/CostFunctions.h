@@ -45,15 +45,6 @@ private:
 
     Eigen::Matrix<double, 1, 6> computeNumericalJacobian(const Eigen::Matrix<double, 6, 1>& se3,
                                                                            double intensity) const;    
-                                                                           
-    Eigen::Matrix<double,1,6> computeChainNumericalJacobian(
-    const Eigen::Matrix<double,6,1>& se3,
-    const Eigen::Matrix3d& intrinsics,
-    const MeshModel::Vertex& vertex,
-    const cv::Mat& image,
-    double intensity,
-    double u, double v) const;
-
 };
 
 #endif // COSTFUNCTIONS_H
