@@ -224,7 +224,7 @@ void Optimizer::optimize(
         // 取 delta 对应于第 j 帧的扰动要用 (j-1)*6
             Eigen::Matrix<double,6,1> d = delta.segment<6>((j-1)*6);
             Sophus::SE3d T = Sophus::SE3d::exp(X.segment<6>(j*6));
-            Sophus::SE3d T_up = Sophus::SE3d::exp(d) * T;
+            Sophus::SE3d T_up = T * Sophus::SE3d::exp(d);
             X.segment<6>(j*6) = T_up.log();
         }
         // 光度同理，delta.tail(intensityDim) 仍然对齐

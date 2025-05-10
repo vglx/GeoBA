@@ -19,7 +19,7 @@ int main() {
     std::vector<Eigen::Matrix4d> camera_poses;
     std::vector<Eigen::Matrix4d> opt_camera_poses;
     Eigen::Matrix3d camera_intrinsics;
-    cv::Mat LR_imgs, MR_imgs, HR_imgs;
+    std::vector<cv::Mat> LR_imgs, MR_imgs, HR_imgs;
     MeshModel mesh_model;
 
     // **2. 加载网格模型**
