@@ -9,7 +9,6 @@ int main() {
     std::cout << "GeoBA System Starting with Dataset...\n";
 
     // **1. 初始化数据集管理器**
-    // DatasetManager dataset_manager("../data/Triplettest/");
     DatasetManager dataset_manager("../data/sim_rectum/");
 
     Optimizer optimizer(1, 10);
@@ -19,7 +18,7 @@ int main() {
     std::vector<Eigen::Matrix4d> camera_poses;
     std::vector<Eigen::Matrix4d> opt_camera_poses;
     Eigen::Matrix3d camera_intrinsics;
-    std::vector<cv::Mat> LR_imgs, MR_imgs, HR_imgs;
+    // std::vector<cv::Mat> LR_imgs, MR_imgs, HR_imgs;
     MeshModel mesh_model;
 
     // **2. 加载网格模型**
@@ -63,28 +62,28 @@ int main() {
 
     opt_camera_poses = camera_poses;
 
-    LR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 1.5);
-    MR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 1.0);
-    HR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 0.5);
+    // LR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 1.5);
+    // MR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 1.0);
+    // HR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 0.5);
 
     // **9. 运行优化**
     std::cout << "Start optimization.\n";
 
-    std::cout << "Optimization with Low Resolution Images ----->\n";
+    // std::cout << "Optimization with Low Resolution Images ----->\n";
 
-    optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, LR_imgs, opt_camera_poses);
+    // optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, LR_imgs, opt_camera_poses);
 
-    Evaluation::ComputeRMSE(gt_camera_poses, camera_poses, opt_camera_poses);
+    // Evaluation::ComputeRMSE(gt_camera_poses, camera_poses, opt_camera_poses);
 
-    std::cout << "Optimization with Medium Resolution Images ----->\n";
+    // std::cout << "Optimization with Medium Resolution Images ----->\n";
 
-    optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, MR_imgs, opt_camera_poses);
+    // optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, MR_imgs, opt_camera_poses);
 
-    Evaluation::ComputeRMSE(gt_camera_poses, camera_poses, opt_camera_poses);
+    // Evaluation::ComputeRMSE(gt_camera_poses, camera_poses, opt_camera_poses);
 
-    std::cout << "Optimization with Hign Resolution Images ----->\n";
+    // std::cout << "Optimization with Hign Resolution Images ----->\n";
 
-    optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, HR_imgs, opt_camera_poses);
+    optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, rgb_images, opt_camera_poses);
 
     std::cout << "Optimization complete.\n";
 
