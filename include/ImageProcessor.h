@@ -9,31 +9,13 @@ class ImageProcessor {
 public:
     ImageProcessor();
 
-    // 深度图处理
-    void filterInvalidDepth(cv::Mat& depthImage, float minDepth, float maxDepth);
-    void interpolateDepth(cv::Mat& depthImage);
-    void filterExDepth(cv::Mat& depthImage, float minDepth, float maxDepth);
-
-    // 光度补偿
-    cv::Mat photometricCompensation(const cv::Mat& image);
-
-    // 计算深度图法向量
-    Eigen::MatrixXf computeDepthNormals(const cv::Mat& depthImage, float fx, float fy, float cx, float cy);
-
     static std::pair<float, float> computeGradient(const cv::Mat& image, double u, double v);
 
-    static Eigen::Vector3d computeNormal(int u, int v, const cv::Mat& depthMap, const Eigen::Matrix3d& camera_intrinsics);
+    static float getBilinearInterpolatedIntensity(const cv::Mat& image, double u, double v);
 
-    static float getBilinearInterpolatedValue(const cv::Mat& image, double u, double v);
+    static std::vector<cv::Mat> applyGaussianBlur(std::vector<cv::Mat>& rgb_images, int kernel_size, double sigma);
 
-private:
-    // 构建金字塔
-    void buildGaussianPyramid(const cv::Mat& image, std::vector<cv::Mat>& pyramid, int levels);
-    void buildLaplacianPyramid(const std::vector<cv::Mat>& gaussianPyramid, std::vector<cv::Mat>& laplacianPyramid);
-    cv::Mat reconstructFromPyramid(const std::vector<cv::Mat>& pyramid);
-
-    // 计算像素点的梯度
-    void computeGradients(const cv::Mat& depthImage, cv::Mat& gradX, cv::Mat& gradY);
+    static std::vector<cv::Mat> downsampleImages(std::vector<cv::Mat>& rgb_images, double scale_factor);
 };
 
 #endif // IMAGE_PROCESSOR_H

@@ -138,7 +138,7 @@ Eigen::Matrix<double,1,6> MultiViewPhotometricError::computeJacobian(
 
 Eigen::Matrix<double, 1, 6> MultiViewPhotometricError::computeNumericalJacobian(const Eigen::Matrix<double, 6, 1>& se3,
                                                                         double intensity) const {
-    double epsilon = 1e-7;
+    double epsilon = 1e-6;
     double sqrt_weight = std::sqrt(weight_photometric_);
     
     // 先计算当前 se3 参数下的光度误差 error0
@@ -167,13 +167,13 @@ Eigen::Matrix<double, 1, 6> MultiViewPhotometricError::computeNumericalJacobian(
 
     // 对 se3 中的每个自由度施加微小扰动，计算有限差分
     for (int i = 0; i < 6; ++i) {
-        // Eigen::Matrix<double, 6, 1> se3_perturbed = se3;
-        // se3_perturbed(i) += epsilon;
-        // Sophus::SE3d transform_perturbed = Sophus::SE3d::exp(se3_perturbed);
+        Eigen::Matrix<double, 6, 1> se3_perturbed = se3;
+        se3_perturbed(i) += epsilon;
+        Sophus::SE3d transform_perturbed = Sophus::SE3d::exp(se3_perturbed);
 
-        Eigen::Matrix<double, 6, 1> delta = Eigen::Matrix<double, 6, 1>::Zero();
-        delta(i) = epsilon;
-        Sophus::SE3d transform_perturbed = transform * Sophus::SE3d::exp(delta);
+        // Eigen::Matrix<double, 6, 1> delta = Eigen::Matrix<double, 6, 1>::Zero();
+        // delta(i) = epsilon;
+        // Sophus::SE3d transform_perturbed = transform * Sophus::SE3d::exp(delta);
         // Sophus::SE3d transform_perturbed = Sophus::SE3d::exp(delta) * transform;
 
         Eigen::Matrix3d R_perturbed = transform_perturbed.rotationMatrix();
