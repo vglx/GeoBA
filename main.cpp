@@ -62,9 +62,15 @@ int main() {
 
     opt_camera_poses = camera_poses;
 
-    LR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 1.5);
-    MR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 1.0);
+    LR_imgs = ImageProcessor::downsampleImages(rgb_images, 0.5);
+    LR_imgs = ImageProcessor::applyGaussianBlur(LR_imgs, 3, 1.5);
+    MR_imgs = ImageProcessor::downsampleImages(rgb_images, 0.75);
+    MR_imgs = ImageProcessor::applyGaussianBlur(MR_imgs, 3, 1.0);
     HR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 0.5);
+
+    // LR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 1.5);
+    // MR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 1.0);
+    // HR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 0.5);
 
     // **9. 运行优化**
     // std::cout << "Start optimization.\n";
