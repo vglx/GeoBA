@@ -62,11 +62,12 @@ int main() {
 
     opt_camera_poses = camera_poses;
 
-    LR_imgs = ImageProcessor::downsampleImages(rgb_images, 0.5);
+    LR_imgs = ImageProcessor::applyGammaCorrection(rgb_images, 0.8);
     LR_imgs = ImageProcessor::applyGaussianBlur(LR_imgs, 3, 1.5);
-    MR_imgs = ImageProcessor::downsampleImages(rgb_images, 0.75);
+    MR_imgs = ImageProcessor::applyCLAHE(rgb_images);
     MR_imgs = ImageProcessor::applyGaussianBlur(MR_imgs, 3, 1.0);
-    HR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 0.5);
+    HR_imgs = ImageProcessor::applyGammaCorrection(rgb_images, 0.9);
+    HR_imgs = ImageProcessor::applyGaussianBlur(HR_imgs, 3, 0.5);
 
     // LR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 1.5);
     // MR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 1.0);

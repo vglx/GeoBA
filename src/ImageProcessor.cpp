@@ -120,3 +120,75 @@ std::vector<cv::Mat> ImageProcessor::downsampleImages(std::vector<cv::Mat>& rgb_
 
     return downsampled_images;
 }
+
+std::vector<cv::Mat> ImageProcessor::applyGammaCorrection(const std::vector<cv::Mat>& rgb_images, double gamma) {
+    std::vector<cv::Mat> gamma_corrected_images;
+    gamma_corrected_images.reserve(rgb_images.size());
+
+    for (const cv::Mat& img : rgb_images) {
+        if (img.empty()) {
+            gamma_corrected_images.push_back(cv::Mat());
+            continue;
+        }
+
+        cv::Mat float_img, gamma_corrected;
+        img.convertTo(float_img, CV_32F, 1.0 / 255.0);
+        cv::pow(float_img, gamma, gamma_corrected);
+        gamma_corrected.convertTo(gamma_corrected, CV_8U, 255);
+
+        gamma_corrected_images.push_back(gamma_corrected);
+    }
+
+    return gamma_corrected_images;
+}
+
+std::vector<cv::Mat> ImageProcessor::applyCLAHE(const std::vector<cv::Mat>& rgb_images) {
+    std::vector<cv::Mat> clahe_images;
+    clahe_images.reserve(rgb_images.size());
+
+    cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(2.0, cv::Size(8, 8));
+
+    for (const cv::Mat& img : rgb_images) {
+        if (img.empty()) {
+            clahe_images.push_back(cv::Mat());
+            continue;
+        }
+
+        cv::Mat gray, clahe_img;
+        cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+        clahe->apply(gray, clahe_img);
+
+        cv::Mat enhanced_img;
+        cv::cvtColor(clahe_img, enhanced_img, cv::COLOR_GRAY2BGR);
+
+        clahe_images.push_back(enhanced_img);
+    }
+
+    return clahe_images;
+}
+
+std::vector<cv::Mat> ImageProcessor::suppressHighlights(const std::vector<cv::Mat>& rgb_images) {
+    std::vector<cv::Mat> inpainted_images;
+    inpainted_images.reserve(rgb_images.size());
+
+    for (const cv::Mat& img : rgb_images) {
+        if (img.empty()) {
+            inpainted_images.push_back(cv::Mat());
+            continue;
+        }
+
+        cv::Mat gray, mask;
+        cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+
+        // 高光区域检测：亮度大于 240 的区域视为高光
+        cv::threshold(gray, mask, 240, 255, cv::THRESH_BINARY);
+
+        // 使用 Navier-Stokes 方法进行修复
+        cv::Mat inpainted;
+        cv::inpaint(img, mask, inpainted, 5, cv::INPAINT_TELEA);
+
+        inpainted_images.push_back(inpainted);
+    }
+
+    return inpainted_images;
+}
