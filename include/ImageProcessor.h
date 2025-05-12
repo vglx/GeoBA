@@ -11,7 +11,7 @@ public:
 
     static std::pair<float, float> computeGradient(const cv::Mat& image, double u, double v);
 
-    static float getBilinearInterpolatedIntensity(const cv::Mat& image, double u, double v);
+    static float getBilinearInterpolatedValue(const cv::Mat& image, double u, double v);
 
     static std::vector<cv::Mat> applyGaussianBlur(std::vector<cv::Mat>& rgb_images, int kernel_size, double sigma);
 

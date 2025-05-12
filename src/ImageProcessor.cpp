@@ -45,7 +45,7 @@ std::pair<float, float> ImageProcessor::computeGradient(const cv::Mat& image, do
     return {grad_u, grad_v};
 }
 
-float ImageProcessor::getBilinearInterpolatedIntensity(const cv::Mat& image, double u, double v) {
+float ImageProcessor::getBilinearInterpolatedValue(const cv::Mat& image, double u, double v) {
     // 获取整数坐标
     int u0 = static_cast<int>(std::floor(u));
     int v0 = static_cast<int>(std::floor(v));
