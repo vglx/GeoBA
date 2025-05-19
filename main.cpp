@@ -8,6 +8,8 @@
 int main() {
     std::cout << "GeoBA System Starting with Dataset...\n";
 
+    int sampling_interval = 1;  // 取样间隔，可调节
+
     // **1. 初始化数据集管理器**
     // DatasetManager dataset_manager("../data/test/");
     DatasetManager dataset_manager("../data/sim_rectum/");
@@ -60,49 +62,55 @@ int main() {
 
     std::cout << "Loaded " << rgb_images.size() << " frames from dataset.\n";
 
-    opt_camera_poses = camera_poses;
+    // 采样数据
+    std::vector<cv::Mat> sampled_rgb_images;
+    std::vector<Eigen::Matrix4d> sampled_gt_camera_poses;
+    std::vector<Eigen::Matrix4d> sampled_camera_poses;
 
-    LR_imgs = ImageProcessor::applyGammaCorrection(rgb_images, 0.8);
+    for (size_t i = 0; i < rgb_images.size(); i += sampling_interval) {
+        sampled_rgb_images.push_back(rgb_images[i]);
+        sampled_camera_poses.push_back(camera_poses[i]);
+        sampled_gt_camera_poses.push_back(gt_camera_poses[i]);
+    }
+
+    std::cout << "Sampled " << sampled_rgb_images.size() << " frames with interval " << sampling_interval << ".\n";
+
+    opt_camera_poses = sampled_camera_poses;
+
+    // 图像预处理
+    LR_imgs = ImageProcessor::applyGammaCorrection(sampled_rgb_images, 0.8);
     LR_imgs = ImageProcessor::applyGaussianBlur(LR_imgs, 3, 1.5);
-    MR_imgs = ImageProcessor::applyCLAHE(rgb_images);
+    MR_imgs = ImageProcessor::applyCLAHE(sampled_rgb_images);
     MR_imgs = ImageProcessor::applyGaussianBlur(MR_imgs, 3, 1.0);
-    HR_imgs = ImageProcessor::applyGammaCorrection(rgb_images, 0.9);
+    HR_imgs = ImageProcessor::applyGammaCorrection(sampled_rgb_images, 0.9);
     HR_imgs = ImageProcessor::applyGaussianBlur(HR_imgs, 3, 0.5);
 
-    // LR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 1.5);
-    // MR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 1.0);
-    // HR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 0.5);
+    // LR_imgs = ImageProcessor::applyGaussianBlur(sampled_rgb_images, 3, 1.5);
+    // MR_imgs = ImageProcessor::applyGaussianBlur(sampled_rgb_images, 3, 1.0);
+    // HR_imgs = ImageProcessor::applyGaussianBlur(sampled_rgb_images, 3, 0.5);
 
     // **9. 运行优化**
     // std::cout << "Start optimization.\n";
     
-    // optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, rgb_images, opt_camera_poses);
+    // optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, sampled_rgb_images, opt_camera_poses);
 
     // std::cout << "Optimization completed.\n";
 
-    // Evaluation::ComputeRMSE(gt_camera_poses, camera_poses, opt_camera_poses);
+    // Evaluation::ComputeRMSE(sampled_gt_camera_poses, sampled_camera_poses, opt_camera_poses);
 
-    std::cout << "Start optimization.\n";
-
-    std::cout << "Optimization with Low Resolution Images ----->\n";
-
+    std::cout << "Start optimization with Low Resolution Images.\n";
     optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, LR_imgs, opt_camera_poses);
+    Evaluation::ComputeRMSE(sampled_gt_camera_poses, sampled_camera_poses, opt_camera_poses);
 
-    Evaluation::ComputeRMSE(gt_camera_poses, camera_poses, opt_camera_poses);
-
-    std::cout << "Optimization with Medium Resolution Images ----->\n";
-
+    std::cout << "Start optimization with Medium Resolution Images.\n";
     optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, MR_imgs, opt_camera_poses);
+    Evaluation::ComputeRMSE(sampled_gt_camera_poses, sampled_camera_poses, opt_camera_poses);
 
-    Evaluation::ComputeRMSE(gt_camera_poses, camera_poses, opt_camera_poses);
-
-    std::cout << "Optimization with Hign Resolution Images ----->\n";
-
+    std::cout << "Start optimization with High Resolution Images.\n";
     optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, HR_imgs, opt_camera_poses);
+    Evaluation::ComputeRMSE(sampled_gt_camera_poses, sampled_camera_poses, opt_camera_poses);
 
-    std::cout << "Optimization complete.\n";
-
-    Evaluation::ComputeRMSE(gt_camera_poses, camera_poses, opt_camera_poses);
+    std::cout << "Optimization Complete.\n";
 
     return 0;
 }
