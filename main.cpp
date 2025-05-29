@@ -109,11 +109,11 @@ int main() {
     std::vector<double> x2_values;
 
     std::cout << "Stage 1: Optimize Photometry Only\n";
-    optimizer.optimizePhotometryOnly(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, LR_imgs, sampled_gt_camera_poses, x2_values);
+    optimizer.optimizePhotometryOnly(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, sampled_rgb_images, sampled_gt_camera_poses, x2_values);
     saveIntensityValues(x2_values, "x2_photometry_only.txt");
 
     std::cout << "Stage 2: Optimize With Initial Photometry\n";
-    optimizer.optimizeWithInitialPhotometry(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, LR_imgs, opt_camera_poses, x2_values);
+    optimizer.optimizeWithInitialPhotometry(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, sampled_rgb_images, opt_camera_poses, x2_values);
     saveIntensityValues(x2_values, "x2_final.txt");
 
     // 图像预处理

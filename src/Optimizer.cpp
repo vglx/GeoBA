@@ -150,7 +150,7 @@ void Optimizer::optimizePhotometryOnly(
     size_t vertex_count = mesh_vertices.size();
     ceres::Problem problem;
 
-    BVH bvh(mesh_triangles, mesh_vertices);
+    // 1. 预处理图像（转灰度+归一化）
     std::vector<cv::Mat> observed_images_gray;
     for (const auto& img : observed_images) {
         cv::Mat gray;
@@ -163,9 +163,14 @@ void Optimizer::optimizePhotometryOnly(
         observed_images_gray.push_back(gray);
     }
 
+    // 2. BVH 构建
+    BVH bvh(mesh_triangles, mesh_vertices);
+
+    // 3. 初始化光度值和计数
     x2_values_out.assign(vertex_count, 0.0);
     std::vector<int> x2_counts(vertex_count, 0);
 
+    // 4. 统计每个顶点的可见光度均值
     #pragma omp parallel for
     for (size_t i = 0; i < vertex_count; ++i) {
         double sum_intensity = 0.0;
@@ -177,7 +182,9 @@ void Optimizer::optimizePhotometryOnly(
 
                 Eigen::Vector2d proj = Projection::projectPoint(mesh_vertices[i], camera_intrinsics,
                     camera_poses[j].block<3,3>(0,0), camera_poses[j].block<3,1>(0,3));
-                if (proj(0) >= 0 && proj(0) < observed_images_gray[j].cols && proj(1) >= 0 && proj(1) < observed_images_gray[j].rows) {
+                if (proj(0) >= 0 && proj(0) < observed_images_gray[j].cols &&
+                    proj(1) >= 0 && proj(1) < observed_images_gray[j].rows) {
+
                     float intensity = ImageProcessor::getBilinearInterpolatedValue(observed_images_gray[j], proj(0), proj(1));
                     sum_intensity += intensity;
                     count++;
@@ -187,11 +194,22 @@ void Optimizer::optimizePhotometryOnly(
         if (count > 0) {
             x2_values_out[i] = sum_intensity / count;
             x2_counts[i] = count;
+        } else {
+            x2_values_out[i] = 0.0;  // 显式标记无效光度值
         }
     }
 
+    // 5. 构造固定的 pose 参数（防止临时变量失效）
+    std::vector<std::vector<double>> fixed_poses(frame_count);
+    for (size_t j = 0; j < frame_count; ++j) {
+        Sophus::SE3d pose_SE3(camera_poses[j].block<3,3>(0,0), camera_poses[j].block<3,1>(0,3));
+        Eigen::Matrix<double, 6, 1> se3_vec = pose_SE3.log();
+        fixed_poses[j] = std::vector<double>(se3_vec.data(), se3_vec.data() + 6);
+    }
+
+    // 6. 构造 Ceres 残差块
     for (size_t i = 0; i < vertex_count; ++i) {
-        if (x2_counts[i] == 0) continue;
+        if (x2_counts[i] == 0) continue;  // 跳过无效顶点
 
         for (size_t j = 0; j < frame_count; ++j) {
             if (Projection::isVertexVisible(mesh_vertices[i], camera_intrinsics,
@@ -199,17 +217,16 @@ void Optimizer::optimizePhotometryOnly(
                 bvh, observed_images_gray[j].cols, observed_images_gray[j].rows)) {
 
                 ceres::CostFunction* photometric_cf = MultiViewPhotometricError::Create(
-                    mesh_vertices[i], mesh_triangles, camera_intrinsics, observed_images_gray[j], bvh, weight_);
+                    mesh_vertices[i], mesh_triangles, camera_intrinsics,
+                    observed_images_gray[j], bvh, weight_);
 
-                Sophus::SE3d pose_SE3(camera_poses[j].block<3,3>(0,0), camera_poses[j].block<3,1>(0,3));
-                Eigen::Matrix<double, 6, 1> se3_vec = pose_SE3.log();
-                std::vector<double> fixed_pose(se3_vec.data(), se3_vec.data() + 6);
-
-                problem.AddResidualBlock(photometric_cf, nullptr, fixed_pose.data(), &x2_values_out[i]);
+                problem.AddResidualBlock(photometric_cf, nullptr, fixed_poses[j].data(), &x2_values_out[i]);
+                problem.SetParameterBlockConstant(&x2_values_inout[i]);
             }
         }
     }
 
+    // 7. 调用 Ceres 求解器
     ceres::Solver::Summary summary;
     ceres::Solve(options_, &problem, &summary);
     std::cout << summary.FullReport() << std::endl;
@@ -247,8 +264,24 @@ void Optimizer::optimizeWithInitialPhotometry(
         for (int j = 0; j < 6; ++j) poses[i * 6 + j] = se3_vec[j];
     }
 
+    std::vector<int> x2_counts(vertex_count, 0);
+
+    // 重新计算每个顶点在多少帧中可见
     for (size_t i = 0; i < vertex_count; ++i) {
-        if (x2_values_inout[i] == 0.0) continue;
+        for (size_t j = 0; j < frame_count; ++j) {
+            if (Projection::isVertexVisible(mesh_vertices[i], camera_intrinsics,
+                camera_poses[j].block<3,3>(0,0), camera_poses[j].block<3,1>(0,3),
+                bvh, observed_images_gray[j].cols, observed_images_gray[j].rows)) {
+                x2_counts[i]++;
+            }
+        }
+    }
+
+    for (size_t i = 0; i < vertex_count; ++i) {
+        if (x2_counts[i] == 0) {
+            x2_values_inout[i] = 0.0;  // 显式标记为无效光度
+            continue;  // 更稳健的可见性判断
+        } 
 
         for (size_t j = 0; j < frame_count; ++j) {
             if (Projection::isVertexVisible(mesh_vertices[i], camera_intrinsics,
