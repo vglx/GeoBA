@@ -18,6 +18,22 @@ public:
                   const std::vector<cv::Mat>& observed_images,
                   std::vector<Eigen::Matrix4d>& camera_poses);
 
+    void optimizePhotometryOnly(
+        const std::vector<MeshModel::Vertex>& mesh_vertices,
+        const std::vector<MeshModel::Triangle>& mesh_triangles,
+        const Eigen::Matrix3d& camera_intrinsics,
+        const std::vector<cv::Mat>& observed_images,
+        const std::vector<Eigen::Matrix4d>& camera_poses,
+        std::vector<double>& x2_values_out);
+
+    void optimizeWithInitialPhotometry(
+        const std::vector<MeshModel::Vertex>& mesh_vertices,
+        const std::vector<MeshModel::Triangle>& mesh_triangles,
+        const Eigen::Matrix3d& camera_intrinsics,
+        const std::vector<cv::Mat>& observed_images,
+        std::vector<Eigen::Matrix4d>& camera_poses,
+        std::vector<double>& x2_values_inout);
+
 private:
     double weight_;
     ceres::Solver::Options options_;

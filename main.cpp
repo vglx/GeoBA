@@ -4,6 +4,35 @@
 #include "ImageProcessor.h"
 #include <iostream>
 #include "Evaluation.h"
+#include <fstream>
+
+void saveIntensityValues(const std::vector<double>& x2_values, const std::string& filename) {
+    std::ofstream ofs(filename);
+    if (!ofs.is_open()) {
+        std::cerr << "Failed to open " << filename << " for writing x2 values.\n";
+        return;
+    }
+    for (double val : x2_values) {
+        ofs << val << "\n";
+    }
+    ofs.close();
+    std::cout << "Saved " << x2_values.size() << " x2 values to " << filename << "\n";
+}
+
+std::vector<double> loadIntensityValues(const std::string& filename) {
+    std::vector<double> values;
+    std::ifstream ifs(filename);
+    if (!ifs.is_open()) {
+        std::cerr << "Failed to open " << filename << " for reading x2 values.\n";
+        return values;
+    }
+    double val;
+    while (ifs >> val) {
+        values.push_back(val);
+    }
+    std::cout << "Loaded " << values.size() << " photometric x2 values from " << filename << "\n";
+    return values;
+}
 
 int main() {
     std::cout << "GeoBA System Starting with Dataset...\n";
@@ -77,13 +106,23 @@ int main() {
 
     opt_camera_poses = sampled_camera_poses;
 
+    std::vector<double> x2_values;
+
+    std::cout << "Stage 1: Optimize Photometry Only\n";
+    optimizer.optimizePhotometryOnly(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, LR_imgs, sampled_gt_camera_poses, x2_values);
+    saveIntensityValues(x2_values, "x2_photometry_only.txt");
+
+    std::cout << "Stage 2: Optimize With Initial Photometry\n";
+    optimizer.optimizeWithInitialPhotometry(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, LR_imgs, opt_camera_poses, x2_values);
+    saveIntensityValues(x2_values, "x2_final.txt");
+
     // 图像预处理
-    LR_imgs = ImageProcessor::applyGammaCorrection(sampled_rgb_images, 0.8);
-    LR_imgs = ImageProcessor::applyGaussianBlur(LR_imgs, 3, 1.5);
-    MR_imgs = ImageProcessor::applyCLAHE(sampled_rgb_images);
-    MR_imgs = ImageProcessor::applyGaussianBlur(MR_imgs, 3, 1.0);
-    HR_imgs = ImageProcessor::applyGammaCorrection(sampled_rgb_images, 0.9);
-    HR_imgs = ImageProcessor::applyGaussianBlur(HR_imgs, 3, 0.5);
+    // LR_imgs = ImageProcessor::applyGammaCorrection(sampled_rgb_images, 0.8);
+    // LR_imgs = ImageProcessor::applyGaussianBlur(LR_imgs, 3, 1.5);
+    // MR_imgs = ImageProcessor::applyCLAHE(sampled_rgb_images);
+    // MR_imgs = ImageProcessor::applyGaussianBlur(MR_imgs, 3, 1.0);
+    // HR_imgs = ImageProcessor::applyGammaCorrection(sampled_rgb_images, 0.9);
+    // HR_imgs = ImageProcessor::applyGaussianBlur(HR_imgs, 3, 0.5);
 
     // LR_imgs = ImageProcessor::applyGaussianBlur(sampled_rgb_images, 3, 1.5);
     // MR_imgs = ImageProcessor::applyGaussianBlur(sampled_rgb_images, 3, 1.0);
@@ -98,17 +137,17 @@ int main() {
 
     // Evaluation::ComputeRMSE(sampled_gt_camera_poses, sampled_camera_poses, opt_camera_poses);
 
-    std::cout << "Start optimization with Low Resolution Images.\n";
-    optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, LR_imgs, opt_camera_poses);
-    Evaluation::ComputeRMSE(sampled_gt_camera_poses, sampled_camera_poses, opt_camera_poses);
+    // std::cout << "Start optimization with Low Resolution Images.\n";
+    // optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, LR_imgs, opt_camera_poses);
+    // Evaluation::ComputeRMSE(sampled_gt_camera_poses, sampled_camera_poses, opt_camera_poses);
 
-    std::cout << "Start optimization with Medium Resolution Images.\n";
-    optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, MR_imgs, opt_camera_poses);
-    Evaluation::ComputeRMSE(sampled_gt_camera_poses, sampled_camera_poses, opt_camera_poses);
+    // std::cout << "Start optimization with Medium Resolution Images.\n";
+    // optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, MR_imgs, opt_camera_poses);
+    // Evaluation::ComputeRMSE(sampled_gt_camera_poses, sampled_camera_poses, opt_camera_poses);
 
-    std::cout << "Start optimization with High Resolution Images.\n";
-    optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, HR_imgs, opt_camera_poses);
-    Evaluation::ComputeRMSE(sampled_gt_camera_poses, sampled_camera_poses, opt_camera_poses);
+    // std::cout << "Start optimization with High Resolution Images.\n";
+    // optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, HR_imgs, opt_camera_poses);
+    // Evaluation::ComputeRMSE(sampled_gt_camera_poses, sampled_camera_poses, opt_camera_poses);
 
     std::cout << "Optimization Complete.\n";
 

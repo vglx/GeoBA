@@ -137,3 +137,142 @@ void Optimizer::optimize(
         camera_poses[i] = pose_mat;
     }
 }
+
+void Optimizer::optimizePhotometryOnly(
+    const std::vector<MeshModel::Vertex>& mesh_vertices,
+    const std::vector<MeshModel::Triangle>& mesh_triangles,
+    const Eigen::Matrix3d& camera_intrinsics,
+    const std::vector<cv::Mat>& observed_images,
+    const std::vector<Eigen::Matrix4d>& camera_poses,
+    std::vector<double>& x2_values_out) {
+
+    size_t frame_count = observed_images.size();
+    size_t vertex_count = mesh_vertices.size();
+    ceres::Problem problem;
+
+    BVH bvh(mesh_triangles, mesh_vertices);
+    std::vector<cv::Mat> observed_images_gray;
+    for (const auto& img : observed_images) {
+        cv::Mat gray;
+        if (img.channels() == 3) {
+            cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+        } else {
+            gray = img;
+        }
+        gray.convertTo(gray, CV_32F, 1.0 / 255.0);
+        observed_images_gray.push_back(gray);
+    }
+
+    x2_values_out.assign(vertex_count, 0.0);
+    std::vector<int> x2_counts(vertex_count, 0);
+
+    #pragma omp parallel for
+    for (size_t i = 0; i < vertex_count; ++i) {
+        double sum_intensity = 0.0;
+        int count = 0;
+        for (size_t j = 0; j < frame_count; ++j) {
+            if (Projection::isVertexVisible(mesh_vertices[i], camera_intrinsics,
+                camera_poses[j].block<3,3>(0,0), camera_poses[j].block<3,1>(0,3),
+                bvh, observed_images_gray[j].cols, observed_images_gray[j].rows)) {
+
+                Eigen::Vector2d proj = Projection::projectPoint(mesh_vertices[i], camera_intrinsics,
+                    camera_poses[j].block<3,3>(0,0), camera_poses[j].block<3,1>(0,3));
+                if (proj(0) >= 0 && proj(0) < observed_images_gray[j].cols && proj(1) >= 0 && proj(1) < observed_images_gray[j].rows) {
+                    float intensity = ImageProcessor::getBilinearInterpolatedValue(observed_images_gray[j], proj(0), proj(1));
+                    sum_intensity += intensity;
+                    count++;
+                }
+            }
+        }
+        if (count > 0) {
+            x2_values_out[i] = sum_intensity / count;
+            x2_counts[i] = count;
+        }
+    }
+
+    for (size_t i = 0; i < vertex_count; ++i) {
+        if (x2_counts[i] == 0) continue;
+
+        for (size_t j = 0; j < frame_count; ++j) {
+            if (Projection::isVertexVisible(mesh_vertices[i], camera_intrinsics,
+                camera_poses[j].block<3,3>(0,0), camera_poses[j].block<3,1>(0,3),
+                bvh, observed_images_gray[j].cols, observed_images_gray[j].rows)) {
+
+                ceres::CostFunction* photometric_cf = MultiViewPhotometricError::Create(
+                    mesh_vertices[i], mesh_triangles, camera_intrinsics, observed_images_gray[j], bvh, weight_);
+
+                Sophus::SE3d pose_SE3(camera_poses[j].block<3,3>(0,0), camera_poses[j].block<3,1>(0,3));
+                Eigen::Matrix<double, 6, 1> se3_vec = pose_SE3.log();
+                std::vector<double> fixed_pose(se3_vec.data(), se3_vec.data() + 6);
+
+                problem.AddResidualBlock(photometric_cf, nullptr, fixed_pose.data(), &x2_values_out[i]);
+            }
+        }
+    }
+
+    ceres::Solver::Summary summary;
+    ceres::Solve(options_, &problem, &summary);
+    std::cout << summary.FullReport() << std::endl;
+}
+
+void Optimizer::optimizeWithInitialPhotometry(
+    const std::vector<MeshModel::Vertex>& mesh_vertices,
+    const std::vector<MeshModel::Triangle>& mesh_triangles,
+    const Eigen::Matrix3d& camera_intrinsics,
+    const std::vector<cv::Mat>& observed_images,
+    std::vector<Eigen::Matrix4d>& camera_poses,
+    std::vector<double>& x2_values_inout) {
+
+    size_t frame_count = observed_images.size();
+    size_t vertex_count = mesh_vertices.size();
+    ceres::Problem problem;
+
+    BVH bvh(mesh_triangles, mesh_vertices);
+    std::vector<cv::Mat> observed_images_gray;
+    for (const auto& img : observed_images) {
+        cv::Mat gray;
+        if (img.channels() == 3) {
+            cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+        } else {
+            gray = img;
+        }
+        gray.convertTo(gray, CV_32F, 1.0 / 255.0);
+        observed_images_gray.push_back(gray);
+    }
+
+    std::vector<double> poses(frame_count * 6);
+    for (size_t i = 0; i < frame_count; ++i) {
+        Sophus::SE3d pose_SE3(camera_poses[i].block<3,3>(0,0), camera_poses[i].block<3,1>(0,3));
+        Eigen::Matrix<double,6,1> se3_vec = pose_SE3.log();
+        for (int j = 0; j < 6; ++j) poses[i * 6 + j] = se3_vec[j];
+    }
+
+    for (size_t i = 0; i < vertex_count; ++i) {
+        if (x2_values_inout[i] == 0.0) continue;
+
+        for (size_t j = 0; j < frame_count; ++j) {
+            if (Projection::isVertexVisible(mesh_vertices[i], camera_intrinsics,
+                camera_poses[j].block<3,3>(0,0), camera_poses[j].block<3,1>(0,3),
+                bvh, observed_images_gray[j].cols, observed_images_gray[j].rows)) {
+
+                ceres::CostFunction* photometric_cf = MultiViewPhotometricError::Create(
+                    mesh_vertices[i], mesh_triangles, camera_intrinsics, observed_images_gray[j], bvh, weight_);
+                problem.AddResidualBlock(photometric_cf, nullptr, &poses[j * 6], &x2_values_inout[i]);
+            }
+        }
+    }
+
+    ceres::Solver::Summary summary;
+    ceres::Solve(options_, &problem, &summary);
+    std::cout << summary.FullReport() << std::endl;
+
+    for (size_t i = 0; i < frame_count; ++i) {
+        Eigen::Matrix<double,6,1> se3_vec;
+        for (int j = 0; j < 6; ++j) se3_vec[j] = poses[i * 6 + j];
+        Sophus::SE3d pose_SE3 = Sophus::SE3d::exp(se3_vec);
+        Eigen::Matrix4d pose_mat = Eigen::Matrix4d::Identity();
+        pose_mat.block<3,3>(0,0) = pose_SE3.rotationMatrix();
+        pose_mat.block<3,1>(0,3) = pose_SE3.translation();
+        camera_poses[i] = pose_mat;
+    }
+}
