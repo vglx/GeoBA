@@ -8,6 +8,25 @@
 #include "ImageProcessor.h"
 #include <ceres/local_parameterization.h>
 
+struct ResidualCountCallback : public ceres::IterationCallback {
+    ceres::Problem* problem_;
+    int* nonzero_jacobian_count_;
+
+    ResidualCountCallback(ceres::Problem* problem, int* jacobian_counter)
+        : problem_(problem), nonzero_jacobian_count_(jacobian_counter) {}
+
+    ceres::CallbackReturnType operator()(const ceres::IterationSummary& summary) override {
+        std::cout << "[Iter " << summary.iteration << "] Total Residuals: "
+                  << problem_->NumResidualBlocks()
+                  << ", Jacobian ≠ 0 Residuals: " << *nonzero_jacobian_count_ << std::endl;
+
+        // 清零，供下一轮使用
+        *nonzero_jacobian_count_ = 0;
+
+        return ceres::SOLVER_CONTINUE;
+    }
+};
+
 Optimizer::Optimizer(double weight)
     : weight_(weight) {
     options_.linear_solver_type = ceres::SPARSE_SCHUR;
@@ -113,6 +132,13 @@ void Optimizer::optimize(
             }
         }
     }
+
+    extern int g_nonzero_jacobian_residuals;
+    g_nonzero_jacobian_residuals = 0;
+
+    auto* callback = new ResidualCountCallback(&problem, &g_nonzero_jacobian_residuals);
+    options_.callbacks.push_back(callback);
+    options_.update_state_every_iteration = true;
 
     // **运行 Ceres 优化**
     ceres::Solver::Summary summary;

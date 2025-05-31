@@ -5,6 +5,8 @@
 #include <cmath>
 #include "ImageProcessor.h"
 
+int g_nonzero_jacobian_residuals = 0;
+
 MultiViewPhotometricError::MultiViewPhotometricError(
     const MeshModel::Vertex& vertex,
     const std::vector<MeshModel::Triangle>& triangles,
@@ -27,6 +29,8 @@ MultiViewPhotometricError::MultiViewPhotometricError(
 bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
                                          double* residuals,
                                          double** jacobians) const {
+
+    extern int g_nonzero_jacobian_residuals;    
 
     Eigen::Map<const Eigen::Matrix<double,6,1>> se3_current(parameters[0]); // 访问 x1（相机位姿）
     double intensity_avg = parameters[1][0]; // 访问 x2（光度均值） 
@@ -91,6 +95,22 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
         }
         if (jacobians[1]) { // 1D 光度的 Jacobian
             jacobians[1][0] = -sqrt_weight; // ✅ 正确
+        }
+    }
+
+    if (jacobians) {
+        bool nonzero = false;
+        if (jacobians[0]) {
+            for (int j = 0; j < 6; ++j) {
+                if (std::abs(jacobians[0][j]) > 1e-10) {
+                    nonzero = true;
+                    break;
+                }
+            }
+        }
+        if (nonzero) {
+            #pragma omp atomic
+            ++g_nonzero_jacobian_residuals;
         }
     }
     
