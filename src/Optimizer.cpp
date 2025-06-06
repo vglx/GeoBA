@@ -18,7 +18,7 @@ struct ResidualCountCallback : public ceres::IterationCallback {
     ceres::CallbackReturnType operator()(const ceres::IterationSummary& summary) override {
         std::cout << "[Iter " << summary.iteration << "] Total Residuals: "
                   << problem_->NumResidualBlocks()
-                  << ", Jacobian ≠ 0 Residuals: " << *nonzero_jacobian_count_ << std::endl;
+                  << ", Residuals: " << *nonzero_jacobian_count_ << std::endl;
 
         // 清零，供下一轮使用
         *nonzero_jacobian_count_ = 0;

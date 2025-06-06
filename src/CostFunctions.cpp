@@ -71,8 +71,13 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
 
     if (proj(0) < 0 || proj(0) >= current_image_.cols || proj(1) < 0 || proj(1) >= current_image_.rows) {
         residuals[0] = 0.0;
-        if (jacobians && jacobians[0]) {
-            std::fill(jacobians[0], jacobians[0] + 6, 0.0);
+        if (jacobians) {
+            if (jacobians[0]) { 
+                std::fill(jacobians[0], jacobians[0] + 6, 0.0);
+            }
+            if (jacobians[1]) { 
+                jacobians[1][0] = 0.0;
+            }
         }
         return true;
     }
@@ -98,20 +103,9 @@ bool MultiViewPhotometricError::Evaluate(double const* const* parameters,
         }
     }
 
-    if (jacobians) {
-        bool nonzero = false;
-        if (jacobians[0]) {
-            for (int j = 0; j < 6; ++j) {
-                if (std::abs(jacobians[0][j]) > 1e-10) {
-                    nonzero = true;
-                    break;
-                }
-            }
-        }
-        if (nonzero) {
-            #pragma omp atomic
-            ++g_nonzero_jacobian_residuals;
-        }
+    if (std::abs(residuals[0]) > 1e-8) {
+        #pragma omp atomic
+        ++g_nonzero_jacobian_residuals;
     }
     
     return true;
