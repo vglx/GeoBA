@@ -247,10 +247,17 @@ void Optimizer::optimizePhotometryOnly(
                     observed_images_gray[j], bvh, weight_);
 
                 problem.AddResidualBlock(photometric_cf, nullptr, fixed_poses[j].data(), &x2_values_out[i]);
-                problem.SetParameterBlockConstant(&x2_values_inout[i]);
+                problem.SetParameterBlockConstant(&x2_values_out[i]);
             }
         }
     }
+
+    extern int g_nonzero_jacobian_residuals;
+    g_nonzero_jacobian_residuals = 0;
+
+    auto* callback = new ResidualCountCallback(&problem, &g_nonzero_jacobian_residuals);
+    options_.callbacks.push_back(callback);
+    options_.update_state_every_iteration = true;
 
     // 7. 调用 Ceres 求解器
     ceres::Solver::Summary summary;
@@ -320,6 +327,13 @@ void Optimizer::optimizeWithInitialPhotometry(
             }
         }
     }
+
+    extern int g_nonzero_jacobian_residuals;
+    g_nonzero_jacobian_residuals = 0;
+
+    auto* callback = new ResidualCountCallback(&problem, &g_nonzero_jacobian_residuals);
+    options_.callbacks.push_back(callback);
+    options_.update_state_every_iteration = true;
 
     ceres::Solver::Summary summary;
     ceres::Solve(options_, &problem, &summary);
