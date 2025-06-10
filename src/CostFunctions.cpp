@@ -115,38 +115,71 @@ Eigen::Matrix<double,1,6> MultiViewPhotometricError::computeJacobian(
     const Eigen::Matrix3d& R,
     const Eigen::Vector3d& t,
     double u, double v) const {
-    Eigen::Matrix<double,1,6> J;
-    J.setZero();
+    const double epsilon = 1e-6;
+    const double sqrt_weight = std::sqrt(weight_);
 
-    Eigen::Vector3d point_world(vertex_.x, vertex_.y, vertex_.z);
-    Eigen::Vector3d point_cam = R.transpose() * (point_world - t);
-    double X = point_cam(0), Y = point_cam(1), Z = point_cam(2);
-    Z = std::max(Z, 1e-3);
-    double fx = camera_intrinsics_(0, 0), fy = camera_intrinsics_(1, 1);
-    double cx = camera_intrinsics_(0, 2), cy = camera_intrinsics_(1, 2);
-
-    // 计算图像梯度
-    auto grad = ImageProcessor::computeGradient(current_image_, u, v);
-    double grad_u = grad.first, grad_v = grad.second;
+    // —— 一：纯解析雅可比 —— 
+    // 1) 图像梯度
+    auto grad = ImageProcessor::computeGradient(image, u, v);
     Eigen::Matrix<double,1,2> J_grad;
-    J_grad << grad_u, grad_v;
+    J_grad << grad.first, grad.second;
 
+    // 2) 相机坐标（与你原来一致）
+    Eigen::Vector3d pw(vertex.x, vertex.y, vertex.z);
+    Eigen::Vector3d pc = R.transpose() * (pw - t);
+    double X = pc.x(), Y = pc.y(), Z = std::max(pc.z(), 1e-6);
+
+    // 3) 投影雅可比
+    double fx = intrinsics(0,0), fy = intrinsics(1,1);
     Eigen::Matrix<double,2,3> J_proj;
-    J_proj << fx / Z, 0, -fx * X / (Z * Z),
-              0, fy / Z, -fy * Y / (Z * Z);
+    J_proj << fx/Z,      0, -fx*X/(Z*Z),
+                 0, fy/Z, -fy*Y/(Z*Z);
 
-    Eigen::Matrix<double,3,6> J_se3;
-    Eigen::Vector3d p_diff = R.transpose() * (point_world - t);  // p_w - t
+    // 4) SE3 对 pc 的雅可比（左乘扰动 + camera→world 约定）
+    Eigen::Matrix<double, 3, 6> J_se3;
+    Eigen::Vector3d p_diff = R.transpose() * (pw - t);
     Eigen::Matrix3d skew;
     skew << 0,           -p_diff(2),  p_diff(1),
             p_diff(2),    0,         -p_diff(0),
             -p_diff(1),   p_diff(0),   0;
-    // J_se3 << R.transpose() * skew, -R.transpose();
     J_se3 << -Eigen::Matrix<double, 3, 3>::Identity(), skew;
 
-    Eigen::Matrix<double,1,6> J_current = J_grad * J_proj * J_se3;
-    // std::cout << "J_grad: " << J_grad << " J_proj: " << J_proj << " J_se3: "<< J_se3 << std::endl;
-    J = J_current;
+    // 5) 链式相乘得到纯解析
+    Eigen::Matrix<double,1,6> J = J_grad * J_proj * J_se3;
+
+    // —— 二：搬入“可见性+越界”门控 —— 
+    // 用同样的 ±ε 扰动方式去检测每一维
+    Sophus::SE3d Twc(R, t);  // 注意：R,t 这里是你的 camera→world
+    int W = image.cols, H = image.rows;
+    for (int i = 0; i < 6; ++i) {
+        // 构造扰动
+        Eigen::Matrix<double,6,1> d = Eigen::Matrix<double,6,1>::Zero();
+        d(i) = epsilon;
+        Sophus::SE3d Tp = Twc * Sophus::SE3d::exp( d);
+        Sophus::SE3d Tm = Twc * Sophus::SE3d::exp(-d);
+
+        // 拆出 R+, t+
+        Eigen::Matrix3d Rp = Tp.rotationMatrix();
+        Eigen::Vector3d tp = Tp.translation();
+        bool vis_p = Projection::isVertexVisible(vertex_, intrinsics, Rp, tp,
+                                                 bvh_, W, H);
+        Eigen::Vector2d uv_p = Projection::projectPoint(vertex_, intrinsics, Rp, tp);
+        bool in_p = uv_p.x() >= 0 && uv_p.x() < W && uv_p.y() >= 0 && uv_p.y() < H;
+
+        // 拆出 R-, t-
+        Eigen::Matrix3d Rm = Tm.rotationMatrix();
+        Eigen::Vector3d tm = Tm.translation();
+        bool vis_m = Projection::isVertexVisible(vertex_, intrinsics, Rm, tm,
+                                                 bvh_, W, H);
+        Eigen::Vector2d uv_m = Projection::projectPoint(vertex_, intrinsics, Rm, tm);
+        bool in_m = uv_m.x() >= 0 && uv_m.x() < W && uv_m.y() >= 0 && uv_m.y() < H;
+
+        // 如果任一端不可见或越界，就把 J(i) 置零
+        if (!(vis_p && in_p && vis_m && in_m)) {
+            J(0, i) = 0.0;
+        }
+    }
+
     return J;
 }
 
