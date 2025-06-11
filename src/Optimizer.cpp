@@ -96,36 +96,38 @@ void Optimizer::optimize(
         X(poseDim + i) = x2_values[i];
     }
 
-    // Gauss-Newton 优化迭代
-    for (int iter = 0; iter < maxIterations_; iter++) {
+    // 对每个顶点和每帧构造残差项
+    // 统计每个顶点可见帧数，预估每个顶点会生成多少残差项
+    std::vector<std::vector<bool>> visible_table(vertex_count, std::vector<bool>(frame_count, false));
+    std::vector<int> residuals_per_vertex(vertex_count, 0);
+    for (size_t i = 0; i < vertex_count; ++i) {
+        if (x2_counts[i] == 0) continue;
 
-        // 对每个顶点和每帧构造残差项
-        // 统计每个顶点可见帧数，预估每个顶点会生成多少残差项
-        std::vector<int> residuals_per_vertex(vertex_count, 0);
-        for (size_t i = 0; i < vertex_count; ++i) {
-            if (x2_counts[i] == 0) continue;
+        for (size_t j = 0; j < frame_count; ++j) {
+            Eigen::Matrix<double, 6, 1> se3 = X.segment<6>(j*6);
+            Sophus::SE3d T = Sophus::SE3d::exp(se3);
+            Eigen::Matrix3d R = T.rotationMatrix();
+            Eigen::Vector3d t = T.translation();
+            const cv::Mat& image = observed_images_gray[j];
 
-            for (size_t j = 0; j < frame_count; ++j) {
-                Eigen::Matrix<double, 6, 1> se3 = X.segment<6>(j*6);
-                Sophus::SE3d T = Sophus::SE3d::exp(se3);
-                Eigen::Matrix3d R = T.rotationMatrix();
-                Eigen::Vector3d t = T.translation();
-                const cv::Mat& image = observed_images_gray[j];
-
-                if (Projection::isVertexVisible(mesh_vertices[i], camera_intrinsics, R, t,
-                                                bvh, image.cols, image.rows)) {
-                    residuals_per_vertex[i]++;
-                }
+            if (Projection::isVertexVisible(mesh_vertices[i], camera_intrinsics, R, t,
+                                            bvh, image.cols, image.rows)) {
+                visible_table[i][j] = true;                                
+                residuals_per_vertex[i]++;
             }
         }
+    }
 
-        // 计算每个顶点在 residuals 和 triplets 中的起始行号偏移
-        std::vector<int> row_offset(vertex_count, 0);
-        int total_rows = 0;
-        for (size_t i = 0; i < vertex_count; ++i) {
-            row_offset[i] = total_rows;
-            total_rows += residuals_per_vertex[i];
-        }
+    // 计算每个顶点在 residuals 和 triplets 中的起始行号偏移
+    std::vector<int> row_offset(vertex_count, 0);
+    int total_rows = 0;
+    for (size_t i = 0; i < vertex_count; ++i) {
+        row_offset[i] = total_rows;
+        total_rows += residuals_per_vertex[i];
+    }
+
+    // Gauss-Newton 优化迭代
+    for (int iter = 0; iter < maxIterations_; iter++) {
 
         // 多线程安全版本
         // 分配全局残差向量（线程共享）
@@ -146,16 +148,14 @@ void Optimizer::optimize(
 
                 int local_rowIndex = row_offset[i];
                 for (size_t j = 0; j < frame_count; ++j) {
+
+                    if (!visible_table[i][j]) continue;
+
                     Eigen::Matrix<double, 6, 1> se3 = X.segment<6>(j * 6);
                     Sophus::SE3d T = Sophus::SE3d::exp(se3);
                     Eigen::Matrix3d R = T.rotationMatrix();
                     Eigen::Vector3d t = T.translation();
                     const cv::Mat& image = observed_images_gray[j];
-
-                    if (!Projection::isVertexVisible(mesh_vertices[i], camera_intrinsics, R, t,
-                                                    bvh, image.cols, image.rows)) {
-                        continue;
-                    }
 
                     PhotometricError costFunc(mesh_vertices[i], mesh_triangles,
                                             camera_intrinsics, image, bvh, weight_);
