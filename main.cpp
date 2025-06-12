@@ -11,7 +11,7 @@ int main() {
     // **1. 初始化数据集管理器**
     DatasetManager dataset_manager("../data/sim_rectum/");
 
-    Optimizer optimizer(1, 50, 10);
+    Optimizer optimizer(1, 10, 2);
 
     std::vector<cv::Mat> rgb_images;
     std::vector<Eigen::Matrix4d> gt_camera_poses;

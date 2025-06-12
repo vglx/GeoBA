@@ -11,9 +11,8 @@
 #include <omp.h>
 #include "ImageProcessor.h"
 
-Optimizer::Optimizer(double weight, int maxIterations)
+Optimizer::Optimizer(double weight, int maxStages, int maxIterations)
     : weight_(weight), maxStages_(maxStages), maxIterations_(maxIterations) {
-    // 如果仍使用 Ceres，这里可初始化 options_ 等，但下面示例为手写优化器
 }
 
 void Optimizer::optimize(
