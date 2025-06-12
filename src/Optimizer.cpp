@@ -129,11 +129,9 @@ void Optimizer::optimize(
     // Gauss-Newton 优化迭代
     for (int iter = 0; iter < maxIterations_; iter++) {
 
-        // 多线程安全版本
-        // 分配全局残差向量（线程共享）
         std::vector<double> residuals(total_rows);
+        int nonzero_residual_count = 0;  // ✅ 统计非零残差项数量
 
-        // 每线程独立 triplets 缓冲区
         int num_threads = omp_get_max_threads();
         std::vector<std::vector<Eigen::Triplet<double>>> triplets_per_thread(num_threads);
 
@@ -148,7 +146,6 @@ void Optimizer::optimize(
 
                 int local_rowIndex = row_offset[i];
                 for (size_t j = 0; j < frame_count; ++j) {
-
                     if (!visible_table[i][j]) continue;
 
                     Eigen::Matrix<double, 6, 1> se3 = X.segment<6>(j * 6);
@@ -167,6 +164,11 @@ void Optimizer::optimize(
                     costFunc.Evaluate(se3, intensity, r, &J_pose, &J_intensity);
                     residuals[local_rowIndex] = r;
 
+                    if (std::abs(r) > 1e-6) {
+                        #pragma omp atomic
+                        nonzero_residual_count++;
+                    }
+
                     for (int k = 0; k < 6; ++k) {
                         local_triplets.emplace_back(local_rowIndex, j * 6 + k, J_pose(k));
                     }
@@ -176,7 +178,6 @@ void Optimizer::optimize(
             }
         }
 
-        // 合并所有线程 triplets
         std::vector<Eigen::Triplet<double>> triplets;
         for (const auto& vec : triplets_per_thread) {
             triplets.insert(triplets.end(), vec.begin(), vec.end());
@@ -187,19 +188,16 @@ void Optimizer::optimize(
         J.setFromTriplets(triplets.begin(), triplets.end());
         J = J.rightCols(stateDim - 6);
 
-        // 计算当前 cost 和梯度
         double cost = F.squaredNorm();
         Eigen::SparseMatrix<double> H = J.transpose() * J;
         Eigen::VectorXd g = -J.transpose() * F;
         double gradNorm = g.norm();
 
-        // 可选 damping
         double lambda = 1e-6;
         H += lambda * Eigen::MatrixXd::Identity(H.rows(), H.cols()).sparseView();
 
         Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
         solver.compute(H);
-
         if (solver.info() != Eigen::Success) {
             std::cerr << "H decomposition failed!" << std::endl;
             continue;
@@ -211,32 +209,23 @@ void Optimizer::optimize(
             continue;
         }
 
-        // // 固定第一帧：将第一帧的 6 个参数更新置零
-        // delta.segment(0, 6).setZero();
-
-        // X += delta;
-        // double deltaNorm = delta.norm();
-
-        // X.segment(6, stateDim - 6) += delta;
-
-        // 1. 位姿更新
         for (size_t j = 1; j < frame_count; ++j) {
-        // 取 delta 对应于第 j 帧的扰动要用 (j-1)*6
             Eigen::Matrix<double,6,1> d = delta.segment<6>((j-1)*6);
             Sophus::SE3d T = Sophus::SE3d::exp(X.segment<6>(j*6));
             Sophus::SE3d T_up = T * Sophus::SE3d::exp(d);
             X.segment<6>(j*6) = T_up.log();
         }
-        // 光度同理，delta.tail(intensityDim) 仍然对齐
-        X.segment(poseDim, intensityDim) += delta.tail(intensityDim);
 
+        X.segment(poseDim, intensityDim) += delta.tail(intensityDim);
         double deltaNorm = delta.norm();
 
-        // 打印当前迭代信息：cost, 梯度范数, 更新量范数
         std::cout << "Iteration " << iter
-                  << ", cost = " << cost
-                  << ", grad norm = " << gradNorm
-                  << ", delta norm = " << deltaNorm << std::endl;
+                << ", cost = " << cost
+                << ", grad norm = " << gradNorm
+                << ", delta norm = " << deltaNorm << std::endl;
+
+        std::cout << "Non-zero residuals in Iteration " << iter << ": "
+                << nonzero_residual_count << " / " << total_rows << std::endl;
 
         if (deltaNorm < 1e-6) break;
     }
