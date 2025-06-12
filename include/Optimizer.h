@@ -21,6 +21,7 @@ public:
                   std::vector<Eigen::Matrix4d>& camera_poses);
 private:
     double weight_;
+    int maxStages_;
     int maxIterations_;
 };
 
