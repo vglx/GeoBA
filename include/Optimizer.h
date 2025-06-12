@@ -11,7 +11,7 @@
 class Optimizer {
 public:
     // 构造函数接收权重和最大迭代次数
-    Optimizer(double weight, int maxIterations);
+    Optimizer(double weight, int maxStages, int maxIterations);
 
     // 优化函数接口，与之前保持一致
     void optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
