@@ -98,6 +98,15 @@ void Optimizer::optimize(
             total_rows += residuals_per_vertex[i];
         }
 
+        int total_rows = 0;
+        for (size_t i = 0; i < vertex_count; ++i) {
+            row_offset[i] = total_rows;
+            total_rows += residuals_per_vertex[i];
+        }
+
+        // ✅ 加在这里
+        std::cout << "[Stage " << stage << "] Total residuals: " << total_rows << std::endl;
+
         // --- 2. 内层优化：结构固定 ---
         for (int iter = 0; iter < maxIterations_; ++iter) {
             std::vector<double> residuals(total_rows);
