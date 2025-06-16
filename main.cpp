@@ -8,6 +8,8 @@
 int main() {
     std::cout << "GeoBA System Starting with Dataset...\n";
 
+    int sampling_interval = 1;  // 取样间隔，可调节
+
     // **1. 初始化数据集管理器**
     DatasetManager dataset_manager("../data/sim_rectum/");
 
@@ -60,7 +62,20 @@ int main() {
 
     std::cout << "Loaded " << rgb_images.size() << " frames from dataset.\n";
 
-    opt_camera_poses = camera_poses;
+    // 采样数据
+    std::vector<cv::Mat> sampled_rgb_images;
+    std::vector<Eigen::Matrix4d> sampled_gt_camera_poses;
+    std::vector<Eigen::Matrix4d> sampled_camera_poses;
+
+    for (size_t i = 0; i < rgb_images.size(); i += sampling_interval) {
+        sampled_rgb_images.push_back(rgb_images[i]);
+        sampled_camera_poses.push_back(camera_poses[i]);
+        sampled_gt_camera_poses.push_back(gt_camera_poses[i]);
+    }
+
+    std::cout << "Sampled " << sampled_rgb_images.size() << " frames with interval " << sampling_interval << ".\n";
+
+    opt_camera_poses = sampled_camera_poses;
 
     // LR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 1.5);
     // MR_imgs = ImageProcessor::applyGaussianBlur(rgb_images, 3, 1.0);
@@ -83,7 +98,7 @@ int main() {
 
     // std::cout << "Optimization with Hign Resolution Images ----->\n";
 
-    optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, rgb_images, opt_camera_poses);
+    optimizer.optimize(mesh_model.getVertices(), mesh_model.getTriangles(), camera_intrinsics, sampled_rgb_images, opt_camera_poses);
 
     std::cout << "Optimization complete.\n";
 
