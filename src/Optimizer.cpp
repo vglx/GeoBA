@@ -51,6 +51,9 @@ void Optimizer::optimize(
     // const int maxStage = 50;
     // const int maxIter = 10;
 
+    double prev_stage_cost = std::numeric_limits<double>::max();
+    int outer_no_improve_counter = 0;
+
     for (int stage = 0; stage < maxStages_; ++stage) {
         // --- 1. 重新构造 visible_table 和光度 x2 ---
         std::vector<std::vector<bool>> visible_table(vertex_count, std::vector<bool>(frame_count, false));
@@ -100,6 +103,9 @@ void Optimizer::optimize(
 
         // ✅ 加在这里
         std::cout << "[Stage " << stage << "] Total residuals: " << total_rows << std::endl;
+
+        double prev_cost = std::numeric_limits<double>::max();
+        int inner_no_improve_counter = 0;
 
         // --- 2. 内层优化：结构固定 ---
         for (int iter = 0; iter < maxIterations_; ++iter) {
@@ -180,13 +186,45 @@ void Optimizer::optimize(
             X.segment(poseDim, intensityDim) += delta.tail(intensityDim);
             double deltaNorm = delta.norm();
 
-            std::cout << "[Stage " << stage << " Iter " << iter
-                      << "] cost=" << cost
-                      << ", gradNorm=" << gradNorm
-                      << ", deltaNorm=" << deltaNorm << std::endl;
+            double cost_change = std::abs(prev_cost - cost);
 
-            if (deltaNorm < 1e-6 || gradNorm < 1e-6 || cost_change < 1e-6)
+            std::cout << "[Stage " << stage << " Iter " << iter
+                    << "] cost=" << cost
+                    << ", gradNorm=" << gradNorm
+                    << ", deltaNorm=" << deltaNorm
+                    << ", costChange=" << cost_change << std::endl;
+
+            if (deltaNorm < 1e-6 || gradNorm < 1e-6 || cost_change < 1e-6) {
+                inner_no_improve_counter++;
+            } else {
+                inner_no_improve_counter = 0;
+            }
+
+            prev_cost = cost;
+
+            if (inner_no_improve_counter >= 3) {
+                std::cout << "Early stop (inner) at iter " << iter << std::endl;
                 break;
+            }
+        }
+
+        double stage_cost = prev_cost; // 已经在 iter 里维护过 prev_cost
+        double stage_cost_change = std::abs(prev_stage_cost - stage_cost);
+
+        // std::cout << "[Stage " << stage << "] stage_cost=" << stage_cost
+        //         << ", stage_cost_change=" << stage_cost_change << std::endl;
+
+        if (stage_cost_change < 1e-6) {
+            outer_no_improve_counter++;
+        } else {
+            outer_no_improve_counter = 0;
+        }
+
+        prev_stage_cost = stage_cost;
+
+        if (outer_no_improve_counter >= 3) {
+            std::cout << "Early stop (outer) at stage " << stage << std::endl;
+            break;
         }
     }
 
