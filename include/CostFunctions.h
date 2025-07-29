@@ -3,48 +3,64 @@
 
 #include "MeshModel.h"
 #include "BVH.h"
-#include <opencv2/core.hpp>
+#include "EDGraph.h"
+#include "Projection.h"
 #include <Eigen/Core>
 #include <Eigen/Dense>
+#include <opencv2/opencv.hpp>
 #include <vector>
 
-// 仅包含接口声明中需要的依赖，其他实现依赖放在 .cpp 中
+// Photometric error struct with joint pose and EDGraph parameter optimization
 class PhotometricError {
 public:
-    // 构造函数
-    PhotometricError(const MeshModel::Vertex& vertex,
-                     const std::vector<MeshModel::Triangle>& triangles,
-                     const Eigen::Matrix3d& intrinsics,
-                     const cv::Mat& current_image,
-                     const BVH& bvh,
-                     double weight);
+    PhotometricError(
+        const MeshModel::Vertex& vertex,
+        int vertex_index,
+        const std::vector<MeshModel::Triangle>& triangles,
+        const Eigen::Matrix3d& intrinsics,
+        const cv::Mat& current_image,
+        const BVH& bvh,
+        double weight,
+        const EDGraph* ed = nullptr
+    );
 
-    // Evaluate 方法：传入当前的 6D 位姿和 1D 光度均值，计算残差和雅可比
-    bool Evaluate(const Eigen::Matrix<double, 6, 1>& se3,
-                  double intensity,
-                  double& residual,
-                  Eigen::Matrix<double, 1, 6>* jacobian_pose,
-                  double* jacobian_intensity) const;
+    // Compute residual and Jacobians for pose(6), intensity(1), and ED params (6*G)
+    bool Evaluate(
+        const Eigen::Matrix<double,6,1>& se3,
+        double intensity,
+        double& residual,
+        Eigen::Matrix<double,1,6>* jacobian_pose,
+        double* jacobian_intensity,
+        Eigen::VectorXd* jacobian_ed = nullptr
+    ) const;
 
 private:
-    // 成员变量
     MeshModel::Vertex vertex_;
+    int vidx_;
     std::vector<MeshModel::Triangle> triangles_;
     Eigen::Matrix3d intrinsics_;
     cv::Mat current_image_;
     BVH bvh_;
     double weight_;
+    const EDGraph* ed_;
 
-    // 计算雅可比：封装图像梯度、投影雅可比和 SE3 导数的计算
-    Eigen::Matrix<double, 1, 6> computeAnalyticalJacobian(const MeshModel::Vertex& vertex,
-                                                const Eigen::Matrix3d& intrinsics,
-                                                const Eigen::Matrix3d& R,
-                                                const Eigen::Vector3d& t,
-                                                const cv::Mat& image,
-                                                double u, double v) const;
+    // Helper: compute pose Jacobian using deformed vertex
+    Eigen::Matrix<double,1,6> computePoseJacobian(
+        const Eigen::Vector3d& v_def,
+        const Eigen::Matrix3d& R,
+        const Eigen::Vector3d& t,
+        double u,
+        double v
+    ) const;
 
-    Eigen::Matrix<double, 1, 6> computeNumericalJacobian(const Eigen::Matrix<double, 6, 1>& se3,
-                                                                           double intensity) const;    
+    // Helper: compute ED param Jacobian for one node
+    Eigen::Matrix<double,1,6> computeEDJacobianAtNode(
+        const Eigen::Matrix<double,1,2>& J_grad,
+        const Eigen::Matrix<double,2,3>& J_proj,
+        const DeformationNode& node,
+        const Eigen::Vector3d& v0,
+        double weight_k
+    ) const;
 };
 
 #endif // COSTFUNCTIONS_H

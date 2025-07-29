@@ -1,18 +1,26 @@
 #include "Projection.h"
 #include <limits>
 #include <Eigen/Geometry>
-#include <iostream>
 
 Eigen::Vector2d Projection::projectPoint(
-    const MeshModel::Vertex& vertex, 
-    const Eigen::Matrix3d& intrinsics, 
-    const Eigen::Matrix3d& rotation, 
-    const Eigen::Vector3d& translation) {
+    const MeshModel::Vertex& vertex,
+    const Eigen::Matrix3d& intrinsics,
+    const Eigen::Matrix3d& rotation,
+    const Eigen::Vector3d& translation,
+    int vidx,
+    const EDGraph* ed) {
+    // 原始顶点位置
+    Eigen::Vector3d pos0(vertex.x, vertex.y, vertex.z);
+    // 若提供 EDGraph，则先做变形
+    Eigen::Vector3d point = ed ? ed->deformVertex(vertex, vidx) : pos0;
 
-    Eigen::Vector3d point(vertex.x, vertex.y, vertex.z);
+    // 相机坐标系下投影
     Eigen::Vector3d cameraPoint = rotation.transpose() * (point - translation);
     Eigen::Vector3d imagePoint = intrinsics * cameraPoint;
-    return Eigen::Vector2d(imagePoint(0) / imagePoint(2), imagePoint(1) / imagePoint(2));
+    return Eigen::Vector2d(
+        imagePoint(0) / imagePoint(2),
+        imagePoint(1) / imagePoint(2)
+    );
 }
 
 bool Projection::isVertexVisible(
@@ -22,38 +30,30 @@ bool Projection::isVertexVisible(
     const Eigen::Vector3d& translation,
     const BVH& bvh,
     int imageWidth,
-    int imageHeight) {
-
+    int imageHeight,
+    int vidx,
+    const EDGraph* ed) {
+    // 相机中心
     Eigen::Vector3d cameraCenter = translation;
-    Eigen::Vector3d vertexPos(vertex.x, vertex.y, vertex.z);
-    Eigen::Vector3d camPoint = rotation.transpose() * (vertexPos - translation);
+    // 原始顶点位置
+    Eigen::Vector3d pos0(vertex.x, vertex.y, vertex.z);
+    // 变形后顶点位置
+    Eigen::Vector3d vertexPos = ed ? ed->deformVertex(vertex, vidx) : pos0;
 
-    // 如果点在相机后面，则不可见
-    if (camPoint.z() <= 0) {
-        return false;
-    }
-    
-    // 投影到图像平面
+    // 检查是否在相机前方
+    Eigen::Vector3d camPoint = rotation.transpose() * (vertexPos - translation);
+    if (camPoint.z() <= 0) return false;
+
+    // 图像平面坐标
     Eigen::Vector3d imagePoint = intrinsics * camPoint;
     double imgX = imagePoint(0) / imagePoint(2);
     double imgY = imagePoint(1) / imagePoint(2);
-
-    // 检查是否超出图像范围
-    if (imgX < 0 || imgX >= imageWidth || imgY < 0 || imgY >= imageHeight) {
+    if (imgX < 0 || imgX >= imageWidth || imgY < 0 || imgY >= imageHeight)
         return false;
-    }
 
-    // 计算射线方向
+    // 遮挡检测射线
     Eigen::Vector3d rayDir = (vertexPos - cameraCenter).normalized();
     double tHit = std::numeric_limits<double>::max();
-
-    // 调用 BVH 进行遮挡检测
-    return bvh.traverse(cameraCenter, rayDir, tHit) && 
-           std::abs(tHit - (vertexPos - cameraCenter).norm()) < 0.005 * tHit;
-
-    // double distance = (vertexPos - cameraCenter).norm();
-    // bool hit = bvh.traverse(cameraCenter, rayDir, tHit);
-    
-    // const double epsilon = 1.0; // mm 级别容差
-    // return !hit || std::abs(tHit - distance) < epsilon;
+    return bvh.traverse(cameraCenter, rayDir, tHit)
+        && std::abs(tHit - (vertexPos - cameraCenter).norm()) < 0.005 * tHit;
 }

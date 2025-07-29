@@ -20,13 +20,15 @@ void Optimizer::optimize(
     const std::vector<MeshModel::Triangle>& mesh_triangles,
     const Eigen::Matrix3d& camera_intrinsics,
     const std::vector<cv::Mat>& observed_images,
-    std::vector<Eigen::Matrix4d>& camera_poses) {
+    std::vector<Eigen::Matrix4d>& camera_poses,
+    EDGraph& edGraph) {
 
     size_t frame_count = observed_images.size();
     size_t vertex_count = mesh_vertices.size();
     int poseDim = static_cast<int>(frame_count * 6);
+    int edDim = static_cast<int>(edGraph.numNodes() * 6);
     int intensityDim = static_cast<int>(vertex_count);
-    int stateDim = poseDim + intensityDim;
+    int stateDim = poseDim + edDim + intensityDim;
 
     BVH bvh(mesh_triangles, mesh_vertices);
 
@@ -47,51 +49,29 @@ void Optimizer::optimize(
         Sophus::SE3d T(camera_poses[i].block<3,3>(0,0), camera_poses[i].block<3,1>(0,3));
         X.segment<6>(i*6) = T.log();
     }
-
-    // const int maxStage = 50;
-    // const int maxIter = 10;
+    edGraph.writeToStateVector(X, poseDim);
 
     double prev_stage_cost = std::numeric_limits<double>::max();
     int outer_no_improve_counter = 0;
 
     for (int stage = 0; stage < maxStages_; ++stage) {
-        // --- 1. 重新构造 visible_table 和光度 x2 ---
         std::vector<std::vector<bool>> visible_table(vertex_count, std::vector<bool>(frame_count, false));
         std::vector<int> residuals_per_vertex(vertex_count, 0);
-        std::vector<double> x2_values(vertex_count, 0.0);
-        std::vector<int> x2_counts(vertex_count, 0);
 
         #pragma omp parallel for
         for (size_t i = 0; i < vertex_count; ++i) {
-            double sum_intensity = 0.0;
-            int count = 0;
             for (size_t j = 0; j < frame_count; ++j) {
                 Sophus::SE3d T = Sophus::SE3d::exp(X.segment<6>(j * 6));
                 Eigen::Matrix3d R = T.rotationMatrix();
                 Eigen::Vector3d t = T.translation();
                 const cv::Mat& image = observed_images_gray[j];
-
                 if (Projection::isVertexVisible(mesh_vertices[i], camera_intrinsics, R, t,
-                                                bvh, image.cols, image.rows)) {
-                    Eigen::Vector2d proj = Projection::projectPoint(mesh_vertices[i], camera_intrinsics, R, t);
-                    if (proj(0) >= 0 && proj(0) < image.cols && proj(1) >= 0 && proj(1) < image.rows) {
-                        float intensity = ImageProcessor::getBilinearInterpolatedIntensity(image, proj(0), proj(1));
-                        sum_intensity += intensity;
-                        count++;
-                        visible_table[i][j] = true;
-                        #pragma omp atomic
-                        residuals_per_vertex[i]++;
-                    }
+                                                bvh, image.cols, image.rows, i, &edGraph)) {
+                    visible_table[i][j] = true;
+                    #pragma omp atomic
+                    residuals_per_vertex[i]++;
                 }
             }
-            if (count > 0) {
-                x2_values[i] = sum_intensity / count;
-                x2_counts[i] = count;
-            }
-        }
-
-        for (size_t i = 0; i < vertex_count; ++i) {
-            X(poseDim + i) = x2_values[i];
         }
 
         std::vector<int> row_offset(vertex_count, 0);
@@ -101,13 +81,11 @@ void Optimizer::optimize(
             total_rows += residuals_per_vertex[i];
         }
 
-        // ✅ 加在这里
         std::cout << "[Stage " << stage << "] Total residuals: " << total_rows << std::endl;
 
         double prev_cost = std::numeric_limits<double>::max();
         int inner_no_improve_counter = 0;
 
-        // --- 2. 内层优化：结构固定 ---
         for (int iter = 0; iter < maxIterations_; ++iter) {
             std::vector<double> residuals(total_rows);
             int num_threads = omp_get_max_threads();
@@ -120,8 +98,7 @@ void Optimizer::optimize(
 
                 #pragma omp for
                 for (size_t i = 0; i < vertex_count; ++i) {
-                    if (x2_counts[i] == 0) continue;
-
+                    if (residuals_per_vertex[i] == 0) continue;
                     int local_rowIndex = row_offset[i];
                     for (size_t j = 0; j < frame_count; ++j) {
                         if (!visible_table[i][j]) continue;
@@ -132,20 +109,24 @@ void Optimizer::optimize(
                         Eigen::Vector3d t = T.translation();
                         const cv::Mat& image = observed_images_gray[j];
 
-                        PhotometricError costFunc(mesh_vertices[i], mesh_triangles,
-                                                camera_intrinsics, image, bvh, weight_);
+                        PhotometricError costFunc(mesh_vertices[i], i, mesh_triangles,
+                                                camera_intrinsics, image, bvh, weight_, &edGraph);
                         double r = 0.0;
                         Eigen::Matrix<double, 1, 6> J_pose;
                         double J_intensity = 0.0;
-                        double intensity = X(poseDim + i);
+                        Eigen::VectorXd J_ed(6 * edGraph.numNodes());
+                        double intensity = X(poseDim + edDim + i);
 
-                        costFunc.Evaluate(se3, intensity, r, &J_pose, &J_intensity);
+                        costFunc.Evaluate(se3, intensity, r, &J_pose, &J_intensity, &J_ed);
                         residuals[local_rowIndex] = r;
 
                         for (int k = 0; k < 6; ++k) {
                             local_triplets.emplace_back(local_rowIndex, j * 6 + k, J_pose(k));
                         }
-                        local_triplets.emplace_back(local_rowIndex, poseDim + i, J_intensity);
+                        for (int k = 0; k < J_ed.size(); ++k) {
+                            local_triplets.emplace_back(local_rowIndex, poseDim + k, J_ed(k));
+                        }
+                        local_triplets.emplace_back(local_rowIndex, poseDim + edDim + i, J_intensity);
                         local_rowIndex++;
                     }
                 }
@@ -159,12 +140,11 @@ void Optimizer::optimize(
             Eigen::VectorXd F = Eigen::Map<Eigen::VectorXd>(residuals.data(), residuals.size());
             Eigen::SparseMatrix<double> J(total_rows, stateDim);
             J.setFromTriplets(triplets.begin(), triplets.end());
-            J = J.rightCols(stateDim - 6); // remove first frame
+            J = J.rightCols(stateDim - 6);
 
             double cost = F.squaredNorm();
             Eigen::SparseMatrix<double> H = J.transpose() * J;
             Eigen::VectorXd g = -J.transpose() * F;
-            double gradNorm = g.norm();
 
             double lambda = 1e-6;
             H += lambda * Eigen::MatrixXd::Identity(H.rows(), H.cols()).sparseView();
@@ -182,38 +162,31 @@ void Optimizer::optimize(
                 Sophus::SE3d T_up = T * Sophus::SE3d::exp(d);
                 X.segment<6>(j*6) = T_up.log();
             }
+            X.segment(poseDim, edDim + intensityDim) += delta.tail(edDim + intensityDim);
 
-            X.segment(poseDim, intensityDim) += delta.tail(intensityDim);
             double deltaNorm = delta.norm();
-
             double cost_change = std::abs(prev_cost - cost);
 
             std::cout << "[Stage " << stage << " Iter " << iter
                     << "] cost=" << cost
-                    << ", gradNorm=" << gradNorm
                     << ", deltaNorm=" << deltaNorm
                     << ", costChange=" << cost_change << std::endl;
 
-            if (deltaNorm < 1e-6 || gradNorm < 1e-6 || cost_change < 1e-6) {
+            if (deltaNorm < 1e-6 || cost_change < 1e-6) {
                 inner_no_improve_counter++;
             } else {
                 inner_no_improve_counter = 0;
             }
 
             prev_cost = cost;
-
             if (inner_no_improve_counter >= 3) {
                 std::cout << "Early stop (inner) at iter " << iter << std::endl;
                 break;
             }
         }
 
-        double stage_cost = prev_cost; // 已经在 iter 里维护过 prev_cost
+        double stage_cost = prev_cost;
         double stage_cost_change = std::abs(prev_stage_cost - stage_cost);
-
-        // std::cout << "[Stage " << stage << "] stage_cost=" << stage_cost
-        //         << ", stage_cost_change=" << stage_cost_change << std::endl;
-
         if (stage_cost_change < 1e-6) {
             outer_no_improve_counter++;
         } else {
@@ -221,14 +194,13 @@ void Optimizer::optimize(
         }
 
         prev_stage_cost = stage_cost;
-
         if (outer_no_improve_counter >= 3) {
             std::cout << "Early stop (outer) at stage " << stage << std::endl;
             break;
         }
     }
 
-    // 写回优化后的 pose
+    edGraph.updateFromStateVector(X, poseDim);
     for (size_t i = 0; i < frame_count; i++) {
         Sophus::SE3d T = Sophus::SE3d::exp(X.segment<6>(i*6));
         Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
