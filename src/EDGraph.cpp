@@ -1,8 +1,22 @@
 #include "EDGraph.h"
 #include <algorithm>
 
-EDGraph::EDGraph(int K)
-    : K_(K) {}
+EDGraph::EDGraph(int K): K_(K) {}
+
+void EDGraph::initializeGraph(const std::vector<MeshModel::Vertex>& vertices, int sampling_step) {
+    std::vector<DeformationNode> nodes;
+    nodes.reserve(vertices.size() / sampling_step + 1);
+
+    for (size_t i = 0; i < vertices.size(); i += sampling_step) {
+        const auto& v = vertices[i];
+        DeformationNode node;
+        node.position = Eigen::Vector3d(v.x, v.y, v.z);
+        node.transform = Sophus::SE3d();  // 默认单位变换
+        nodes.push_back(node);
+    }
+    setGraphNodes(nodes);           // 设置类内部 nodes_
+    bindVertices(mesh_vertices);    // 绑定顶点 -> 控制点
+}
 
 void EDGraph::setGraphNodes(const std::vector<DeformationNode>& nodes) {
     graph_ = nodes;

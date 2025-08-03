@@ -22,6 +22,7 @@ set(SOURCE_FILES
     src/Projection.cpp
     src/BVH.cpp
     src/Evaluation.cpp
+    src/EDGraph.cpp
     main.cpp
 )
 

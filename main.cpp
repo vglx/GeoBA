@@ -33,18 +33,10 @@ int main() {
               << mesh_model.getTriangles().size() << " triangles.\n";
 
     // **4. 构建 EDGraph 控制节点并绑定顶点**
-    std::vector<DeformationNode> nodes;
-    const auto& vertices = mesh_model.getVertices();
-    nodes.reserve(vertices.size());
-    for (const auto& v : vertices) {
-        DeformationNode node;
-        node.position = Eigen::Vector3d(v.x, v.y, v.z);
-        node.transform = Sophus::SE3d();  // 默认单位变换
-        nodes.push_back(node);
-    }
     EDGraph edGraph(4);  // 每顶点绑定 4 个最近节点
-    edGraph.setGraphNodes(nodes);
-    edGraph.bindVertices(vertices);
+    int sampling_step = 10;  // 控制稀疏程度
+    edGraph.initializeGraph(mesh_model.getVertices(), sampling_step);
+
 
     // **5. 加载 RGB 图像**
     if (!dataset_manager.loadAllRGBImages(rgb_images)) {

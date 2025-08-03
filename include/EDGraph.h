@@ -17,6 +17,8 @@ class EDGraph {
 public:
     explicit EDGraph(int K = 4);
 
+    void initializeGraph(const std::vector<MeshModel::Vertex>& mesh_vertices, int sampling_step = 10);
+
     // 设置节点集合（rest positions + initial transforms）
     void setGraphNodes(const std::vector<DeformationNode>& nodes);
     // 绑定每个顶点到 K 个最近节点（预计算）
