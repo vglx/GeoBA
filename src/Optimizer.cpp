@@ -55,6 +55,19 @@ void Optimizer::optimize(
     int outer_no_improve_counter = 0;
 
     for (int stage = 0; stage < maxStages_; ++stage) {
+        // === 1. 用当前 EDGraph 变形顶点更新 BVH ===
+        std::vector<MeshModel::Vertex> deformed_vertices(vertex_count);
+
+        #pragma omp parallel for
+        for (int vi = 0; vi < static_cast<int>(vertex_count); ++vi) {
+            Eigen::Vector3d v_def = edGraph.deformVertex(mesh_vertices[vi], vi);
+            deformed_vertices[vi].x = static_cast<float>(v_def.x());
+            deformed_vertices[vi].y = static_cast<float>(v_def.y());
+            deformed_vertices[vi].z = static_cast<float>(v_def.z());
+        }
+        bvh.refit(deformed_vertices);
+
+        // === 2. 可见性判断（原样保留） ===
         std::vector<std::vector<bool>> visible_table(vertex_count, std::vector<bool>(frame_count, false));
         std::vector<int> residuals_per_vertex(vertex_count, 0);
 
