@@ -1,18 +1,89 @@
 #include "Optimizer.h"
 #include "CostFunctions.h"
 #include "Projection.h"
-#include "BVH.h"
-#include <iostream>
-#include <vector>
-#include <Eigen/Core>
-#include <Eigen/Sparse>
-#include <Eigen/Dense>
-#include <sophus/se3.hpp>
-#include <omp.h>
 #include "ImageProcessor.h"
+#include <Eigen/Sparse>
+#include <iostream>
+#include <omp.h>
 
-Optimizer::Optimizer(double weight, int maxStages, int maxIterations)
-    : weight_(weight), maxStages_(maxStages), maxIterations_(maxIterations) {
+Optimizer::Optimizer(double weight, int maxStages, int maxIterations,
+                     double lambda_smooth,
+                     double lambda_temp,
+                     double lambda_rigid,
+                     int edge_knn)
+    : weight_(weight), maxStages_(maxStages), maxIterations_(maxIterations),
+      lambda_smooth_(lambda_smooth), lambda_temp_(lambda_temp), lambda_rigid_(lambda_rigid),
+      edge_knn_(edge_knn) {}
+
+Sophus::SE3d Optimizer::mat4ToSE3(const Eigen::Matrix4d& Tm) {
+    Eigen::Matrix3d R = Tm.block<3,3>(0,0);
+    Eigen::Vector3d t = Tm.block<3,1>(0,3);
+    return Sophus::SE3d(R, t);
+}
+
+cv::Mat Optimizer::ensureGrayFloat(const cv::Mat& img) {
+    cv::Mat gray;
+    if (img.channels() == 3) {
+        cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+    } else {
+        gray = img;
+    }
+    gray.convertTo(gray, CV_32F, 1.0/255.0);
+    return gray;
+}
+
+void Optimizer::initializeIntensityByAverage(
+    const std::vector<MeshModel::Vertex>& vertices,
+    const Eigen::Matrix3d& K,
+    const std::vector<cv::Mat>& images_gray,
+    const std::vector<Sophus::SE3d>& poses,
+    std::vector<double>& I
+) const {
+    const int V = static_cast<int>(vertices.size());
+    const int F = static_cast<int>(images_gray.size());
+    I.assign(V, 0.0);
+    std::vector<int> cnt(V, 0);
+
+    for (int j = 0; j < F; ++j) {
+        const auto& img = images_gray[j];
+        const int W = img.cols, H = img.rows;
+        const Eigen::Matrix3d& R = poses[j].rotationMatrix();
+        const Eigen::Vector3d& t = poses[j].translation();
+        for (int vi = 0; vi < V; ++vi) {
+            Eigen::Vector3d x(vertices[vi].x, vertices[vi].y, vertices[vi].z);
+            // project with pose (no ED in init)
+            Eigen::Vector3d Pc = R.transpose() * (x - t);
+            if (Pc.z() <= 1e-6) continue;
+            double u = K(0,0)*Pc.x()/Pc.z() + K(0,2);
+            double v = K(1,1)*Pc.y()/Pc.z() + K(1,2);
+            if (u < 0 || u >= W || v < 0 || v >= H) continue;
+            float Iuv = ImageProcessor::getBilinearInterpolatedIntensity(img, u, v);
+            I[vi] += static_cast<double>(Iuv);
+            cnt[vi]++;
+        }
+    }
+    for (int vi = 0; vi < V; ++vi) if (cnt[vi] > 0) I[vi] /= cnt[vi];
+}
+
+std::vector<std::pair<int,int>> Optimizer::buildNodeEdges(const std::vector<DeformationNode>& nodes, int k) {
+    std::vector<std::pair<int,int>> edges;
+    const int N = static_cast<int>(nodes.size());
+    if (N == 0 || k <= 0) return edges;
+    std::vector<std::pair<double,int>> heap; heap.reserve(N);
+    for (int i = 0; i < N; ++i) {
+        heap.clear();
+        for (int j = 0; j < N; ++j) if (i != j) {
+            double d2 = (nodes[i].position - nodes[j].position).squaredNorm();
+            heap.emplace_back(d2, j);
+        }
+        int kk = std::min(k, N-1);
+        std::nth_element(heap.begin(), heap.begin()+kk, heap.end());
+        for (int m = 0; m < kk; ++m) {
+            int j = heap[m].second;
+            if (i < j) edges.emplace_back(i,j); // undirected unique
+        }
+    }
+    return edges;
 }
 
 void Optimizer::optimize(
@@ -20,205 +91,281 @@ void Optimizer::optimize(
     const std::vector<MeshModel::Triangle>& mesh_triangles,
     const Eigen::Matrix3d& camera_intrinsics,
     const std::vector<cv::Mat>& observed_images,
-    std::vector<Eigen::Matrix4d>& camera_poses,
-    EDGraph& edGraph) {
+    const std::vector<Eigen::Matrix4d>& camera_poses,
+    EDGraph& edGraph,
+    std::vector<EDState>& ed_states_per_frame,
+    std::vector<double>& vertex_intensity
+) {
+    const int F = static_cast<int>(observed_images.size());
+    const int V = static_cast<int>(mesh_vertices.size());
+    const int G = edGraph.numNodes();
 
-    size_t frame_count = observed_images.size();
-    size_t vertex_count = mesh_vertices.size();
-    int poseDim = static_cast<int>(frame_count * 6);
-    int edDim = static_cast<int>(edGraph.numNodes() * 6);
-    int intensityDim = static_cast<int>(vertex_count);
-    int stateDim = poseDim + edDim + intensityDim;
+    // 1) Prepare gray images and poses (SE3, but fixed)
+    std::vector<cv::Mat> images_gray; images_gray.reserve(F);
+    for (const auto& img : observed_images) images_gray.push_back(ensureGrayFloat(img));
+    std::vector<Sophus::SE3d> poses(F);
+    for (int j = 0; j < F; ++j) poses[j] = mat4ToSE3(camera_poses[j]);
 
-    BVH bvh(mesh_triangles, mesh_vertices);
+    // 2) Init per-frame ED states to identity
+    ed_states_per_frame.assign(F, EDState());
+    for (int j = 0; j < F; ++j) ed_states_per_frame[j].resize(G);
 
-    std::vector<cv::Mat> observed_images_gray;
-    for (const auto& img : observed_images) {
-        cv::Mat gray;
-        if (img.channels() == 3) {
-            cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
-        } else {
-            gray = img;
-        }
-        gray.convertTo(gray, CV_32F, 1.0/255.0);
-        observed_images_gray.push_back(gray);
-    }
+    // 3) Init vertex intensity as multi-view average (ED = I)
+    initializeIntensityByAverage(mesh_vertices, camera_intrinsics, images_gray, poses, vertex_intensity);
+
+    // 4) State layout: [ frame0(12G), frame1(12G), ..., frameF-1(12G), intensity(V) ]
+    const int edBlock = 12 * G;
+    const int edDim   = edBlock * F;
+    const int intDim  = V;
+    const int stateDim = edDim + intDim;
+
+    auto edOffset = [&](int frame){ return frame * edBlock; };
+    auto intOffset = [&](int v){ return edDim + v; };
 
     Eigen::VectorXd X = Eigen::VectorXd::Zero(stateDim);
-    for (size_t i = 0; i < frame_count; i++) {
-        Sophus::SE3d T(camera_poses[i].block<3,3>(0,0), camera_poses[i].block<3,1>(0,3));
-        X.segment<6>(i*6) = T.log();
+    for (int j = 0; j < F; ++j) {
+        edGraph.writeStateToVector(ed_states_per_frame[j], X, edOffset(j));
     }
-    edGraph.writeToStateVector(X, poseDim);
+    for (int vi = 0; vi < V; ++vi) X(intOffset(vi)) = vertex_intensity[vi];
 
-    double prev_stage_cost = std::numeric_limits<double>::max();
-    int outer_no_improve_counter = 0;
+    // Build a BVH per frame (strict occlusion per frame)
+    std::vector<BVH> bvhs; bvhs.reserve(F);
+    for (int j = 0; j < F; ++j) bvhs.emplace_back(mesh_triangles, mesh_vertices);
+
+    // Precompute node edges for ARAP-like smoothness
+    auto edges = buildNodeEdges(edGraph.getGraphNodes(), edge_knn_);
+
+    double prev_stage_cost = std::numeric_limits<double>::infinity();
+    int outer_no_improve = 0;
 
     for (int stage = 0; stage < maxStages_; ++stage) {
-        // === 1. 用当前 EDGraph 变形顶点更新 BVH ===
-        std::vector<MeshModel::Vertex> deformed_vertices(vertex_count);
-
-        #pragma omp parallel for
-        for (int vi = 0; vi < static_cast<int>(vertex_count); ++vi) {
-            Eigen::Vector3d v_def = edGraph.deformVertex(mesh_vertices[vi], vi);
-            deformed_vertices[vi].x = static_cast<float>(v_def.x());
-            deformed_vertices[vi].y = static_cast<float>(v_def.y());
-            deformed_vertices[vi].z = static_cast<float>(v_def.z());
+        // 4.1) Refit BVH for each frame using that frame's current ED state
+        for (int j = 0; j < F; ++j) {
+            std::vector<MeshModel::Vertex> def_vertices(V);
+            #pragma omp parallel for
+            for (int vi = 0; vi < V; ++vi) {
+                Eigen::Vector3d xd = edGraph.deformVertex(mesh_vertices[vi], vi, ed_states_per_frame[j]);
+                def_vertices[vi].x = static_cast<float>(xd.x());
+                def_vertices[vi].y = static_cast<float>(xd.y());
+                def_vertices[vi].z = static_cast<float>(xd.z());
+            }
+            bvhs[j].refit(def_vertices);
         }
-        bvh.refit(deformed_vertices);
 
-        // === 2. 可见性判断（原样保留） ===
-        std::vector<std::vector<bool>> visible_table(vertex_count, std::vector<bool>(frame_count, false));
-        std::vector<int> residuals_per_vertex(vertex_count, 0);
+        // 4.2) Visibility table per frame
+        std::vector<std::vector<char>> visible(V, std::vector<char>(F, 0));
+        std::vector<int> residuals_per_vertex(V, 0);
 
         #pragma omp parallel for
-        for (size_t i = 0; i < vertex_count; ++i) {
-            for (size_t j = 0; j < frame_count; ++j) {
-                Sophus::SE3d T = Sophus::SE3d::exp(X.segment<6>(j * 6));
+        for (int vi = 0; vi < V; ++vi) {
+            for (int j = 0; j < F; ++j) {
+                const auto& T = poses[j];
                 Eigen::Matrix3d R = T.rotationMatrix();
                 Eigen::Vector3d t = T.translation();
-                const cv::Mat& image = observed_images_gray[j];
-                if (Projection::isVertexVisible(mesh_vertices[i], camera_intrinsics, R, t,
-                                                bvh, image.cols, image.rows, i, &edGraph)) {
-                    visible_table[i][j] = true;
+                const cv::Mat& img = images_gray[j];
+                if (Projection::isVertexVisible(mesh_vertices[vi], camera_intrinsics, R, t,
+                                                bvhs[j], img.cols, img.rows, vi, &edGraph)) {
+                    visible[vi][j] = 1;
                     #pragma omp atomic
-                    residuals_per_vertex[i]++;
+                    residuals_per_vertex[vi]++;
                 }
             }
         }
 
-        std::vector<int> row_offset(vertex_count, 0);
+        // 4.3) Row offsets and regularizer row budget
+        std::vector<int> rowOffset(V, 0);
         int total_rows = 0;
-        for (size_t i = 0; i < vertex_count; ++i) {
-            row_offset[i] = total_rows;
-            total_rows += residuals_per_vertex[i];
-        }
+        for (int vi = 0; vi < V; ++vi) { rowOffset[vi] = total_rows; total_rows += residuals_per_vertex[vi]; }
 
-        std::cout << "[Stage " << stage << "] Total residuals: " << total_rows << std::endl;
+        // --- Regularization row budget ---
+        // ARAP-like smoothness: per edge and per frame, 12 residuals (9 for A, 3 for b)
+        const int num_edges = static_cast<int>(edges.size());
+        const int arap_rows  = F * num_edges * 12;
+        // Temporal consistency: per node, between consecutive frames, 12 residuals
+        const int temp_rows  = (F > 1 ? (F-1) * G * 12 : 0);
+        // Near-rigid: per node per frame, 9 residuals on (A - I)
+        const int rigid_rows = F * G * 9;
+        const int reg_rows_total = arap_rows + temp_rows + rigid_rows;
+        const int data_rows_total = total_rows;
+        total_rows += reg_rows_total;
 
-        double prev_cost = std::numeric_limits<double>::max();
-        int inner_no_improve_counter = 0;
+        double prev_cost = std::numeric_limits<double>::infinity();
+        int inner_no_improve = 0;
 
         for (int iter = 0; iter < maxIterations_; ++iter) {
-            std::vector<double> residuals(total_rows);
-            int num_threads = omp_get_max_threads();
-            std::vector<std::vector<Eigen::Triplet<double>>> triplets_per_thread(num_threads);
+            std::vector<double> residuals(total_rows, 0.0);
+            int nthreads = omp_get_max_threads();
+            std::vector<std::vector<Eigen::Triplet<double>>> triplets_per_thread(nthreads);
 
+            // --- Data term ---
             #pragma omp parallel
             {
                 int tid = omp_get_thread_num();
-                auto& local_triplets = triplets_per_thread[tid];
+                auto& Tvec = triplets_per_thread[tid];
 
                 #pragma omp for
-                for (size_t i = 0; i < vertex_count; ++i) {
-                    if (residuals_per_vertex[i] == 0) continue;
-                    int local_rowIndex = row_offset[i];
-                    for (size_t j = 0; j < frame_count; ++j) {
-                        if (!visible_table[i][j]) continue;
+                for (int vi = 0; vi < V; ++vi) {
+                    if (residuals_per_vertex[vi] == 0) continue;
+                    int row = rowOffset[vi];
+                    for (int j = 0; j < F; ++j) {
+                        if (!visible[vi][j]) continue;
 
-                        Eigen::Matrix<double, 6, 1> se3 = X.segment<6>(j * 6);
-                        Sophus::SE3d T = Sophus::SE3d::exp(se3);
-                        Eigen::Matrix3d R = T.rotationMatrix();
-                        Eigen::Vector3d t = T.translation();
-                        const cv::Mat& image = observed_images_gray[j];
+                        // Construct photometric residual for (vertex vi, frame j)
+                        PhotometricError cost(
+                            mesh_vertices[vi], vi, mesh_triangles,
+                            camera_intrinsics, images_gray[j], bvhs[j],
+                            weight_, &edGraph, &ed_states_per_frame[j]
+                        );
 
-                        PhotometricError costFunc(mesh_vertices[i], i, mesh_triangles,
-                                                camera_intrinsics, image, bvh, weight_, &edGraph);
                         double r = 0.0;
-                        Eigen::Matrix<double, 1, 6> J_pose;
-                        double J_intensity = 0.0;
-                        Eigen::VectorXd J_ed(6 * edGraph.numNodes());
-                        double intensity = X(poseDim + edDim + i);
+                        const Sophus::SE3d& T = poses[j];
+                        Eigen::Matrix<double,6,1> se3 = T.log();
+                        double I_v = X(intOffset(vi));
+                        // We do NOT optimize pose => jacobian_pose = nullptr
+                        double JI = 0.0; Eigen::VectorXd JED; // size = 12*G
+                        cost.Evaluate(se3, I_v, r, nullptr, &JI, &JED);
+                        residuals[row] = r;
 
-                        costFunc.Evaluate(se3, intensity, r, &J_pose, &J_intensity, &J_ed);
-                        residuals[local_rowIndex] = r;
-
-                        for (int k = 0; k < 6; ++k) {
-                            local_triplets.emplace_back(local_rowIndex, j * 6 + k, J_pose(k));
+                        // Fill Jacobians: ED block for frame j, and intensity column
+                        const int edCol0 = edOffset(j);
+                        for (int k = 0; k < JED.size(); ++k) {
+                            if (JED(k) != 0.0)
+                                Tvec.emplace_back(row, edCol0 + k, JED(k));
                         }
-                        for (int k = 0; k < J_ed.size(); ++k) {
-                            local_triplets.emplace_back(local_rowIndex, poseDim + k, J_ed(k));
-                        }
-                        local_triplets.emplace_back(local_rowIndex, poseDim + edDim + i, J_intensity);
-                        local_rowIndex++;
+                        if (JI != 0.0) Tvec.emplace_back(row, intOffset(vi), JI);
+                        row++;
                     }
                 }
             }
 
-            std::vector<Eigen::Triplet<double>> triplets;
-            for (const auto& vec : triplets_per_thread) {
-                triplets.insert(triplets.end(), vec.begin(), vec.end());
+            // --- Regularizers ---
+            int reg_row = data_rows_total; // start after data rows
+            const double sw_arap = std::sqrt(std::max(0.0, lambda_smooth_));
+            const double sw_temp = std::sqrt(std::max(0.0, lambda_temp_));
+            const double sw_rig  = std::sqrt(std::max(0.0, lambda_rigid_));
+
+            // ARAP-like smoothness: for each frame and edge (i,j), penalize element-wise differences on A and b
+            {
+                auto& Tvec = triplets_per_thread[0]; // single-thread assemble; cheap vs data term
+                for (int j = 0; j < F; ++j) {
+                    const int edCol0 = edOffset(j);
+                    for (const auto& e : edges) {
+                        int i = e.first, l = e.second;
+                        // A diff (9)
+                        for (int q = 0; q < 9; ++q) {
+                            residuals[reg_row] = 0.0;
+                            Tvec.emplace_back(reg_row, edCol0 + 12*i + q,  sw_arap);
+                            Tvec.emplace_back(reg_row, edCol0 + 12*l + q, -sw_arap);
+                            reg_row++;
+                        }
+                        // b diff (3)
+                        for (int q = 0; q < 3; ++q) {
+                            residuals[reg_row] = 0.0;
+                            Tvec.emplace_back(reg_row, edCol0 + 12*i + 9 + q,  sw_arap);
+                            Tvec.emplace_back(reg_row, edCol0 + 12*l + 9 + q, -sw_arap);
+                            reg_row++;
+                        }
+                    }
+                }
             }
 
-            Eigen::VectorXd F = Eigen::Map<Eigen::VectorXd>(residuals.data(), residuals.size());
+            // Temporal consistency: between frames j and j-1, per node, element-wise diffs on A and b
+            {
+                auto& Tvec = triplets_per_thread[0];
+                for (int j = 1; j < F; ++j) {
+                    const int col_prev = edOffset(j-1);
+                    const int col_cur  = edOffset(j);
+                    for (int i = 0; i < G; ++i) {
+                        for (int q = 0; q < 9; ++q) {
+                            residuals[reg_row] = 0.0;
+                            Tvec.emplace_back(reg_row, col_cur  + 12*i + q,  sw_temp);
+                            Tvec.emplace_back(reg_row, col_prev + 12*i + q, -sw_temp);
+                            reg_row++;
+                        }
+                        for (int q = 0; q < 3; ++q) {
+                            residuals[reg_row] = 0.0;
+                            Tvec.emplace_back(reg_row, col_cur  + 12*i + 9 + q,  sw_temp);
+                            Tvec.emplace_back(reg_row, col_prev + 12*i + 9 + q, -sw_temp);
+                            reg_row++;
+                        }
+                    }
+                }
+            }
+
+            // Near-rigid prior on A: penalize A - I (9 scalars), small weight
+            {
+                auto& Tvec = triplets_per_thread[0];
+                for (int j = 0; j < F; ++j) {
+                    const int edCol0 = edOffset(j);
+                    for (int i = 0; i < G; ++i) {
+                        for (int q = 0; q < 9; ++q) {
+                            double target = (q==0 || q==4 || q==8) ? 1.0 : 0.0; // I3 in column-major vec
+                            residuals[reg_row] = sw_rig * (-target);
+                            Tvec.emplace_back(reg_row, edCol0 + 12*i + q, sw_rig);
+                            reg_row++;
+                        }
+                    }
+                }
+            }
+
+            // Assemble and solve
+            std::vector<Eigen::Triplet<double>> triplets;
+            for (auto& vec : triplets_per_thread) triplets.insert(triplets.end(), vec.begin(), vec.end());
+
+            Eigen::VectorXd Fvec = Eigen::Map<Eigen::VectorXd>(residuals.data(), residuals.size());
             Eigen::SparseMatrix<double> J(total_rows, stateDim);
             J.setFromTriplets(triplets.begin(), triplets.end());
-            J = J.rightCols(stateDim - 6);
 
-            double cost = F.squaredNorm();
+            double cost_val = Fvec.squaredNorm();
             Eigen::SparseMatrix<double> H = J.transpose() * J;
-            Eigen::VectorXd g = -J.transpose() * F;
+            Eigen::VectorXd g = -J.transpose() * Fvec;
 
-            double lambda = 1e-6;
+            // LM damping (simple)
+            const double lambda = 1e-6;
             H += lambda * Eigen::MatrixXd::Identity(H.rows(), H.cols()).sparseView();
 
             Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
             solver.compute(H);
-            if (solver.info() != Eigen::Success) continue;
-
-            Eigen::VectorXd delta = solver.solve(g);
-            if (solver.info() != Eigen::Success) continue;
-
-            for (size_t j = 1; j < frame_count; ++j) {
-                Eigen::Matrix<double,6,1> d = delta.segment<6>((j-1)*6);
-                Sophus::SE3d T = Sophus::SE3d::exp(X.segment<6>(j*6));
-                Sophus::SE3d T_up = T * Sophus::SE3d::exp(d);
-                X.segment<6>(j*6) = T_up.log();
+            if (solver.info() != Eigen::Success) {
+                std::cerr << "[Warn] Solver factorization failed. Skipping iter." << std::endl;
+                break;
             }
-            X.segment(poseDim, edDim + intensityDim) += delta.tail(edDim + intensityDim);
-
-            double deltaNorm = delta.norm();
-            double cost_change = std::abs(prev_cost - cost);
-
-            std::cout << "[Stage " << stage << " Iter " << iter
-                    << "] cost=" << cost
-                    << ", deltaNorm=" << deltaNorm
-                    << ", costChange=" << cost_change << std::endl;
-
-            if (deltaNorm < 1e-6 || cost_change < 1e-6) {
-                inner_no_improve_counter++;
-            } else {
-                inner_no_improve_counter = 0;
+            Eigen::VectorXd dx = solver.solve(g);
+            if (solver.info() != Eigen::Success) {
+                std::cerr << "[Warn] Solver solve failed. Skipping iter." << std::endl;
+                break;
             }
 
-            prev_cost = cost;
-            if (inner_no_improve_counter >= 3) {
+            // Update X
+            X += dx;
+
+            // Unpack back to states for next iteration
+            for (int j = 0; j < F; ++j) {
+                edGraph.readStateFromVector(X, edOffset(j), ed_states_per_frame[j]);
+            }
+            for (int vi = 0; vi < V; ++vi) vertex_intensity[vi] = X(intOffset(vi));
+
+            double dnorm = dx.norm();
+            double dcost = std::abs(prev_cost - cost_val);
+            std::cout << "[Stage " << stage << " Iter " << iter << "] cost=" << cost_val
+                      << ", |dx|=" << dnorm << ", dcost=" << dcost << std::endl;
+
+            if (dnorm < 1e-6 || dcost < 1e-6) inner_no_improve++;
+            else inner_no_improve = 0;
+            prev_cost = cost_val;
+            if (inner_no_improve >= 3) {
                 std::cout << "Early stop (inner) at iter " << iter << std::endl;
                 break;
             }
         }
 
-        double stage_cost = prev_cost;
-        double stage_cost_change = std::abs(prev_stage_cost - stage_cost);
-        if (stage_cost_change < 1e-6) {
-            outer_no_improve_counter++;
-        } else {
-            outer_no_improve_counter = 0;
-        }
-
+        double stage_cost = std::isfinite(prev_cost) ? prev_cost : 0.0;
+        double stage_drop = std::abs(prev_stage_cost - stage_cost);
+        if (stage_drop < 1e-6) outer_no_improve++; else outer_no_improve = 0;
         prev_stage_cost = stage_cost;
-        if (outer_no_improve_counter >= 3) {
+        if (outer_no_improve >= 3) {
             std::cout << "Early stop (outer) at stage " << stage << std::endl;
             break;
         }
-    }
-
-    edGraph.updateFromStateVector(X, poseDim);
-    for (size_t i = 0; i < frame_count; i++) {
-        Sophus::SE3d T = Sophus::SE3d::exp(X.segment<6>(i*6));
-        Eigen::Matrix4d pose = Eigen::Matrix4d::Identity();
-        pose.block<3,3>(0,0) = T.rotationMatrix();
-        pose.block<3,1>(0,3) = T.translation();
-        camera_poses[i] = pose;
     }
 }
