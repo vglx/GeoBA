@@ -1,66 +1,57 @@
 #ifndef COSTFUNCTIONS_H
 #define COSTFUNCTIONS_H
 
+#include <Eigen/Core>
+#include <vector>
+#include <opencv2/opencv.hpp>
 #include "MeshModel.h"
 #include "BVH.h"
 #include "EDGraph.h"
-#include "Projection.h"
-#include <Eigen/Core>
-#include <Eigen/Dense>
-#include <opencv2/opencv.hpp>
-#include <vector>
 
-// Photometric error struct with joint pose and EDGraph parameter optimization
+// PhotometricError (data term):
+// r = sqrt(w) * ( I(u,v) - I_v )
+// where (u,v) are the projection of the *deformed* vertex using fixed (R,t).
+// Jacobians wrt intensity (scalar) and ED affine parameters (12 per node).
 class PhotometricError {
 public:
-    PhotometricError(
-        const MeshModel::Vertex& vertex,
-        int vertex_index,
-        const std::vector<MeshModel::Triangle>& triangles,
-        const Eigen::Matrix3d& intrinsics,
-        const cv::Mat& current_image,
-        const BVH& bvh,
-        double weight,
-        const EDGraph* ed = nullptr
-    );
+    PhotometricError(const MeshModel::Vertex& vertex,
+                     int vertex_index,
+                     const std::vector<MeshModel::Triangle>& mesh_triangles,
+                     const Eigen::Matrix3d& K,
+                     const cv::Mat& image_gray_float,   // CV_32F in [0,1]
+                     const BVH& bvh,                    // kept for signature compatibility
+                     double sqrt_w,
+                     const EDGraph* edGraph);
 
-    // Compute residual and Jacobians for pose(6), intensity(1), and ED params (6*G)
-    bool Evaluate(
-        const Eigen::Matrix<double,6,1>& se3,
-        double intensity,
-        double& residual,
-        Eigen::Matrix<double,1,6>* jacobian_pose,
-        double* jacobian_intensity,
-        Eigen::VectorXd* jacobian_ed = nullptr
-    ) const;
+    // Evaluate residual and Jacobians.
+    // Pose has been removed; we pass fixed R,t here.
+    bool Evaluate(double intensity_i,
+                  double& residual,
+                  double* jacobian_intensity,     // (optional) d r / d I_v
+                  Eigen::VectorXd* jacobian_ed,   // (optional) size = 12*G, only a few non-zeros filled
+                  const Eigen::Matrix3d& R,
+                  const Eigen::Vector3d& t) const;
 
 private:
-    MeshModel::Vertex vertex_;
+    // Bilinear fetch + gradient (du,dv) at (u,v)
+    inline bool sampleBilinearAndGradient(float u, float v,
+                                          float& I,
+                                          float& dIdu,
+                                          float& dIdv) const;
+
+    // camera projection of a 3D point in world (p_w) with fixed R,t
+    inline bool projectPoint(const Eigen::Vector3d& p_w,
+                             float& u, float& v, float& Zc) const;
+
+private:
+    MeshModel::Vertex v_raw_;
     int vidx_;
-    std::vector<MeshModel::Triangle> triangles_;
-    Eigen::Matrix3d intrinsics_;
-    cv::Mat current_image_;
-    BVH bvh_;
-    double weight_;
+    const std::vector<MeshModel::Triangle>& tris_;
+    Eigen::Matrix3d K_;
+    cv::Mat img_;           // CV_32F [0,1]
+    const BVH& bvh_;
+    double sqrt_w_;
     const EDGraph* ed_;
-
-    // Helper: compute pose Jacobian using deformed vertex
-    Eigen::Matrix<double,1,6> computePoseJacobian(
-        const Eigen::Vector3d& v_def,
-        const Eigen::Matrix3d& R,
-        const Eigen::Vector3d& t,
-        double u,
-        double v
-    ) const;
-
-    // Helper: compute ED param Jacobian for one node
-    Eigen::Matrix<double,1,6> computeEDJacobianAtNode(
-        const Eigen::Matrix<double,1,2>& J_grad,
-        const Eigen::Matrix<double,2,3>& J_proj,
-        const DeformationNode& node,
-        const Eigen::Vector3d& v0,
-        double weight_k
-    ) const;
 };
 
 #endif // COSTFUNCTIONS_H

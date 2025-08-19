@@ -1,88 +1,192 @@
 #include "EDGraph.h"
 #include <algorithm>
+#include <limits>
+#include <cmath>
 
-EDGraph::EDGraph(int K): K_(K) {}
+namespace {
+inline double sqr(double v) { return v * v; }
+}
 
-void EDGraph::initializeGraph(const std::vector<MeshModel::Vertex>& vertices, int sampling_step) {
+EDGraph::EDGraph(int K, int neighborK)
+    : K_(K), neighborK_(neighborK) {}
+
+void EDGraph::initializeGraph(const std::vector<MeshModel::Vertex>& mesh_vertices,
+                              int sampling_step,
+                              bool build_neighbors) {
+    // 1) 采样生成节点
     std::vector<DeformationNode> nodes;
-    nodes.reserve(vertices.size() / sampling_step + 1);
+    nodes.reserve(mesh_vertices.size() / std::max(1, sampling_step) + 1);
 
-    for (size_t i = 0; i < vertices.size(); i += sampling_step) {
-        const auto& v = vertices[i];
-        DeformationNode node;
+    for (size_t i = 0; i < mesh_vertices.size(); i += std::max(1, sampling_step)) {
+        const auto& v = mesh_vertices[i];
+        DeformationNode node{};
         node.position = Eigen::Vector3d(v.x, v.y, v.z);
-        node.transform = Sophus::SE3d();  // 默认单位变换
+        node.A.setIdentity();
+        node.t.setZero();
         nodes.push_back(node);
     }
-    setGraphNodes(nodes);           // 设置类内部 nodes_
-    bindVertices(mesh_vertices);    // 绑定顶点 -> 控制点
+    setGraphNodes(nodes);
+
+    // 2) 绑定顶点 -> K 近邻节点
+    bindVertices(mesh_vertices);
+
+    // 3) 可选构建邻接边
+    if (build_neighbors) buildNeighbors_();
 }
 
 void EDGraph::setGraphNodes(const std::vector<DeformationNode>& nodes) {
     graph_ = nodes;
+    edges_.clear();
 }
 
 void EDGraph::bindVertices(const std::vector<MeshModel::Vertex>& vertices) {
-    size_t n = vertices.size();
-    bindings_.assign(n, {});
-    weights_.assign(n, {});
+    const size_t nV = vertices.size();
+    const int G = numNodes();
+    bindings_.assign(nV, {});
+    weights_.assign(nV, {});
+    if (G == 0 || nV == 0) return;
 
-    for (size_t i = 0; i < n; ++i) {
-        Eigen::Vector3d v(vertices[i].x, vertices[i].y, vertices[i].z);
+    for (size_t vid = 0; vid < nV; ++vid) {
+        const Eigen::Vector3d v(vertices[vid].x, vertices[vid].y, vertices[vid].z);
         std::vector<std::pair<int, double>> dists;
-        dists.reserve(graph_.size());
-        for (int j = 0; j < (int)graph_.size(); ++j) {
+        dists.reserve(G);
+        for (int j = 0; j < G; ++j) {
             double dist = (v - graph_[j].position).norm();
             dists.emplace_back(j, dist);
         }
-        std::sort(dists.begin(), dists.end(), [](auto& a, auto& b) {
-            return a.second < b.second;
-        });
+        std::nth_element(dists.begin(), dists.begin() + std::min(K_, (int)dists.size()) - 1, dists.end(),
+                         [](const auto& a, const auto& b){ return a.second < b.second; });
+        std::sort(dists.begin(), dists.begin() + std::min(K_, (int)dists.size()),
+                  [](const auto& a, const auto& b){ return a.second < b.second; });
 
-        double sum = 0.0;
-        int kth = std::min(K_, (int)dists.size());
-        bindings_[i].resize(kth);
-        weights_[i].resize(kth);
+        const int kth = std::min(K_, (int)dists.size());
+        bindings_[vid].resize(kth);
+        weights_[vid].resize(kth);
+
+        double sumW = 0.0;
+        constexpr double eps = 1e-8;
         for (int k = 0; k < kth; ++k) {
-            bindings_[i][k] = dists[k].first;
-            double w = 1.0 / (dists[k].second + 1e-8);
-            weights_[i][k] = w;
-            sum += w;
+            bindings_[vid][k] = dists[k].first;
+            // 反距离权重，并做归一化
+            double w = 1.0 / (dists[k].second + eps);
+            weights_[vid][k] = w;
+            sumW += w;
         }
-        for (double& w : weights_[i]) w /= sum;
+        if (sumW <= eps) {
+            // 退化情形：把第一个权重设为 1
+            if (kth > 0) {
+                std::fill(weights_[vid].begin(), weights_[vid].end(), 0.0);
+                weights_[vid][0] = 1.0;
+            }
+        } else {
+            for (double& w : weights_[vid]) w /= sumW;
+        }
     }
 }
 
 Eigen::Vector3d EDGraph::deformVertex(const MeshModel::Vertex& vertex, int vidx) const {
-    Eigen::Vector3d v(vertex.x, vertex.y, vertex.z);
-    Eigen::Vector3d result(0, 0, 0);
-    const auto& node_ids = bindings_[vidx];
-    const auto& node_ws = weights_[vidx];
-    for (size_t k = 0; k < node_ids.size(); ++k) {
-        int nid = node_ids[k];
-        double w = node_ws[k];
-        const auto& node = graph_[nid];
-        Eigen::Vector3d g = node.position;
-        // ED 变形公式：R_j (v - g_j) + g_j + t_j
-        Eigen::Vector3d p = node.transform.so3() * (v - g) + g + node.transform.translation();
-        result += w * p;
-    }
-    return result;
-}
+    const Eigen::Vector3d v(vertex.x, vertex.y, vertex.z);
+    Eigen::Vector3d out = Eigen::Vector3d::Zero();
 
-void EDGraph::updateFromStateVector(const Eigen::VectorXd& x, int offset) {
-    int G = numNodes();
-    for (int i = 0; i < G; ++i) {
-        // 每个节点 6 个自由度
-        Eigen::Matrix<double,6,1> se3 = x.segment<6>(offset + 6 * i);
-        graph_[i].transform = Sophus::SE3d::exp(se3);
+    if ((size_t)vidx >= bindings_.size()) return v; // 安全保护
+
+    const auto& node_ids = bindings_[vidx];
+    const auto& node_ws  = weights_[vidx];
+
+    for (size_t k = 0; k < node_ids.size(); ++k) {
+        const int nid = node_ids[k];
+        const double w = node_ws[k];
+        const auto& node = graph_[nid];
+
+        const Eigen::Vector3d& g = node.position;
+        const Eigen::Vector3d p = node.A * (v - g) + g + node.t; // 仿射 ED
+        out += w * p;
     }
+    return out;
 }
 
 void EDGraph::writeToStateVector(Eigen::VectorXd& x, int offset) const {
-    int G = numNodes();
+    const int G = numNodes();
+    if (G == 0) return;
+    // 确保 x 尺寸足够由调用方负责；此处仅写入
     for (int i = 0; i < G; ++i) {
-        Eigen::Matrix<double,6,1> se3 = graph_[i].transform.log();
-        x.segment<6>(offset + 6 * i) = se3;
+        const auto& A = graph_[i].A; // 行主序: A(0,0)..A(2,2)
+        x(offset + 12*i + 0) = A(0,0);
+        x(offset + 12*i + 1) = A(0,1);
+        x(offset + 12*i + 2) = A(0,2);
+        x(offset + 12*i + 3) = A(1,0);
+        x(offset + 12*i + 4) = A(1,1);
+        x(offset + 12*i + 5) = A(1,2);
+        x(offset + 12*i + 6) = A(2,0);
+        x(offset + 12*i + 7) = A(2,1);
+        x(offset + 12*i + 8) = A(2,2);
+        x(offset + 12*i + 9) = graph_[i].t(0);
+        x(offset + 12*i +10) = graph_[i].t(1);
+        x(offset + 12*i +11) = graph_[i].t(2);
     }
+}
+
+void EDGraph::updateFromStateVector(const Eigen::VectorXd& x, int offset) {
+    const int G = numNodes();
+    if (G == 0) return;
+    for (int i = 0; i < G; ++i) {
+        Eigen::Matrix3d A;
+        A(0,0) = x(offset + 12*i + 0);
+        A(0,1) = x(offset + 12*i + 1);
+        A(0,2) = x(offset + 12*i + 2);
+        A(1,0) = x(offset + 12*i + 3);
+        A(1,1) = x(offset + 12*i + 4);
+        A(1,2) = x(offset + 12*i + 5);
+        A(2,0) = x(offset + 12*i + 6);
+        A(2,1) = x(offset + 12*i + 7);
+        A(2,2) = x(offset + 12*i + 8);
+        graph_[i].A = A;
+        graph_[i].t(0) = x(offset + 12*i + 9);
+        graph_[i].t(1) = x(offset + 12*i +10);
+        graph_[i].t(2) = x(offset + 12*i +11);
+    }
+}
+
+void EDGraph::setNeighborsForSmoothing(int neighborK) {
+    neighborK_ = std::max(0, neighborK);
+    buildNeighbors_();
+}
+
+void EDGraph::buildNeighbors_() {
+    // 基于节点坐标的暴力 KNN（无第三方索引依赖）
+    const int G = numNodes();
+    edges_.clear();
+    if (G <= 1 || neighborK_ <= 0) {
+        // 清空 neighbors 字段
+        for (auto& n : graph_) n.neighbors.clear();
+        return;
+    }
+
+    for (int i = 0; i < G; ++i) {
+        std::vector<std::pair<int,double>> dists;
+        dists.reserve(G-1);
+        const Eigen::Vector3d gi = graph_[i].position;
+        for (int j = 0; j < G; ++j) if (j != i) {
+            double d = (gi - graph_[j].position).squaredNorm();
+            dists.emplace_back(j, d);
+        }
+        const int k = std::min(neighborK_, (int)dists.size());
+        std::nth_element(dists.begin(), dists.begin()+k, dists.end(),
+                         [](const auto& a, const auto& b){ return a.second < b.second; });
+        std::sort(dists.begin(), dists.begin()+k,
+                  [](const auto& a, const auto& b){ return a.second < b.second; });
+
+        graph_[i].neighbors.clear();
+        graph_[i].neighbors.reserve(k);
+        for (int t = 0; t < k; ++t) {
+            const int j = dists[t].first;
+            graph_[i].neighbors.push_back(j);
+            int a = std::min(i, j), b = std::max(i, j);
+            edges_.emplace_back(a, b);
+        }
+    }
+
+    // 去重 (i<j) 边
+    std::sort(edges_.begin(), edges_.end());
+    edges_.erase(std::unique(edges_.begin(), edges_.end()), edges_.end());
 }

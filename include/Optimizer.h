@@ -11,18 +11,25 @@
 
 class Optimizer {
 public:
-    Optimizer(double weight, int maxStages, int maxIterations);
+    Optimizer(double w_data,
+              int maxStages,
+              int maxIterations,
+              double lambda_smooth = 1.0,
+              double lambda_rot = 0.1);
 
+    // camera_poses_gt: fixed GT poses (not optimized)
     void optimize(
         const std::vector<MeshModel::Vertex>& mesh_vertices,
         const std::vector<MeshModel::Triangle>& mesh_triangles,
         const Eigen::Matrix3d& camera_intrinsics,
         const std::vector<cv::Mat>& observed_images,
-        std::vector<Eigen::Matrix4d>& camera_poses,
+        const std::vector<Eigen::Matrix4d>& camera_poses_gt,
         EDGraph& edGraph);
 
 private:
-    double weight_;
+    double w_data_;
+    double lambda_smooth_;
+    double lambda_rot_;
     int maxStages_;
     int maxIterations_;
 };
