@@ -9,9 +9,10 @@
 #include "EDGraph.h"
 
 // PhotometricError (data term):
-// r = sqrt(w) * ( I(u,v) - I_v )
+// r = sqrt(w) * sqrt(w_huber) * ( I(u,v) - I_v )
 // where (u,v) are the projection of the *deformed* vertex using fixed (R,t).
 // Jacobians wrt intensity (scalar) and ED affine parameters (12 per node).
+// NOTE: Uses the T_wc convention consistently: p_c = R^T * (p_w - t)
 class PhotometricError {
 public:
     PhotometricError(const MeshModel::Vertex& vertex,
@@ -32,16 +33,22 @@ public:
                   const Eigen::Matrix3d& R,
                   const Eigen::Vector3d& t) const;
 
+    // Optional: adjust the Huber delta (in intensity units [0,1]).
+    void setHuberDelta(double d) { huber_delta_ = d; }
+
 private:
-    // Bilinear fetch + gradient (du,dv) at (u,v)
-    inline bool sampleBilinearAndGradient(float u, float v,
+    // Bilinear fetch + gradient (du,dv) at (u,v). This version clamps to image bounds
+    // so it never fails at borders; always returns true.
+    inline bool sampleBilinearAndGradient(float& u, float& v,
                                           float& I,
                                           float& dIdu,
                                           float& dIdv) const;
 
-    // camera projection of a 3D point in world (p_w) with fixed R,t
-    inline bool projectPoint(const Eigen::Vector3d& p_w,
-                             float& u, float& v, float& Zc) const;
+    static inline double huberWeight(double r, double delta) {
+        const double ar = std::abs(r);
+        if (ar <= delta) return 1.0;        // inside quadratic region
+        return delta / (ar + 1e-12);        // outside: w = delta/|r|
+    }
 
 private:
     MeshModel::Vertex v_raw_;
@@ -52,6 +59,9 @@ private:
     const BVH& bvh_;
     double sqrt_w_;
     const EDGraph* ed_;
+
+    // Robust kernel delta (default for [0,1] intensities)
+    double huber_delta_ = 0.05;   // ~ 12/255
 };
 
 #endif // COSTFUNCTIONS_H

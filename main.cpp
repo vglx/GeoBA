@@ -1,90 +1,109 @@
 #include "DatasetManager.h"
 #include "Optimizer.h"
 #include "MeshModel.h"
-#include "ImageProcessor.h"
 #include "EDGraph.h"
+
+#include <opencv2/opencv.hpp>
+#include <Eigen/Dense>
 #include <iostream>
-// #include "Evaluation.h"  // 不再评估位姿RMSE，若有其它评估可自行保留
+#include <vector>
+#include <string>
 
-int main() {
-    std::cout << "GeoBA System Starting with Dataset...\n";
+int main(int argc, char** argv) {
+    std::cout << "==== GeoBA (Fixed Poses + Temporal Affine ED + Active Subgraph) ====\n";
 
-    int sampling_interval = 1;  // 可调
+    // ---- dataset root (optional argv[1])
+    std::string dataset_root = "../data/sim_rectum/";
+    if (argc > 1) dataset_root = argv[1];
 
-    // 1) 数据集
-    DatasetManager dataset_manager("../data/sim_rectum/");
+    // ---- controls
+    const int sampling_interval   = 1;   // sample every k frames
+    const int neighborK           = 8;   // graph smoothness neighborhood size
+    const int K_bind              = 4;   // KNN bindings per vertex
+    const int sampling_step_nodes = 10;  // node sampling step when building ED graph
 
-    // 2) Optimizer（固定位姿 + 仿射ED）
-    //    这里的 lambda_smooth / lambda_rot 可按需调
-    Optimizer optimizer(/*w_data=*/1.0, /*maxStages=*/10, /*maxIterations=*/1,
-                        /*lambda_smooth=*/1.0, /*lambda_rot=*/0.1);
+    // ---- dataset manager
+    DatasetManager dataset_manager(dataset_root);
 
-    std::vector<cv::Mat> rgb_images;
-    std::vector<Eigen::Matrix4d> gt_camera_poses;
-    Eigen::Matrix3d camera_intrinsics;
+    // ---- mesh
     MeshModel mesh_model;
-
-    // 3) 网格
     if (!dataset_manager.loadMeshModel(mesh_model)) {
-        std::cerr << "Failed to load global mesh model.\n";
+        std::cerr << "[main] Failed to load mesh model from: " << dataset_root << std::endl;
         return -1;
     }
-    std::cout << "Loaded mesh with " << mesh_model.getVertices().size() << " vertices and "
-              << mesh_model.getTriangles().size() << " triangles.\n";
+    const auto& V = mesh_model.getVertices();
+    const auto& F = mesh_model.getTriangles();
+    std::cout << "[main] Mesh: " << V.size() << " vertices, " << F.size() << " triangles" << std::endl;
 
-    // 4) EDGraph（仿射）初始化与绑定
-    EDGraph edGraph(/*K=*/4);
-    int sampling_step = 10;
-    edGraph.initializeGraph(mesh_model.getVertices(), sampling_step);
+    // ---- build affine ED graph (nodes+bindings+neighbors)
+    EDGraph edGraph(/*K=*/K_bind);
+    edGraph.initializeGraph(V, sampling_step_nodes, /*build_neighbors=*/true);
+    edGraph.setNeighborsForSmoothing(neighborK);
 
-    // 5) 图像
+    // ---- images (RGB) & intrinsics
+    std::vector<cv::Mat> rgb_images;
     if (!dataset_manager.loadAllRGBImages(rgb_images)) {
-        std::cerr << "Failed to load RGB images.\n";
+        std::cerr << "[main] Failed to load RGB images" << std::endl;
+        return -1;
+    }
+    std::cout << "[main] Loaded " << rgb_images.size() << " RGB frames" << std::endl;
+
+    Eigen::Matrix3d K;
+    if (!dataset_manager.loadCameraIntrinsics(K)) {
+        std::cerr << "[main] Failed to load camera intrinsics" << std::endl;
         return -1;
     }
 
-    // 6) 相机内参
-    if (!dataset_manager.loadCameraIntrinsics(camera_intrinsics)) {
-        std::cerr << "Failed to load camera intrinsics.\n";
-        return -1;
-    }
-
-    // 7) 仅加载 GT 位姿（优化中固定使用）
+    // ---- poses: use ONLY ground-truth (fixed during optimization)
+    std::vector<Eigen::Matrix4d> gt_camera_poses;
     if (!dataset_manager.loadPoses(gt_camera_poses, "poses_gt")) {
-        std::cerr << "Failed to load ground truth poses.\n";
+        std::cerr << "[main] Failed to load ground-truth poses" << std::endl;
         return -1;
     }
 
     if (rgb_images.size() != gt_camera_poses.size()) {
-        std::cerr << "Mismatch in dataset sizes (RGB vs GT Poses).\n";
+        std::cerr << "[main] Mismatch: RGB frames (" << rgb_images.size()
+                  << ") vs GT poses (" << gt_camera_poses.size() << ")" << std::endl;
         return -1;
     }
-    std::cout << "Loaded " << rgb_images.size() << " frames from dataset.\n";
 
-    // 8) 采样
-    std::vector<cv::Mat> sampled_rgb_images;
-    std::vector<Eigen::Matrix4d> sampled_gt_camera_poses;
+    // ---- frame sampling
+    std::vector<cv::Mat> sampled_images;
+    std::vector<Eigen::Matrix4d> sampled_gt_poses;
+    sampled_images.reserve((rgb_images.size() + sampling_interval - 1) / sampling_interval);
+    sampled_gt_poses.reserve(sampled_images.capacity());
+
     for (size_t i = 0; i < rgb_images.size(); i += sampling_interval) {
-        sampled_rgb_images.push_back(rgb_images[i]);
-        sampled_gt_camera_poses.push_back(gt_camera_poses[i]);
+        sampled_images.push_back(rgb_images[i]);
+        sampled_gt_poses.push_back(gt_camera_poses[i]);
     }
-    std::cout << "Sampled " << sampled_rgb_images.size() << " frames with interval "
-              << sampling_interval << ".\n";
 
-    // 9) 仅以 GT 位姿运行优化（不再传/维护 init/opt poses）
-    std::cout << "Start optimization...\n";
+    std::cout << "[main] Sampled " << sampled_images.size()
+              << " frames (interval=" << sampling_interval << ")" << std::endl;
+
+    // ---- optimizer (data + smooth + rotation + anchor + temporal)
+    const double w_data        = 1.0;   // photometric weight
+    const int    maxStages     = 10;    // outer stages (refit BVH, update anchors)
+    const int    maxIterations = 3;     // inner GN iters per stage
+    const double lambda_smooth = 1.0;   // spatial smoothness between neighbor nodes
+    const double lambda_rot    = 0.1;   // rotation (A^T A - I)
+
+    Optimizer optimizer(w_data, maxStages, maxIterations, lambda_smooth, lambda_rot);
+    // new knobs from rewritten optimizer
+    optimizer.setTemporalWeight(1.0);   // temporal consistency between adjacent frames
+    // optimizer.setWindowSize(W);      // reserved: not used in this all-frames version
+
+    std::cout << "[main] Start optimization..." << std::endl;
     optimizer.optimize(
-        mesh_model.getVertices(),
-        mesh_model.getTriangles(),
-        camera_intrinsics,
-        sampled_rgb_images,
-        sampled_gt_camera_poses,  // ✅ 固定的 GT 位姿
+        V,
+        F,
+        K,
+        sampled_images,
+        sampled_gt_poses,   // fixed GT poses (not optimized)
         edGraph
     );
-    std::cout << "Optimization complete.\n";
+    std::cout << "[main] Optimization complete." << std::endl;
 
-    // 10) 若需要，可在此导出变形后的网格或统计光度误差等
-    // Evaluation::... (此处不再做位姿 RMSE，因未优化位姿)
-
+    // (Optional) TODO: export deformed mesh / per-frame results
     return 0;
 }

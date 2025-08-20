@@ -46,9 +46,7 @@ private:
     static bool intersectAABB(const Eigen::Vector3d& rayOrigin,
                               const Eigen::Vector3d& rayDir,
                               const Eigen::Vector3d& bbox_min,
-                              const Eigen::Vector3d& bbox_max,
-                              double& tmin,
-                              double& tmax);
+                              const Eigen::Vector3d& bbox_max);
 
     static bool rayTriangleIntersection(const Eigen::Vector3d& rayOrigin,
                                         const Eigen::Vector3d& rayDir,

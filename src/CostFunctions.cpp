@@ -1,4 +1,5 @@
 #include "CostFunctions.h"
+#include <algorithm>
 #include <cmath>
 
 PhotometricError::PhotometricError(const MeshModel::Vertex& vertex,
@@ -12,46 +13,39 @@ PhotometricError::PhotometricError(const MeshModel::Vertex& vertex,
     : v_raw_(vertex), vidx_(vertex_index), tris_(mesh_triangles),
       K_(K), img_(image_gray_float), bvh_(bvh), sqrt_w_(sqrt_w), ed_(edGraph) {}
 
-bool PhotometricError::projectPoint(const Eigen::Vector3d& p_w,
-                                    float& u, float& v, float& Zc) const {
-    // Camera: p_c = R * p_w + t;  pinhole: [u v 1]^T = K * (p_c / Z)
-    // R,t are passed via Evaluate (fixed GT pose); here we only do K * (..)
-    // This helper actually needs R,t — but to avoid storing them in the class,
-    // we keep projection in Evaluate, not here. So this function remains unused.
-    (void)p_w; (void)u; (void)v; (void)Zc; return false;
-}
-
-bool PhotometricError::sampleBilinearAndGradient(float u, float v,
+bool PhotometricError::sampleBilinearAndGradient(float& u, float& v,
                                                  float& I,
                                                  float& dIdu,
                                                  float& dIdv) const {
     const int W = img_.cols;
     const int H = img_.rows;
 
-    if (u < 1.0f || v < 1.0f || u > W-2.0f || v > H-2.0f) return false;
+    // Clamp to avoid dropping residuals near border (border band = 1px here; Projection can add more)
+    u = std::min(std::max(u, 1.0f), (float)W - 2.0f);
+    v = std::min(std::max(v, 1.0f), (float)H - 2.0f);
 
-    int x = (int)std::floor(u);
-    int y = (int)std::floor(v);
-    float a = u - x;
-    float b = v - y;
+    const int x = (int)std::floor(u);
+    const int y = (int)std::floor(v);
+    const float a = u - x;
+    const float b = v - y;
 
-    float I00 = img_.at<float>(y,   x  );
-    float I10 = img_.at<float>(y,   x+1);
-    float I01 = img_.at<float>(y+1, x  );
-    float I11 = img_.at<float>(y+1, x+1);
+    const float I00 = img_.at<float>(y,   x  );
+    const float I10 = img_.at<float>(y,   x+1);
+    const float I01 = img_.at<float>(y+1, x  );
+    const float I11 = img_.at<float>(y+1, x+1);
 
     // bilinear value
     I = (1-a)*(1-b)*I00 + a*(1-b)*I10 + (1-a)*b*I01 + a*b*I11;
 
-    // spatial gradients via bilinear of finite differences
+    // spatial gradients via bilinear of forward differences
     // du-direction (x):
-    float Gx00 = I10 - I00;
-    float Gx01 = I11 - I01;
-    float Gx = (1-b)*Gx00 + b*Gx01;
+    const float Gx00 = I10 - I00;
+    const float Gx01 = I11 - I01;
+    const float Gx = (1-b)*Gx00 + b*Gx01;
     // dv-direction (y):
-    float Gy00 = I01 - I00;
-    float Gy10 = I11 - I10;
-    float Gy = (1-a)*Gy00 + a*Gy10;
+    const float Gy00 = I01 - I00;
+    const float Gy10 = I11 - I10;
+    const float Gy = (1-a)*Gy00 + a*Gy10;
 
     dIdu = Gx; dIdv = Gy;
     return true;
@@ -64,10 +58,10 @@ bool PhotometricError::Evaluate(double intensity_i,
                                 const Eigen::Matrix3d& R,
                                 const Eigen::Vector3d& t) const {
     // 1) deform vertex by affine ED
-    Eigen::Vector3d pw = ed_->deformVertex(v_raw_, vidx_);
+    const Eigen::Vector3d pw = ed_->deformVertex(v_raw_, vidx_);
 
-    // 2) project
-    Eigen::Vector3d pc = R * pw + t;
+    // 2) project with T_wc convention: p_c = R^T (p_w - t)
+    const Eigen::Vector3d pc = R.transpose() * (pw - t);
     const double Z = pc.z();
     if (Z <= 1e-8) return false;
 
@@ -77,15 +71,20 @@ bool PhotometricError::Evaluate(double intensity_i,
     float uf = fx * (float)(pc.x()/Z) + cx;
     float vf = fy * (float)(pc.y()/Z) + cy;
 
-    // 3) sample intensity and gradient
+    // 3) sample intensity and gradient (clamped)
     float I, dIdu, dIdv;
-    if (!sampleBilinearAndGradient(uf, vf, I, dIdu, dIdv)) return false;
+    sampleBilinearAndGradient(uf, vf, I, dIdu, dIdv);
 
-    // 4) residual
-    residual = (float)sqrt_w_ * (I - (float)intensity_i);
+    // 4) raw residual and robust weight (Huber)
+    const double r_raw = (double)I - intensity_i;           // intensity in [0,1]
+    const double w_rob = huberWeight(r_raw, huber_delta_);  // in [0,1]
+    const double sqrt_wr = std::sqrt(w_rob);
+
+    // final residual
+    residual = sqrt_w_ * sqrt_wr * r_raw;
 
     // 5) jacobian wrt intensity
-    if (jacobian_intensity) *jacobian_intensity = -sqrt_w_;
+    if (jacobian_intensity) *jacobian_intensity = -sqrt_w_ * sqrt_wr;
 
     // 6) jacobian wrt ED affine parameters (only for nodes bound to this vertex)
     if (jacobian_ed) {
@@ -102,23 +101,22 @@ bool PhotometricError::Evaluate(double intensity_i,
         // dI/d[u,v] (1x2)
         Eigen::RowVector2d JimgPix; JimgPix << dIdu, dIdv; // already in image units
 
-        // dI/dp (1x3)
-        Eigen::RowVector3d Jimg = JimgPix * Jproj * R; // chain: p_w -> p_c -> [u,v] -> I
+        // dI/dp (1x3) with T_wc: chain p_w -> p_c -> [u,v] -> I, and p_c = R^T(p_w - t)
+        const Eigen::RowVector3d Jimg = JimgPix * Jproj * R.transpose();
 
         // accumulate per bound node
-        const auto& binds = ed_->getBindings()[vidx_];
+        const auto& binds   = ed_->getBindings()[vidx_];
         const auto& weights = ed_->getWeights()[vidx_];
+        const Eigen::Vector3d vraw(v_raw_.x, v_raw_.y, v_raw_.z);
 
         for (size_t k = 0; k < binds.size(); ++k) {
             const int nid = binds[k];
             const double w = weights[k];
             const Eigen::Vector3d g = ed_->getGraphNodes()[nid].position;
-            const Eigen::Vector3d q = Eigen::Vector3d(v_raw_.x, v_raw_.y, v_raw_.z) - g; // (v-g)
+            const Eigen::Vector3d q = vraw - g; // (v-g)
 
             // d p_w / d vec(A) = (q \otimes I_3)  -> 3x9;  d p_w / d t = I_3
-            // We need (1x9) and (1x3) rows: Jimg (1x3) * above
-            // (q \otimes I_3) in row-major blocks
-            // columns order: A(0,0),A(0,1),A(0,2), A(1,0)...A(2,2)
+            // (q \otimes I_3) laid out in row-major blocks
             double dA[9];
             dA[0] = Jimg(0) * q(0); // d/d A00
             dA[1] = Jimg(0) * q(1); // d/d A01
@@ -131,11 +129,11 @@ bool PhotometricError::Evaluate(double intensity_i,
             dA[8] = Jimg(2) * q(2); // d/d A22
 
             const int base = 12 * nid;
-            for (int c = 0; c < 9; ++c) (*jacobian_ed)(base + c) += sqrt_w_ * w * dA[c];
+            for (int c = 0; c < 9; ++c) (*jacobian_ed)(base + c) += sqrt_w_ * sqrt_wr * w * dA[c];
             // translation t
-            (*jacobian_ed)(base + 9)  += sqrt_w_ * w * Jimg(0);
-            (*jacobian_ed)(base + 10) += sqrt_w_ * w * Jimg(1);
-            (*jacobian_ed)(base + 11) += sqrt_w_ * w * Jimg(2);
+            (*jacobian_ed)(base + 9)  += sqrt_w_ * sqrt_wr * w * Jimg(0);
+            (*jacobian_ed)(base + 10) += sqrt_w_ * sqrt_wr * w * Jimg(1);
+            (*jacobian_ed)(base + 11) += sqrt_w_ * sqrt_wr * w * Jimg(2);
         }
     }
 

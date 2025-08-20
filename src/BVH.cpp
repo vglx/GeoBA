@@ -81,8 +81,7 @@ bool BVH::traverseBVH(int nodeIndex,
                       const Eigen::Vector3d& rayDir,
                       double& tHit) const {
     const BVHNode& node = nodes[nodeIndex];
-    double tmin, tmax;
-    if (!intersectAABB(rayOrigin, rayDir, node.bbox_min, node.bbox_max, tmin, tmax))
+    if (!intersectAABB(rayOrigin, rayDir, node.bbox_min, node.bbox_max))
         return false;
     bool hit = false;
     if (node.left < 0 && node.right < 0) {
@@ -107,15 +106,22 @@ bool BVH::traverseBVH(int nodeIndex,
 bool BVH::intersectAABB(const Eigen::Vector3d& rayOrigin,
                         const Eigen::Vector3d& rayDir,
                         const Eigen::Vector3d& bbox_min,
-                        const Eigen::Vector3d& bbox_max,
-                        double& tmin,
-                        double& tmax) {
-    tmin = 0;
-    tmax = std::numeric_limits<double>::max();
+                        const Eigen::Vector3d& bbox_max) {
+    constexpr double eps = 1e-12;
+    tmin = -std::numeric_limits<double>::infinity();
+    tmax =  std::numeric_limits<double>::infinity();
     for (int i = 0; i < 3; ++i) {
-        double invD = 1.0 / rayDir[i];
-        double t0 = (bbox_min[i] - rayOrigin[i]) * invD;
-        double t1 = (bbox_max[i] - rayOrigin[i]) * invD;
+        const double dir  = rayDir[i];
+        const double orig = rayOrigin[i];
+        const double bmin = bbox_min[i];
+        const double bmax = bbox_max[i];
+        if (std::abs(dir) < eps) {
+            if (orig < bmin || orig > bmax) return false; // 平行且不在 slab 内
+            continue; // 在 slab 内，不收缩区间
+        }
+        double invD = 1.0 / dir;
+        double t0 = (bmin - orig) * invD;
+        double t1 = (bmax - orig) * invD;
         if (invD < 0) std::swap(t0, t1);
         tmin = std::max(tmin, t0);
         tmax = std::min(tmax, t1);
