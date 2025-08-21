@@ -188,6 +188,63 @@ void EDGraph::buildNodesFPS(const std::vector<MeshModel::Vertex>& V, int target)
     }
 }
 
+void EDGraph::bindVertices(const std::vector<MeshModel::Vertex>& vertices) {
+    const size_t nV = vertices.size();
+    const int G = numNodes();
+    bindings_.assign(nV, {});
+    weights_.assign(nV, {});
+    if (G == 0 || nV == 0 || K_ <= 0) return;
+
+    for (size_t vid = 0; vid < nV; ++vid) {
+        const Eigen::Vector3d v(vertices[vid].x, vertices[vid].y, vertices[vid].z);
+
+        // 距离表（暴力 KNN；规模不大时够用）
+        std::vector<std::pair<int, double>> dists;
+        dists.reserve(G);
+        for (int j = 0; j < G; ++j) {
+            const double dist = (v - graph_[j].position).norm();  // 也可用 squaredNorm() 再开根
+            dists.emplace_back(j, dist);
+        }
+
+        const int kth = std::min<int>(K_, static_cast<int>(dists.size()));
+        if (kth <= 0) continue;
+
+        // 取最近的 kth 个，并对前 kth 个排序
+        std::nth_element(dists.begin(), dists.begin() + (kth - 1), dists.end(),
+                         [](const auto& a, const auto& b){ return a.second < b.second; });
+        std::sort(dists.begin(), dists.begin() + kth,
+                  [](const auto& a, const auto& b){ return a.second < b.second; });
+
+        bindings_[vid].resize(kth);
+        weights_[vid].resize(kth);
+
+        // 反距离权重 + 归一化；处理“距离≈0”的退化情况
+        constexpr double eps = 1e-8;
+        double sumW = 0.0;
+        bool has_zero = (dists[0].second < eps);
+        if (has_zero) {
+            // 顶点正好落在某节点上：该节点权重=1，其它=0
+            bindings_[vid][0] = dists[0].first;
+            weights_[vid][0]  = 1.0;
+            for (int k = 1; k < kth; ++k) { bindings_[vid][k] = dists[k].first; weights_[vid][k] = 0.0; }
+        } else {
+            for (int k = 0; k < kth; ++k) {
+                bindings_[vid][k] = dists[k].first;
+                const double w = 1.0 / (dists[k].second + eps);
+                weights_[vid][k] = w;
+                sumW += w;
+            }
+            if (sumW > eps) {
+                for (int k = 0; k < kth; ++k) weights_[vid][k] /= sumW;
+            } else {
+                // 极少见：所有 w 很小，兜底给最近的一个
+                std::fill(weights_[vid].begin(), weights_[vid].end(), 0.0);
+                weights_[vid][0] = 1.0;
+            }
+        }
+    }
+}
+
 Eigen::Vector3d EDGraph::deformVertex(const MeshModel::Vertex& vertex, int vidx) const {
     const Eigen::Vector3d v(vertex.x, vertex.y, vertex.z);
     Eigen::Vector3d out = Eigen::Vector3d::Zero();
@@ -272,10 +329,12 @@ void EDGraph::buildNeighbors_() {
             dists.emplace_back(j, d);
         }
         const int k = std::min(neighborK_, (int)dists.size());
-        std::nth_element(dists.begin(), dists.begin()+k, dists.end(),
-                         [](const auto& a, const auto& b){ return a.second < b.second; });
-        std::sort(dists.begin(), dists.begin()+k,
-                  [](const auto& a, const auto& b){ return a.second < b.second; });
+        if (k > 0) {
+            std::nth_element(dists.begin(), dists.begin() + (k - 1), dists.end(),
+                            [](const auto& a, const auto& b){ return a.second < b.second; });
+            std::sort(dists.begin(), dists.begin() + k,
+                    [](const auto& a, const auto& b){ return a.second < b.second; });
+        }
 
         graph_[i].neighbors.clear(); graph_[i].neighbors.reserve(k);
         for (int t = 0; t < k; ++t) {
