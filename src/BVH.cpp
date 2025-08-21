@@ -108,8 +108,8 @@ bool BVH::intersectAABB(const Eigen::Vector3d& rayOrigin,
                         const Eigen::Vector3d& bbox_min,
                         const Eigen::Vector3d& bbox_max) {
     constexpr double eps = 1e-12;
-    tmin = -std::numeric_limits<double>::infinity();
-    tmax =  std::numeric_limits<double>::infinity();
+    double tmin = -std::numeric_limits<double>::infinity();
+    double tmax =  std::numeric_limits<double>::infinity();
     for (int i = 0; i < 3; ++i) {
         const double dir  = rayDir[i];
         const double orig = rayOrigin[i];
