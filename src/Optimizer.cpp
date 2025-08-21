@@ -2,12 +2,15 @@
 #include "CostFunctions.h"
 #include "Projection.h"
 #include "BVH.h"
+
 #include <iostream>
 #include <limits>
 #include <unordered_set>
-#include <Eigen/Sparse>
-#include <omp.h>
 #include <cmath>
+
+#include <Eigen/Sparse>
+#include <Eigen/IterativeLinearSolvers>   // for LeastSquaresConjugateGradient
+#include <omp.h>
 
 namespace {
 inline double sqr(double v){ return v*v; }
@@ -24,7 +27,6 @@ inline float bilinearSample(const cv::Mat& img, float u, float v){
     float I11 = img.at<float>(y1, x1);
     return (1-a)*(1-b)*I00 + a*(1-b)*I10 + (1-a)*b*I01 + a*b*I11;
 }
-
 inline double clamp01(double x){ return x < 0.0 ? 0.0 : (x > 1.0 ? 1.0 : x); }
 }
 
@@ -72,7 +74,7 @@ void Optimizer::optimize(
     const int edDimPerFrameFull = 12 * G;
     std::vector<Eigen::VectorXd> Xfull(F, Eigen::VectorXd::Zero(edDimPerFrameFull));
     for (int f = 0; f < (int)F; ++f) edGraph.writeToStateVector(Xfull[f], /*offset=*/0);
-    Eigen::VectorXd Intens = Eigen::VectorXd::Zero((int)N);  // 将在 stage=0 之后按可见均值初始化
+    Eigen::VectorXd Intens = Eigen::VectorXd::Zero((int)N);  // filled at first stage by visible-frame average
 
     // Precompute bindings once
     const auto& bindings = edGraph.getBindings();  // [N] -> vector<int> of node ids
@@ -81,7 +83,7 @@ void Optimizer::optimize(
     double prev_stage_cost = std::numeric_limits<double>::max();
     int outer_no_improve = 0;
 
-    bool intensity_initialized = false; // 只在第一次可见性构建后做一次均值初始化
+    bool intensity_initialized = false; // do once after we computed visibility
 
     for (int stage = 0; stage < maxStages_; ++stage) {
         // =========================
@@ -100,15 +102,14 @@ void Optimizer::optimize(
                 Vdef[vi].y = (float)p.y();
                 Vdef[vi].z = (float)p.z();
             }
-            bvhs.emplace_back(mesh_triangles, Vdef); // BVH stores refs: safe because Vdef lives for the whole stage
+            bvhs.emplace_back(mesh_triangles, Vdef);
         }
 
         // =========================
-        // (2) Visibility (frame by frame)
+        // (2) Visibility per frame (mark active vertices + nodes)
         // =========================
         std::vector<std::vector<int>> visible_vertices(F); // per frame list of visible vertex indices
         visible_vertices.assign(F, {});
-
         for (int f = 0; f < (int)F; ++f) {
             edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
             const auto& img = imgs_gray[f];
@@ -135,22 +136,19 @@ void Optimizer::optimize(
         }
 
         // =========================
-        // (2.5) Intensity 初始化：所有可见帧投影像素的均值（只做一次）
+        // (2.5) Intensity init by visible-frame average (do once)
         // =========================
         if (!intensity_initialized) {
             std::vector<double> sumI(N, 0.0);
             std::vector<int>    cntI(N, 0);
-
             for (int f = 0; f < (int)F; ++f) {
                 const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
                 const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
                 const cv::Mat& img = imgs_gray[f];
-
-                // 与数据项一致：使用 ED 形变后的顶点坐标做投影采样
                 for (int idx = 0; idx < (int)visible_vertices[f].size(); ++idx) {
                     const int i = visible_vertices[f][idx];
                     const Eigen::Vector3d pw = edGraph.deformVertex(mesh_vertices[i], i);
-                    const Eigen::Vector3d pc = R.transpose() * (pw - t); // T_wc 约定
+                    const Eigen::Vector3d pc = R.transpose() * (pw - t);
                     if (pc.z() <= 1e-8) continue;
                     float uf = (float)(K(0,0) * (pc.x()/pc.z()) + K(0,2));
                     float vf = (float)(K(1,1) * (pc.y()/pc.z()) + K(1,2));
@@ -159,10 +157,7 @@ void Optimizer::optimize(
                     cntI[i] += 1;
                 }
             }
-            for (int i = 0; i < (int)N; ++i) {
-                if (cntI[i] > 0) Intens(i) = sumI[i] / cntI[i];
-                else Intens(i) = 0.0; // 从未可见：保留 0 或可改为 0.5
-            }
+            for (int i = 0; i < (int)N; ++i) Intens(i) = (cntI[i] > 0) ? (sumI[i] / cntI[i]) : 0.0;
             intensity_initialized = true;
             std::cout << "[Init] intensity by visible-frame average: assigned for "
                       << std::count_if(cntI.begin(), cntI.end(), [](int c){return c>0;})
@@ -170,83 +165,54 @@ void Optimizer::optimize(
         }
 
         // =========================
-        // (3) Active node/edge sets per frame + compact ED mapping; active intensity set
+        // (3) Active node/edge sets per frame + compact mapping; active intensities
         // =========================
         std::vector<std::vector<char>> active_node(F, std::vector<char>(G, 0));
         std::vector<std::vector<std::pair<int,int>>> active_edges(F);
         std::vector<std::vector<int>> compact_idx(F, std::vector<int>(G, -1));
-        std::vector<int> Sf(F, 0); // active node count per frame
-
-        // intensity activity across all frames this stage
+        std::vector<int> Sf(F, 0);
         std::vector<char> int_active(N, 0);
 
         for (int f = 0; f < (int)F; ++f) {
-            // nodes touched by any visible vertex's bindings; mark intensity active too
             for (int vid : visible_vertices[f]) {
                 int_active[vid] = 1;
                 const auto& b = bindings[vid];
                 for (int nid : b) active_node[f][nid] = 1;
             }
-            // assign compact indices for ED
             int acc = 0;
             for (int j = 0; j < G; ++j) if (active_node[f][j]) compact_idx[f][j] = acc++;
             Sf[f] = acc;
-            // edges whose both ends active
             std::vector<std::pair<int,int>> Ef; Ef.reserve(edges.size());
-            for (const auto& e : edges) {
-                if (active_node[f][e.first] && active_node[f][e.second]) Ef.push_back(e);
-            }
+            for (const auto& e : edges) if (active_node[f][e.first] && active_node[f][e.second]) Ef.push_back(e);
             active_edges[f].swap(Ef);
         }
 
-        // compact column offsets for ED blocks
         auto offsEDc = [&](int f)->int{
-            int ofs = 0;
-            for (int k = 0; k < f; ++k) ofs += 12 * Sf[k];
-            return ofs;
-        };
+            int ofs = 0; for (int k = 0; k < f; ++k) ofs += 12 * Sf[k]; return ofs; };
         auto colA_c = [&](int f,int node,int k)->int{
-            int ci = compact_idx[f][node];
-            if (ci < 0) return -1; // inactive -> no column
-            return offsEDc(f) + 12*ci + k; // k in [0..8]
-        };
+            int ci = compact_idx[f][node]; if (ci < 0) return -1; return offsEDc(f) + 12*ci + k; };
         auto colt_c = [&](int f,int node,int k)->int{
-            int ci = compact_idx[f][node];
-            if (ci < 0) return -1;
-            return offsEDc(f) + 12*ci + 9 + k; // k in [0..2]
-        };
+            int ci = compact_idx[f][node]; if (ci < 0) return -1; return offsEDc(f) + 12*ci + 9 + k; };
 
-        // compact mapping for intensities
         std::vector<int> int_compact_idx(N, -1);
-        int N_active = 0;
-        for (int i = 0; i < (int)N; ++i) if (int_active[i]) int_compact_idx[i] = N_active++;
+        int N_active = 0; for (int i = 0; i < (int)N; ++i) if (int_active[i]) int_compact_idx[i] = N_active++;
 
         // =========================
         // (4) Row layout
         // =========================
         std::vector<int> data_row_ofs(F, 0);
         int total_data_rows = 0;
-        for (int f = 0; f < (int)F; ++f) {
-            data_row_ofs[f] = total_data_rows;
-            total_data_rows += (int)visible_vertices[f].size();
-        }
+        for (int f = 0; f < (int)F; ++f) { data_row_ofs[f] = total_data_rows; total_data_rows += (int)visible_vertices[f].size(); }
         int smooth_rows = 0, rot_rows = 0;
-        for (int f = 0; f < (int)F; ++f) {
-            smooth_rows += (int)active_edges[f].size() * (9 + 3);
-            rot_rows    += Sf[f] * 9;
-        }
-        // temporal rows between f-1 and f (INTERSECTION so both sides exist as variables)
+        for (int f = 0; f < (int)F; ++f) { smooth_rows += (int)active_edges[f].size() * (9 + 3); rot_rows += Sf[f] * 9; }
         int temporal_rows = 0;
-        for (int f = 1; f < (int)F; ++f) {
-            for (int j = 0; j < G; ++j) if (active_node[f-1][j] && active_node[f][j]) temporal_rows += 12;
-        }
+        for (int f = 1; f < (int)F; ++f) for (int j = 0; j < G; ++j) if (active_node[f-1][j] && active_node[f][j]) temporal_rows += 12;
 
         const int row_smooth_begin   = total_data_rows;
         const int row_rot_begin      = row_smooth_begin + smooth_rows;
         const int row_temporal_begin = row_rot_begin    + rot_rows;
         const int total_rows         = row_temporal_begin + temporal_rows;
 
-        // compact state dimension = sum_f 12*Sf[f] + N_active (intensities)
         int edDimCompact = 0; for (int f = 0; f < (int)F; ++f) edDimCompact += 12 * Sf[f];
         const int offsInt = edDimCompact; // intensity block offset
         const int stateDimCompact = offsInt + N_active;
@@ -261,7 +227,7 @@ void Optimizer::optimize(
                   << ", intensActive=" << N_active << ", total=" << stateDimCompact << std::endl;
 
         // =========================
-        // (5) Gauss-Newton iterations
+        // (5) Gauss-Newton iterations (matrix-free normal equations via LSCG on J)
         // =========================
         double prev_cost = std::numeric_limits<double>::max();
         int inner_no_improve = 0;
@@ -275,9 +241,12 @@ void Optimizer::optimize(
 
             int num_threads = omp_get_max_threads();
             std::vector<std::vector<Eigen::Triplet<double>>> triplets_thr(num_threads);
-            for (auto& v : triplets_thr) v.reserve((size_t) (total_data_rows * 24.0 / std::max(1,num_threads)));
+            // conservative per-thread reservation only for DATA term (dominant): ~ (1 + 12*K)
+            int Kbind = (bindings.empty() ? 0 : (int)bindings[0].size());
+            size_t per_thread_est = (size_t)std::max(1, total_data_rows / std::max(1,num_threads)) * (size_t)(1 + 12 * std::max(1, Kbind));
+            for (auto& v : triplets_thr) v.reserve(per_thread_est);
 
-            // ---- DATA TERM (frame by frame)
+            // ---- DATA TERM
             #pragma omp parallel for schedule(static)
             for (int f = 0; f < (int)F; ++f) {
                 int tid = omp_get_thread_num();
@@ -294,49 +263,35 @@ void Optimizer::optimize(
                     const int i = visible_vertices[f][idx];
 
                     PhotometricError cost(mesh_vertices[i], i, mesh_triangles, K, img, bvh, sqrt_w, &edGraph);
-                    double residual = 0.0;
-                    double J_I = 0.0;
-                    Eigen::VectorXd J_ed(12 * G);
-                    J_ed.setZero();
-
+                    double residual = 0.0; double J_I = 0.0; Eigen::VectorXd J_ed(12 * G); J_ed.setZero();
                     const double intensity_i = Intens(i);
                     cost.Evaluate(intensity_i, residual, &J_I, &J_ed, R, t);
 
                     Fvec[r] = residual;
-                    // intensity column is guaranteed to exist for a visible i in this stage
                     const int icol = offsInt + int_compact_idx[i];
                     Tlocal.emplace_back(r, icol, J_I);
 
-                    // ED columns (only for active bound nodes)
                     const auto& b = bindings[i];
                     for (int nid : b) {
                         int base_src = 12 * nid; // in J_ed
-                        // A (9)
                         for (int c = 0; c < 9; ++c) {
-                            const double v = J_ed[base_src + c];
-                            if (v == 0.0) continue;
-                            int col = colA_c(f, nid, c);
-                            if (col >= 0) Tlocal.emplace_back(r, col, v);
+                            const double v = J_ed[base_src + c]; if (v == 0.0) continue;
+                            int col = colA_c(f, nid, c); if (col >= 0) Tlocal.emplace_back(r, col, v);
                         }
-                        // t (3)
                         for (int c = 0; c < 3; ++c) {
-                            const double v = J_ed[base_src + 9 + c];
-                            if (v == 0.0) continue;
-                            int col = colt_c(f, nid, c);
-                            if (col >= 0) Tlocal.emplace_back(r, col, v);
+                            const double v = J_ed[base_src + 9 + c]; if (v == 0.0) continue;
+                            int col = colt_c(f, nid, c); if (col >= 0) Tlocal.emplace_back(r, col, v);
                         }
                     }
                     ++r;
                 }
             }
 
-            // ---- SMOOTH REG  (per frame, only active edges)
+            // ---- SMOOTH REG (per frame, only active edges)
             int row_ptr = row_smooth_begin;
             for (int f = 0; f < (int)F; ++f) {
                 for (const auto& e : active_edges[f]) {
                     const int i = e.first, j = e.second;
-
-                    // 9 for A diff
                     for (int m = 0; m < 9; ++m) {
                         const int ci = colA_c(f,i,m), cj = colA_c(f,j,m);
                         Fvec[row_ptr] = sqrt_ls * ( Xfull[f][12*i + m] - Xfull[f][12*j + m] );
@@ -344,7 +299,6 @@ void Optimizer::optimize(
                         if (cj >= 0) triplets_thr[0].emplace_back(row_ptr, cj, -sqrt_ls);
                         ++row_ptr;
                     }
-                    // 3 for t diff
                     for (int m = 0; m < 3; ++m) {
                         const int ci = colt_c(f,i,m), cj = colt_c(f,j,m);
                         Fvec[row_ptr] = sqrt_ls * ( Xfull[f][12*i + 9 + m] - Xfull[f][12*j + 9 + m] );
@@ -355,26 +309,19 @@ void Optimizer::optimize(
                 }
             }
 
-            // ---- ROTATION REG  (vec(A^T A - I)) — analytic Jacobian, only active nodes
+            // ---- ROTATION REG (vec(A^T A - I)) — analytic Jacobian
             int row_rot_ptr = row_rot_begin;
             for (int f = 0; f < (int)F; ++f) {
                 for (int j = 0; j < G; ++j) if (active_node[f][j]) {
-                    // read A_j^f from Xfull
-                    Eigen::Matrix3d A;
-                    for (int k=0;k<3;++k) for (int l=0;l<3;++l) A(k,l) = Xfull[f][12*j + 3*k + l];
+                    Eigen::Matrix3d A; for (int k=0;k<3;++k) for (int l=0;l<3;++l) A(k,l) = Xfull[f][12*j + 3*k + l];
                     Eigen::Matrix3d C = A.transpose()*A - Eigen::Matrix3d::Identity();
-                    // residuals
                     for (int k=0;k<3;++k) for (int l=0;l<3;++l) Fvec[row_rot_ptr + 3*k + l] = sqrt_lr * C(k,l);
-                    // analytic J
                     for (int i = 0; i < 3; ++i) {
                         for (int jcol = 0; jcol < 3; ++jcol) {
-                            const int col_idx = colA_c(f, j, 3*i + jcol);
-                            if (col_idx < 0) continue;
+                            const int col_idx = colA_c(f, j, 3*i + jcol); if (col_idx < 0) continue;
                             for (int k = 0; k < 3; ++k) {
                                 for (int l = 0; l < 3; ++l) {
-                                    double d = 0.0;
-                                    if (jcol == k) d += A(i,l);
-                                    if (jcol == l) d += A(i,k);
+                                    double d = 0.0; if (jcol == k) d += A(i,l); if (jcol == l) d += A(i,k);
                                     if (d != 0.0) triplets_thr[0].emplace_back(row_rot_ptr + 3*k + l, col_idx, sqrt_lr * d);
                                 }
                             }
@@ -384,23 +331,19 @@ void Optimizer::optimize(
                 }
             }
 
-            // ---- TEMPORAL (between f-1 and f), only for nodes active in BOTH frames
+            // ---- TEMPORAL REG (between f-1 and f), only nodes active in BOTH frames
             int row_temp_ptr = row_temporal_begin;
             for (int f = 1; f < (int)F; ++f) {
                 for (int j = 0; j < G; ++j) if (active_node[f-1][j] && active_node[f][j]) {
-                    // A (9)
                     for (int c = 0; c < 9; ++c) {
-                        const int c1 = colA_c(f,  j,c);
-                        const int c0 = colA_c(f-1,j,c);
+                        const int c1 = colA_c(f,  j,c); const int c0 = colA_c(f-1,j,c);
                         Fvec[row_temp_ptr] = sqrt_ltp * ( Xfull[f][12*j + c] - Xfull[f-1][12*j + c] );
                         if (c1 >= 0) triplets_thr[0].emplace_back(row_temp_ptr, c1,  sqrt_ltp);
                         if (c0 >= 0) triplets_thr[0].emplace_back(row_temp_ptr, c0, -sqrt_ltp);
                         ++row_temp_ptr;
                     }
-                    // t (3)
                     for (int c = 0; c < 3; ++c) {
-                        const int c1 = colt_c(f,  j,c);
-                        const int c0 = colt_c(f-1,j,c);
+                        const int c1 = colt_c(f,  j,c); const int c0 = colt_c(f-1,j,c);
                         Fvec[row_temp_ptr] = sqrt_ltp * ( Xfull[f][12*j + 9 + c] - Xfull[f-1][12*j + 9 + c] );
                         if (c1 >= 0) triplets_thr[0].emplace_back(row_temp_ptr, c1,  sqrt_ltp);
                         if (c0 >= 0) triplets_thr[0].emplace_back(row_temp_ptr, c0, -sqrt_ltp);
@@ -410,38 +353,48 @@ void Optimizer::optimize(
             }
 
             // ---- Gather & solve (compact system)
-            std::vector<Eigen::Triplet<double>> triplets; triplets.reserve((size_t)total_rows * 24);
-            for (auto& v : triplets_thr) triplets.insert(triplets.end(), v.begin(), v.end());
+            // realistic nnz estimate to avoid over-reserving (and OOM)
+            size_t est_data_nnz = (size_t)total_data_rows * (size_t)(1 + 12 * std::max(1, (int)(bindings.empty()?0:bindings[0].size())));
+            size_t est_smooth_nnz = (size_t)smooth_rows * 2;
+            size_t est_rot_nnz = (size_t)rot_rows * 6;      // each (k,l) touches ~6 entries
+            size_t est_temp_nnz = (size_t)temporal_rows * 2;
+            size_t nnz_est = est_data_nnz + est_smooth_nnz + est_rot_nnz + est_temp_nnz;
+
+            std::vector<Eigen::Triplet<double>> triplets; triplets.reserve(nnz_est);
+            for (auto& v : triplets_thr) {
+                triplets.insert(triplets.end(), v.begin(), v.end());
+                std::vector<Eigen::Triplet<double>>().swap(v); // free thread-local
+            }
 
             Eigen::VectorXd Fv = Eigen::Map<Eigen::VectorXd>(Fvec.data(), (int)Fvec.size());
             Eigen::SparseMatrix<double> J(total_rows, stateDimCompact);
             J.setFromTriplets(triplets.begin(), triplets.end());
+            std::vector<Eigen::Triplet<double>>().swap(triplets); // release peak memory before solving
 
             const double cost = Fv.squaredNorm();
-            Eigen::SparseMatrix<double> H = J.transpose() * J;
-            Eigen::VectorXd g = -J.transpose() * Fv;
 
-            const double lambda = 1e-6;
-            H += lambda * Eigen::MatrixXd::Identity(H.rows(), H.cols()).sparseView();
-
-            Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
-            solver.compute(H);
-            if (solver.info() != Eigen::Success) { std::cout << "[Optimizer] LDLT failed." << std::endl; break; }
-            Eigen::VectorXd delta = solver.solve(g);
-            if (solver.info() != Eigen::Success) { std::cout << "[Optimizer] Solve failed." << std::endl; break; }
+            // Solve min ||J * delta + F|| using LSCG (does not form H = J^T J explicitly)
+            Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<double>> lscg;
+            lscg.setTolerance(1e-5);
+            lscg.setMaxIterations(200);
+            lscg.compute(J);
+            Eigen::VectorXd rhs = -Fv;
+            Eigen::VectorXd delta = lscg.solve(rhs);
+            if (lscg.info() != Eigen::Success) {
+                std::cout << "[Optimizer] LSCG failed / did not converge. iter=" << lscg.iterations()
+                          << ", err=" << lscg.error() << std::endl; break;
+            }
 
             // ---- Apply update back to full ED blocks (Xfull) and active Intens
-            // ED (per frame)
             for (int f = 0; f < (int)F; ++f) {
                 const int ofs = offsEDc(f);
                 for (int j = 0; j < G; ++j) if (active_node[f][j]) {
                     const int ci = compact_idx[f][j];
                     const int base_src = ofs + 12*ci;
-                    for (int c = 0; c < 9; ++c) Xfull[f][12*j + c]     += delta[base_src + c];
-                    for (int c = 0; c < 3; ++c) Xfull[f][12*j + 9 + c] += delta[base_src + 9 + c];
+                    for (int c = 0; c < 9; ++c)  Xfull[f][12*j + c]     += delta[base_src + c];
+                    for (int c = 0; c < 3; ++c)  Xfull[f][12*j + 9 + c] += delta[base_src + 9 + c];
                 }
             }
-            // intensities (only active ones) + clamp to [0,1]
             for (int i = 0; i < (int)N; ++i) if (int_active[i]) {
                 const int icol = offsInt + int_compact_idx[i];
                 Intens(i) = clamp01(Intens(i) + delta[icol]);
@@ -452,7 +405,9 @@ void Optimizer::optimize(
             std::cout << "[Stage " << stage << " | it " << it
                       << "] cost=" << cost
                       << ", |delta|=" << dnorm
-                      << ", dcost=" << dcost << std::endl;
+                      << ", dcost=" << dcost
+                      << ", lscg_iter=" << lscg.iterations()
+                      << ", lscg_err=" << lscg.error() << std::endl;
 
             if (dnorm < 1e-6 || dcost < 1e-6) ++inner_no_improve; else inner_no_improve = 0;
             prev_cost = cost;
@@ -473,7 +428,5 @@ void Optimizer::optimize(
     }
 
     // Export the final per-frame ED back to edGraph for frame 0 (or leave to caller)
-    if (F > 0) {
-        edGraph.updateFromStateVector(Xfull[0], /*offset=*/0);
-    }
+    if (F > 0) edGraph.updateFromStateVector(Xfull[0], /*offset=*/0);
 }
