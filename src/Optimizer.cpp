@@ -7,10 +7,25 @@
 #include <unordered_set>
 #include <Eigen/Sparse>
 #include <omp.h>
+#include <cmath>
 
 namespace {
 inline double sqr(double v){ return v*v; }
 static const double kEps = 1e-8;
+
+inline float bilinearSample(const cv::Mat& img, float u, float v){
+    int x = (int)std::floor(u), y = (int)std::floor(v);
+    int x1 = x + 1, y1 = y + 1;
+    if (x < 0 || y < 0 || x1 >= img.cols || y1 >= img.rows) return 0.f;
+    float a = u - x, b = v - y;
+    float I00 = img.at<float>(y, x);
+    float I10 = img.at<float>(y, x1);
+    float I01 = img.at<float>(y1, x);
+    float I11 = img.at<float>(y1, x1);
+    return (1-a)*(1-b)*I00 + a*(1-b)*I10 + (1-a)*b*I01 + a*b*I11;
+}
+
+inline double clamp01(double x){ return x < 0.0 ? 0.0 : (x > 1.0 ? 1.0 : x); }
 }
 
 Optimizer::Optimizer(double w_data,
@@ -57,7 +72,7 @@ void Optimizer::optimize(
     const int edDimPerFrameFull = 12 * G;
     std::vector<Eigen::VectorXd> Xfull(F, Eigen::VectorXd::Zero(edDimPerFrameFull));
     for (int f = 0; f < (int)F; ++f) edGraph.writeToStateVector(Xfull[f], /*offset=*/0);
-    Eigen::VectorXd Intens = Eigen::VectorXd::Zero((int)N);
+    Eigen::VectorXd Intens = Eigen::VectorXd::Zero((int)N);  // 将在 stage=0 之后按可见均值初始化
 
     // Precompute bindings once
     const auto& bindings = edGraph.getBindings();  // [N] -> vector<int> of node ids
@@ -65,6 +80,8 @@ void Optimizer::optimize(
 
     double prev_stage_cost = std::numeric_limits<double>::max();
     int outer_no_improve = 0;
+
+    bool intensity_initialized = false; // 只在第一次可见性构建后做一次均值初始化
 
     for (int stage = 0; stage < maxStages_; ++stage) {
         // =========================
@@ -115,6 +132,41 @@ void Optimizer::optimize(
                 }
             }
             visible_vertices[f].swap(vis);
+        }
+
+        // =========================
+        // (2.5) Intensity 初始化：所有可见帧投影像素的均值（只做一次）
+        // =========================
+        if (!intensity_initialized) {
+            std::vector<double> sumI(N, 0.0);
+            std::vector<int>    cntI(N, 0);
+
+            for (int f = 0; f < (int)F; ++f) {
+                const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
+                const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
+                const cv::Mat& img = imgs_gray[f];
+
+                // 与数据项一致：使用 ED 形变后的顶点坐标做投影采样
+                for (int idx = 0; idx < (int)visible_vertices[f].size(); ++idx) {
+                    const int i = visible_vertices[f][idx];
+                    const Eigen::Vector3d pw = edGraph.deformVertex(mesh_vertices[i], i);
+                    const Eigen::Vector3d pc = R.transpose() * (pw - t); // T_wc 约定
+                    if (pc.z() <= 1e-8) continue;
+                    float uf = (float)(K(0,0) * (pc.x()/pc.z()) + K(0,2));
+                    float vf = (float)(K(1,1) * (pc.y()/pc.z()) + K(1,2));
+                    float I = bilinearSample(img, uf, vf);
+                    sumI[i] += (double)I;
+                    cntI[i] += 1;
+                }
+            }
+            for (int i = 0; i < (int)N; ++i) {
+                if (cntI[i] > 0) Intens(i) = sumI[i] / cntI[i];
+                else Intens(i) = 0.0; // 从未可见：保留 0 或可改为 0.5
+            }
+            intensity_initialized = true;
+            std::cout << "[Init] intensity by visible-frame average: assigned for "
+                      << std::count_if(cntI.begin(), cntI.end(), [](int c){return c>0;})
+                      << " / " << N << " vertices." << std::endl;
         }
 
         // =========================
@@ -389,10 +441,10 @@ void Optimizer::optimize(
                     for (int c = 0; c < 3; ++c) Xfull[f][12*j + 9 + c] += delta[base_src + 9 + c];
                 }
             }
-            // intensities (only active ones)
+            // intensities (only active ones) + clamp to [0,1]
             for (int i = 0; i < (int)N; ++i) if (int_active[i]) {
                 const int icol = offsInt + int_compact_idx[i];
-                Intens(i) += delta[icol];
+                Intens(i) = clamp01(Intens(i) + delta[icol]);
             }
 
             const double dnorm = delta.norm();
