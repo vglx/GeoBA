@@ -125,56 +125,6 @@ void EDGraph::buildNodesFPS(const std::vector<MeshModel::Vertex>& V, int target)
     // 最远点采样：O(N * target)
     graph_.clear();
     if (V.empty() || target <= 0) return;
-    target = std::min<int>(target, (int)V.size());
-
-    // 距离表初始化为 +inf
-    std::vector<double> mindist(V.size(), std::numeric_limits<double>::infinity());
-    std::vector<int> chosen; chosen.reserve(target);
-
-    // 选一个种子（这里用包围盒中心最近的点，稳健）
-    Eigen::Vector3d bbmin( std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
-    Eigen::Vector3d bbmax(-std::numeric_limits<double>::max(),-std::numeric_limits<double>::max(),-std::numeric_limits<double>::max());
-    for (const auto& v : V) { bbmin.x() = std::min(bbmin.x(), v.x); bbmin.y() = std::min(bbmin.y(), v.y); bbmin.z() = std::min(bbmin.z(), v.z);
-                              bbmax.x() = std::max(bbmax.x(), v.x); bbmax.y() = std::max(bbmax.y(), v.y); bbmax.z() = std::max(bbmax.z(), v.z); }
-    Eigen::Vector3d center = 0.5*(bbmin+bbmax);
-    int seed = 0; double best = std::numeric_limits<double>::infinity();
-    for (int i = 0; i < (int)V.size(); ++i) {
-        double d = (Eigen::Vector3d(V[i].x, V[i].y, V[i].z) - center).squaredNorm();
-        if (d < best) { best = d; seed = i; }
-    }
-
-    auto add_point = [&](int idx){
-        chosen.push_back(idx);
-        Eigen::Vector3d p(V[idx].x, V[idx].y, V[idx].z);
-        for (int i = 0; i < (int)V.size(); ++i) {
-            Eigen::Vector3d q(V[i].x, V[i].y, V[i].z);
-            double d = (q - p).squaredNorm();
-            if (d < mindist[i]) mindist[i] = d;
-        }
-    };
-
-    add_point(seed);
-    while ((int)chosen.size() < target) {
-        int next = 0; double far2 = -1.0;
-        for (int i = 0; i < (int)V.size(); ++i) {
-            if (mindist[i] > far2) { far2 = mindist[i]; next = i; }
-        }
-        add_point(next);
-    }
-
-    graph_.reserve(chosen.size());
-    for (int idx : chosen) {
-        const auto& v = V[idx];
-        DeformationNode node{}; node.position = Eigen::Vector3d(v.x, v.y, v.z);
-        node.A.setIdentity(); node.t.setZero();
-        graph_.push_back(node);
-    }
-}
-
-void EDGraph::buildNodesFPS(const std::vector<MeshModel::Vertex>& V, int target) {
-    // 最远点采样：O(N * target)
-    graph_.clear();
-    if (V.empty() || target <= 0) return;
     target = std::min<int>(target, static_cast<int>(V.size()));
 
     // 距离表初始化为 +inf
