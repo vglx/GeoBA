@@ -64,42 +64,59 @@ void EDGraph::buildNodesVoxel(const std::vector<MeshModel::Vertex>& V, double s)
     graph_.clear();
     if (V.empty()) return;
 
-    Eigen::Vector3d bbmin( std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
-    Eigen::Vector3d bbmax(-std::numeric_limits<double>::max(),-std::numeric_limits<double>::max(),-std::numeric_limits<double>::max());
+    // 1) 计算包围盒（用 Eigen 的逐元素 min/max，避免 std::min 类型推导冲突）
+    Eigen::Vector3d bbmin(  std::numeric_limits<double>::max(),
+                            std::numeric_limits<double>::max(),
+                            std::numeric_limits<double>::max());
+    Eigen::Vector3d bbmax(- std::numeric_limits<double>::max(),
+                          - std::numeric_limits<double>::max(),
+                          - std::numeric_limits<double>::max());
+
     for (const auto& v : V) {
-        bbmin.x() = std::min(bbmin.x(), v.x); bbmin.y() = std::min(bbmin.y(), v.y); bbmin.z() = std::min(bbmin.z(), v.z);
-        bbmax.x() = std::max(bbmax.x(), v.x); bbmax.y() = std::max(bbmax.y(), v.y); bbmax.z() = std::max(bbmax.z(), v.z);
+        const Eigen::Vector3d p(v.x, v.y, v.z);
+        bbmin = bbmin.cwiseMin(p);
+        bbmax = bbmax.cwiseMax(p);
     }
 
-    const Eigen::Vector3d invS(1.0/s, 1.0/s, 1.0/s);
-    const Eigen::Vector3d halfS(0.5*s, 0.5*s, 0.5*s);
-
-    std::unordered_map<VKey, int, VKeyHash, VKeyEq> rep; rep.reserve(V.size()/8);
+    // 2) 体素散列
+    const Eigen::Vector3d invS(1.0 / s, 1.0 / s, 1.0 / s);
+    std::unordered_map<VKey, int, VKeyHash, VKeyEq> rep;
+    rep.reserve(V.size() / 8);
 
     for (size_t i = 0; i < V.size(); ++i) {
         const auto& v = V[i];
-        Eigen::Vector3d p(v.x, v.y, v.z);
-        Eigen::Vector3d rel = (p - bbmin).cwiseProduct(invS);
-        VKey k{ (int)std::floor(rel.x()), (int)std::floor(rel.y()), (int)std::floor(rel.z()) };
+        const Eigen::Vector3d p(v.x, v.y, v.z);
+
+        const Eigen::Vector3d rel = (p - bbmin).cwiseProduct(invS);
+        const VKey k{
+            static_cast<int>(std::floor(rel.x())),
+            static_cast<int>(std::floor(rel.y())),
+            static_cast<int>(std::floor(rel.z()))
+        };
 
         auto it = rep.find(k);
         if (it == rep.end()) {
-            rep.emplace(k, (int)i);
+            rep.emplace(k, static_cast<int>(i));
         } else {
             // 选更靠近体素中心的顶点
-            int old = it->second;
-            Eigen::Vector3d pc = bbmin + Eigen::Vector3d((k.x+0.5)*s, (k.y+0.5)*s, (k.z+0.5)*s);
-            double d_old = (Eigen::Vector3d(V[old].x, V[old].y, V[old].z) - pc).squaredNorm();
-            double d_new = (p - pc).squaredNorm();
-            if (d_new < d_old) it->second = (int)i;
+            const int old = it->second;
+            const Eigen::Vector3d pc = bbmin + Eigen::Vector3d((k.x + 0.5) * s,
+                                                               (k.y + 0.5) * s,
+                                                               (k.z + 0.5) * s);
+            const double d_old = (Eigen::Vector3d(V[old].x, V[old].y, V[old].z) - pc).squaredNorm();
+            const double d_new = (p - pc).squaredNorm();
+            if (d_new < d_old) it->second = static_cast<int>(i);
         }
     }
 
+    // 3) 输出节点
     graph_.reserve(rep.size());
     for (const auto& kv : rep) {
         const auto& v = V[kv.second];
-        DeformationNode node{}; node.position = Eigen::Vector3d(v.x, v.y, v.z);
-        node.A.setIdentity(); node.t.setZero();
+        DeformationNode node;
+        node.position = Eigen::Vector3d(v.x, v.y, v.z);
+        node.A.setIdentity();
+        node.t.setZero();
         graph_.push_back(node);
     }
 }
@@ -154,41 +171,70 @@ void EDGraph::buildNodesFPS(const std::vector<MeshModel::Vertex>& V, int target)
     }
 }
 
-void EDGraph::bindVertices(const std::vector<MeshModel::Vertex>& vertices) {
-    const size_t nV = vertices.size();
-    const int G = numNodes();
-    bindings_.assign(nV, {});
-    weights_.assign(nV, {});
-    if (G == 0 || nV == 0) return;
+void EDGraph::buildNodesFPS(const std::vector<MeshModel::Vertex>& V, int target) {
+    // 最远点采样：O(N * target)
+    graph_.clear();
+    if (V.empty() || target <= 0) return;
+    target = std::min<int>(target, static_cast<int>(V.size()));
 
-    for (size_t vid = 0; vid < nV; ++vid) {
-        const Eigen::Vector3d v(vertices[vid].x, vertices[vid].y, vertices[vid].z);
-        std::vector<std::pair<int, double>> dists;
-        dists.reserve(G);
-        for (int j = 0; j < G; ++j) {
-            double dist = (v - graph_[j].position).norm();
-            dists.emplace_back(j, dist);
-        }
-        const int kth = std::min(K_, (int)dists.size());
-        std::nth_element(dists.begin(), dists.begin() + kth - 1, dists.end(),
-                         [](const auto& a, const auto& b){ return a.second < b.second; });
-        std::sort(dists.begin(), dists.begin() + kth,
-                  [](const auto& a, const auto& b){ return a.second < b.second; });
+    // 距离表初始化为 +inf
+    std::vector<double> mindist(V.size(), std::numeric_limits<double>::infinity());
+    std::vector<int> chosen; 
+    chosen.reserve(target);
 
-        bindings_[vid].resize(kth);
-        weights_[vid].resize(kth);
+    // 1) 用逐元素 min/max 求包围盒（避免 std::min/max 的类型推导问题）
+    Eigen::Vector3d bbmin(  std::numeric_limits<double>::max(),
+                            std::numeric_limits<double>::max(),
+                            std::numeric_limits<double>::max());
+    Eigen::Vector3d bbmax( -std::numeric_limits<double>::max(),
+                           -std::numeric_limits<double>::max(),
+                           -std::numeric_limits<double>::max());
+    for (const auto& v : V) {
+        const Eigen::Vector3d p(v.x, v.y, v.z);
+        bbmin = bbmin.cwiseMin(p);
+        bbmax = bbmax.cwiseMax(p);
+    }
 
-        double sumW = 0.0; constexpr double eps = 1e-8;
-        for (int k = 0; k < kth; ++k) {
-            bindings_[vid][k] = dists[k].first;
-            double w = 1.0 / (dists[k].second + eps); // 反距离权重
-            weights_[vid][k] = w; sumW += w;
+    // 2) 选种子：离包围盒中心最近的点
+    const Eigen::Vector3d center = 0.5 * (bbmin + bbmax);
+    int seed = 0; 
+    double best = std::numeric_limits<double>::infinity();
+    for (int i = 0; i < static_cast<int>(V.size()); ++i) {
+        const Eigen::Vector3d p(V[i].x, V[i].y, V[i].z);
+        const double d = (p - center).squaredNorm();
+        if (d < best) { best = d; seed = i; }
+    }
+
+    // 3) FPS 主循环
+    auto add_point = [&](int idx){
+        chosen.push_back(idx);
+        const Eigen::Vector3d p(V[idx].x, V[idx].y, V[idx].z);
+        for (int i = 0; i < static_cast<int>(V.size()); ++i) {
+            const Eigen::Vector3d q(V[i].x, V[i].y, V[i].z);
+            const double d = (q - p).squaredNorm();
+            if (d < mindist[i]) mindist[i] = d;
         }
-        if (sumW <= eps) {
-            if (kth > 0) { std::fill(weights_[vid].begin(), weights_[vid].end(), 0.0); weights_[vid][0] = 1.0; }
-        } else {
-            for (double& w : weights_[vid]) w /= sumW; // 归一化
+    };
+
+    add_point(seed);
+    while (static_cast<int>(chosen.size()) < target) {
+        int next = 0; 
+        double far2 = -1.0;
+        for (int i = 0; i < static_cast<int>(V.size()); ++i) {
+            if (mindist[i] > far2) { far2 = mindist[i]; next = i; }
         }
+        add_point(next);
+    }
+
+    // 4) 输出节点
+    graph_.reserve(chosen.size());
+    for (int idx : chosen) {
+        const auto& v = V[idx];
+        DeformationNode node;
+        node.position = Eigen::Vector3d(v.x, v.y, v.z);
+        node.A.setIdentity();
+        node.t.setZero();
+        graph_.push_back(node);
     }
 }
 
