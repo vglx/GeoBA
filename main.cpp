@@ -8,27 +8,62 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <cstring>
+#include <cstdlib>
+
+struct Args {
+    std::string dataset_root = "../data/sim_rectum/";
+    int sampling_interval = 2;   // sample every k frames
+    // EDGraph params (defaults for Voxel)
+    EDGraph::SamplingMode mode = EDGraph::SamplingMode::Voxel;
+    int    stride      = 30;     // Stride only
+    double voxel_size  = 0.015;  // Voxel only (model units)
+    int    fps_target  = 1500;   // FPS only
+    int    neighborK   = 6;      // graph smoothness neighborhood size
+    int    K_bind      = 3;      // KNN bindings per vertex
+} args;
+
+static void parse_cli(int argc, char** argv) {
+    // Very lightweight flag parser
+    // Usage examples:
+    //   ./GeoBA /path/to/dataset --mode voxel --voxel 0.02 --interval 3 --Kbind 3 --neighborK 6
+    //   ./GeoBA /path/to/dataset --mode fps   --fps 1200
+    //   ./GeoBA /path/to/dataset --mode stride --stride 20
+    if (argc > 1 && argv[1][0] != '-') {
+        args.dataset_root = argv[1];
+    }
+    for (int i = 1; i < argc; ++i) {
+        const char* a = argv[i];
+        auto next = [&](double def)->double{ return (i+1<argc? std::atof(argv[++i]) : def); };
+        auto nexti = [&](int def)->int{ return (i+1<argc? std::atoi(argv[++i]) : def); };
+        if      (!std::strcmp(a, "--interval"))   args.sampling_interval = nexti(args.sampling_interval);
+        else if (!std::strcmp(a, "--mode")) {
+            if (i+1<argc) {
+                const char* m = argv[++i];
+                if (!std::strcmp(m, "voxel"))  args.mode = EDGraph::SamplingMode::Voxel;
+                else if (!std::strcmp(m, "fps")) args.mode = EDGraph::SamplingMode::FPS;
+                else if (!std::strcmp(m, "stride")) args.mode = EDGraph::SamplingMode::Stride;
+            }
+        }
+        else if (!std::strcmp(a, "--voxel"))     args.voxel_size = next(args.voxel_size);
+        else if (!std::strcmp(a, "--fps"))       args.fps_target = nexti(args.fps_target);
+        else if (!std::strcmp(a, "--stride"))    args.stride     = nexti(args.stride);
+        else if (!std::strcmp(a, "--neighborK")) args.neighborK  = nexti(args.neighborK);
+        else if (!std::strcmp(a, "--Kbind"))     args.K_bind     = nexti(args.K_bind);
+    }
+}
 
 int main(int argc, char** argv) {
     std::cout << "==== GeoBA (Fixed Poses + Temporal Affine ED + Active Subgraph) ====\n";
-
-    // ---- dataset root (optional argv[1])
-    std::string dataset_root = "../data/sim_rectum/";
-    if (argc > 1) dataset_root = argv[1];
-
-    // ---- controls
-    const int sampling_interval   = 1;   // sample every k frames
-    const int neighborK           = 8;   // graph smoothness neighborhood size
-    const int K_bind              = 4;   // KNN bindings per vertex
-    const int sampling_step_nodes = 10;  // node sampling step when building ED graph
+    parse_cli(argc, argv);
 
     // ---- dataset manager
-    DatasetManager dataset_manager(dataset_root);
+    DatasetManager dataset_manager(args.dataset_root);
 
     // ---- mesh
     MeshModel mesh_model;
     if (!dataset_manager.loadMeshModel(mesh_model)) {
-        std::cerr << "[main] Failed to load mesh model from: " << dataset_root << std::endl;
+        std::cerr << "[main] Failed to load mesh model from: " << args.dataset_root << std::endl;
         return -1;
     }
     const auto& V = mesh_model.getVertices();
@@ -36,9 +71,22 @@ int main(int argc, char** argv) {
     std::cout << "[main] Mesh: " << V.size() << " vertices, " << F.size() << " triangles" << std::endl;
 
     // ---- build affine ED graph (nodes+bindings+neighbors)
-    EDGraph edGraph(/*K=*/K_bind);
-    edGraph.initializeGraph(V, sampling_step_nodes, /*build_neighbors=*/true);
-    edGraph.setNeighborsForSmoothing(neighborK);
+    EDGraph edGraph(/*K=*/args.K_bind, /*neighborK=*/args.neighborK);
+    EDGraph::BuildParams p;
+    p.mode      = args.mode;
+    p.stride    = args.stride;
+    p.voxel_size= args.voxel_size;
+    p.fps_target= args.fps_target;
+    p.K_bind    = args.K_bind;
+    p.neighborK = args.neighborK;
+
+    if (!edGraph.initializeGraph(V, p, /*build_neighbors=*/true)) {
+        std::cerr << "[main] Failed to initialize EDGraph" << std::endl;
+        return -1;
+    }
+    std::cout << "[main] EDGraph: nodes=" << edGraph.numNodes()
+              << ", K_bind=" << args.K_bind
+              << ", neighborK=" << args.neighborK << std::endl;
 
     // ---- images (RGB) & intrinsics
     std::vector<cv::Mat> rgb_images;
@@ -70,28 +118,26 @@ int main(int argc, char** argv) {
     // ---- frame sampling
     std::vector<cv::Mat> sampled_images;
     std::vector<Eigen::Matrix4d> sampled_gt_poses;
-    sampled_images.reserve((rgb_images.size() + sampling_interval - 1) / sampling_interval);
+    sampled_images.reserve((rgb_images.size() + args.sampling_interval - 1) / args.sampling_interval);
     sampled_gt_poses.reserve(sampled_images.capacity());
 
-    for (size_t i = 0; i < rgb_images.size(); i += sampling_interval) {
+    for (size_t i = 0; i < rgb_images.size(); i += args.sampling_interval) {
         sampled_images.push_back(rgb_images[i]);
         sampled_gt_poses.push_back(gt_camera_poses[i]);
     }
 
     std::cout << "[main] Sampled " << sampled_images.size()
-              << " frames (interval=" << sampling_interval << ")" << std::endl;
+              << " frames (interval=" << args.sampling_interval << ")" << std::endl;
 
-    // ---- optimizer (data + smooth + rotation + anchor + temporal)
+    // ---- optimizer (data + smooth + rotation + temporal)
     const double w_data        = 1.0;   // photometric weight
     const int    maxStages     = 10;    // outer stages (refit BVH, update anchors)
-    const int    maxIterations = 3;     // inner GN iters per stage
+    const int    maxIterations = 5;     // inner GN iters per stage
     const double lambda_smooth = 1.0;   // spatial smoothness between neighbor nodes
     const double lambda_rot    = 0.1;   // rotation (A^T A - I)
 
     Optimizer optimizer(w_data, maxStages, maxIterations, lambda_smooth, lambda_rot);
-    // new knobs from rewritten optimizer
     optimizer.setTemporalWeight(1.0);   // temporal consistency between adjacent frames
-    // optimizer.setWindowSize(W);      // reserved: not used in this all-frames version
 
     std::cout << "[main] Start optimization..." << std::endl;
     optimizer.optimize(

@@ -1,11 +1,10 @@
-// ===============================
-// File: EDGraph.h  (Affine EDGraph)
-// ===============================
 #ifndef EDGRAPH_H
 #define EDGRAPH_H
 
 #include <Eigen/Core>
 #include <vector>
+#include <unordered_map>
+#include <cstdint>
 #include "MeshModel.h"  // 顶点定义: struct MeshModel::Vertex { double x,y,z; ... }
 
 // -------------------------------
@@ -25,12 +24,29 @@ struct DeformationNode {
 
 class EDGraph {
 public:
+    // 采样模式
+    enum class SamplingMode { Stride, Voxel, FPS };
+
+    struct BuildParams {
+        SamplingMode mode = SamplingMode::Stride;
+        int    stride      = 10;        // Stride: 每隔 stride 个顶点采 1 个
+        double voxel_size  = 0.01;      // Voxel: 体素边长（模型单位）
+        int    fps_target  = 1500;      // FPS: 目标控制点数
+        int    K_bind      = 4;         // 顶点 -> 控制点 KNN 绑定数
+        int    neighborK   = 6;         // 每控制点邻居数（用于平滑正则）
+    };
+
     // K: 每个顶点绑定的节点数；neighborK: 每个节点的邻接数量（用于平滑正则）
     explicit EDGraph(int K = 4, int neighborK = 6);
 
-    // 从网格顶点采样生成节点，并完成绑定；可选构建邻接
+    // 旧接口（向后兼容）：按索引步长采样
     void initializeGraph(const std::vector<MeshModel::Vertex>& mesh_vertices,
                          int sampling_step = 10,
+                         bool build_neighbors = true);
+
+    // 新接口：可插拔采样策略
+    bool initializeGraph(const std::vector<MeshModel::Vertex>& mesh_vertices,
+                         const BuildParams& params,
                          bool build_neighbors = true);
 
     // 外部直接设置节点（提供 g/A/t），随后可 bindVertices / buildNeighbors
@@ -61,6 +77,23 @@ public:
 private:
     // 构建节点邻接（内部使用；返回边集）
     void buildNeighbors_();
+
+    // 采样策略实现
+    void buildNodesStride(const std::vector<MeshModel::Vertex>&, int stride);
+
+    struct VKey { int32_t x, y, z; };
+    struct VKeyHash { size_t operator()(const VKey& k) const noexcept {
+            // 3D 哈希
+            uint64_t h = (uint64_t)(uint32_t)k.x * 73856093ull
+                        ^ (uint64_t)(uint32_t)k.y * 19349663ull
+                        ^ (uint64_t)(uint32_t)k.z * 83492791ull;
+            return (size_t)h;
+        }
+    };
+    struct VKeyEq { bool operator()(const VKey& a, const VKey& b) const noexcept { return a.x==b.x && a.y==b.y && a.z==b.z; } };
+
+    void buildNodesVoxel(const std::vector<MeshModel::Vertex>&, double voxel_size);
+    void buildNodesFPS(const std::vector<MeshModel::Vertex>&, int target);
 
     int K_;                 // 顶点绑定的节点数
     int neighborK_;         // 每节点的邻接数量
