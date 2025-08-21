@@ -13,13 +13,13 @@
 
 struct Args {
     std::string dataset_root = "../data/sim_rectum/";
-    int sampling_interval = 2;   // sample every k frames
+    int sampling_interval = 6;   // sample every k frames
     // EDGraph params (defaults for Voxel)
     EDGraph::SamplingMode mode = EDGraph::SamplingMode::Voxel;
     int    stride      = 30;     // Stride only
-    double voxel_size  = 0.015;  // Voxel only (model units)
+    double voxel_size  = 0.3;  // Voxel only (model units)
     int    fps_target  = 1500;   // FPS only
-    int    neighborK   = 6;      // graph smoothness neighborhood size
+    int    neighborK   = 3;      // graph smoothness neighborhood size
     int    K_bind      = 3;      // KNN bindings per vertex
 } args;
 
@@ -131,13 +131,13 @@ int main(int argc, char** argv) {
 
     // ---- optimizer (data + smooth + rotation + temporal)
     const double w_data        = 1.0;   // photometric weight
-    const int    maxStages     = 10;    // outer stages (refit BVH, update anchors)
-    const int    maxIterations = 5;     // inner GN iters per stage
-    const double lambda_smooth = 1.0;   // spatial smoothness between neighbor nodes
-    const double lambda_rot    = 0.1;   // rotation (A^T A - I)
+    const int    maxStages     = 6;    // outer stages (refit BVH, update anchors)
+    const int    maxIterations = 1;     // inner GN iters per stage
+    const double lambda_smooth = 0.46;   // spatial smoothness between neighbor nodes
+    const double lambda_rot    = 1.26;   // rotation (A^T A - I)
 
     Optimizer optimizer(w_data, maxStages, maxIterations, lambda_smooth, lambda_rot);
-    optimizer.setTemporalWeight(1.0);   // temporal consistency between adjacent frames
+    optimizer.setTemporalWeight(0.0);   // temporal consistency between adjacent frames
 
     std::cout << "[main] Start optimization..." << std::endl;
     optimizer.optimize(
