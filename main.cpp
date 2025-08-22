@@ -15,9 +15,9 @@ struct Args {
     std::string dataset_root = "../data/sim_rectum/";
     int sampling_interval = 6;   // sample every k frames
     // EDGraph params (defaults for Voxel)
-    EDGraph::SamplingMode mode = EDGraph::SamplingMode::Voxel;
+    EDGraph::SamplingMode mode = EDGraph::SamplingMode::FPS;
     int    stride      = 30;     // Stride only
-    double voxel_size  = 0.3;  // Voxel only (model units)
+    double voxel_size  = 3.0;  // Voxel only (model units)
     int    fps_target  = 1500;   // FPS only
     int    neighborK   = 3;      // graph smoothness neighborhood size
     int    K_bind      = 3;      // KNN bindings per vertex
