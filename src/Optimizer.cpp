@@ -9,7 +9,8 @@
 #include <cmath>
 
 #include <Eigen/Sparse>
-#include <Eigen/IterativeLinearSolvers>   // for LeastSquaresConjugateGradient
+#include <Eigen/IterativeLinearSolvers>   // (kept for reference / fallback)
+#include <Eigen/SparseCholesky>           // for SimplicialLDLT
 #include <omp.h>
 
 namespace {
@@ -227,7 +228,7 @@ void Optimizer::optimize(
                   << ", intensActive=" << N_active << ", total=" << stateDimCompact << std::endl;
 
         // =========================
-        // (5) Gauss-Newton iterations (matrix-free normal equations via LSCG on J)
+        // (5) Gauss-Newton iterations — SWITCHED to SimplicialLDLT on normal equations
         // =========================
         double prev_cost = std::numeric_limits<double>::max();
         int inner_no_improve = 0;
@@ -352,8 +353,7 @@ void Optimizer::optimize(
                 }
             }
 
-            // ---- Gather & solve (compact system)
-            // realistic nnz estimate to avoid over-reserving (and OOM)
+            // ---- Gather to J (compact) ----
             size_t est_data_nnz = (size_t)total_data_rows * (size_t)(1 + 12 * std::max(1, (int)(bindings.empty()?0:bindings[0].size())));
             size_t est_smooth_nnz = (size_t)smooth_rows * 2;
             size_t est_rot_nnz = (size_t)rot_rows * 6;      // each (k,l) touches ~6 entries
@@ -373,17 +373,42 @@ void Optimizer::optimize(
 
             const double cost = Fv.squaredNorm();
 
-            // Solve min ||J * delta + F|| using LSCG (does not form H = J^T J explicitly)
-            Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<double>> lscg;
-            lscg.setTolerance(1e-5);
-            lscg.setMaxIterations(200);
-            lscg.compute(J);
-            Eigen::VectorXd rhs = -Fv;
-            Eigen::VectorXd delta = lscg.solve(rhs);
-            if (lscg.info() != Eigen::Success) {
-                std::cout << "[Optimizer] LSCG failed / did not converge. iter=" << lscg.iterations()
-                          << ", err=" << lscg.error() << std::endl; break;
+            // ========================= SOLVE with SimplicialLDLT on normal equations =========================
+            // Build H = J^T J and b = -J^T F
+            Eigen::SparseMatrix<double> JT = J.transpose();
+            Eigen::VectorXd b = -JT * Fv;
+            Eigen::SparseMatrix<double> H = JT * J;
+
+            // Optional: release J to lower peak memory before factorization
+            J.resize(0,0); JT.makeCompressed(); JT.resize(0,0);
+
+            // Levenberg-style tiny damping to stabilize semi-definite blocks
+            double lm = 1e-6;
+            if (H.rows() > 0) {
+                // scale damping by max diagonal for invariance
+                Eigen::VectorXd diag = H.diagonal();
+                double scale = 1.0;
+                if (diag.size() > 0) {
+                    double m = diag.cwiseAbs().maxCoeff();
+                    if (std::isfinite(m) && m > 0) scale = m;
+                }
+                lm *= scale;
+                // add to diagonal
+                H.diagonal().array() += lm;
             }
+
+            Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>, Eigen::Lower, Eigen::AMDOrdering<int>> ldlt;
+            ldlt.compute(H);
+            if (ldlt.info() != Eigen::Success) {
+                std::cout << "[Optimizer] LDLT factorization failed (info=" << (int)ldlt.info() << ")" << std::endl;
+                break;
+            }
+            Eigen::VectorXd delta = ldlt.solve(b);
+            if (ldlt.info() != Eigen::Success) {
+                std::cout << "[Optimizer] LDLT solve failed (info=" << (int)ldlt.info() << ")" << std::endl;
+                break;
+            }
+            // ================================================================================================
 
             // ---- Apply update back to full ED blocks (Xfull) and active Intens
             for (int f = 0; f < (int)F; ++f) {
@@ -406,8 +431,8 @@ void Optimizer::optimize(
                       << "] cost=" << cost
                       << ", |delta|=" << dnorm
                       << ", dcost=" << dcost
-                      << ", lscg_iter=" << lscg.iterations()
-                      << ", lscg_err=" << lscg.error() << std::endl;
+                      << ", solver=LDLT(lm=" << std::scientific << lm << ")" << std::defaultfloat
+                      << std::endl;
 
             if (dnorm < 1e-6 || dcost < 1e-6) ++inner_no_improve; else inner_no_improve = 0;
             prev_cost = cost;

@@ -133,8 +133,8 @@ int main(int argc, char** argv) {
     const double w_data        = 1.0;   // photometric weight
     const int    maxStages     = 6;    // outer stages (refit BVH, update anchors)
     const int    maxIterations = 1;     // inner GN iters per stage
-    const double lambda_smooth = 0.46;   // spatial smoothness between neighbor nodes
-    const double lambda_rot    = 1.26;   // rotation (A^T A - I)
+    const double lambda_smooth = 0.23;   // spatial smoothness between neighbor nodes
+    const double lambda_rot    = 0.52;   // rotation (A^T A - I)
 
     Optimizer optimizer(w_data, maxStages, maxIterations, lambda_smooth, lambda_rot);
     optimizer.setTemporalWeight(0.0);   // temporal consistency between adjacent frames
