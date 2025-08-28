@@ -19,6 +19,8 @@ public:
 
     void setTemporalWeight(double lambda_temporal) { lambda_temporal_ = lambda_temporal; }
 
+    // Frame 0 is treated as the fixed template (no data term, no variables).
+    // Data term starts from frame 1, matching to per‑vertex template intensity sampled from frame 0.
     void optimize(
         const std::vector<MeshModel::Vertex>& mesh_vertices,
         const std::vector<MeshModel::Triangle>& mesh_triangles,
@@ -31,7 +33,7 @@ private:
     double w_data_;
     double lambda_smooth_;
     double lambda_rot_;
-    double lambda_temporal_ = 1.0;   // temporal smoothness between adjacent frames
+    double lambda_temporal_ = 1.0;   // temporal smoothness between adjacent frames (only if both frames have variables)
     int maxStages_;
     int maxIterations_;
 };

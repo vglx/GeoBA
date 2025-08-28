@@ -11,37 +11,47 @@
 #include <cstring>
 #include <cstdlib>
 
+// -----------------------------------------------------------------------------
+// This main wires the pipeline for the "frame 0 as template intensity" variant.
+// - Frame 0 is used ONLY to sample per‑vertex template intensity (fixed).
+// - Data terms start from frame 1 (>=1) and optimize only ED for those frames.
+// - Poses are fixed from GT; no pose optimization.
+// -----------------------------------------------------------------------------
+
 struct Args {
     std::string dataset_root = "../data/sim_rectum/";
-    int sampling_interval = 6;   // sample every k frames
-    // EDGraph params (defaults for Voxel)
+    int sampling_interval = 6;      // sample every k frames
+    int max_frames = 0;             // 0 = use all after sampling; >0 = cap after sampling
+
+    // EDGraph params
     EDGraph::SamplingMode mode = EDGraph::SamplingMode::FPS;
-    int    stride      = 30;     // Stride only
-    double voxel_size  = 3.0;  // Voxel only (model units)
-    int    fps_target  = 1500;   // FPS only
-    int    neighborK   = 3;      // graph smoothness neighborhood size
-    int    K_bind      = 3;      // KNN bindings per vertex
+    int    stride      = 30;        // Stride only
+    double voxel_size  = 3.0;       // Voxel only (model units)
+    int    fps_target  = 1500;      // FPS only
+    int    neighborK   = 3;         // graph smoothness neighborhood size
+    int    K_bind      = 3;         // KNN bindings per vertex
 } args;
 
 static void parse_cli(int argc, char** argv) {
-    // Very lightweight flag parser
     // Usage examples:
     //   ./GeoBA /path/to/dataset --mode voxel --voxel 0.02 --interval 3 --Kbind 3 --neighborK 6
     //   ./GeoBA /path/to/dataset --mode fps   --fps 1200
     //   ./GeoBA /path/to/dataset --mode stride --stride 20
+    //   ./GeoBA /path/to/dataset --limit 2   (use only 2 frames after sampling)
     if (argc > 1 && argv[1][0] != '-') {
         args.dataset_root = argv[1];
     }
     for (int i = 1; i < argc; ++i) {
         const char* a = argv[i];
-        auto next = [&](double def)->double{ return (i+1<argc? std::atof(argv[++i]) : def); };
+        auto next  = [&](double def)->double{ return (i+1<argc? std::atof(argv[++i]) : def); };
         auto nexti = [&](int def)->int{ return (i+1<argc? std::atoi(argv[++i]) : def); };
         if      (!std::strcmp(a, "--interval"))   args.sampling_interval = nexti(args.sampling_interval);
+        else if (!std::strcmp(a, "--limit"))      args.max_frames        = nexti(args.max_frames);
         else if (!std::strcmp(a, "--mode")) {
             if (i+1<argc) {
                 const char* m = argv[++i];
-                if (!std::strcmp(m, "voxel"))  args.mode = EDGraph::SamplingMode::Voxel;
-                else if (!std::strcmp(m, "fps")) args.mode = EDGraph::SamplingMode::FPS;
+                if      (!std::strcmp(m, "voxel"))  args.mode = EDGraph::SamplingMode::Voxel;
+                else if (!std::strcmp(m, "fps"))    args.mode = EDGraph::SamplingMode::FPS;
                 else if (!std::strcmp(m, "stride")) args.mode = EDGraph::SamplingMode::Stride;
             }
         }
@@ -54,7 +64,7 @@ static void parse_cli(int argc, char** argv) {
 }
 
 int main(int argc, char** argv) {
-    std::cout << "==== GeoBA (Fixed Poses + Temporal Affine ED + Active Subgraph) ====\n";
+    std::cout << "==== GeoBA (Frame0 Template Intensities + Affine ED, Poses Fixed) ====\n";
     parse_cli(argc, argv);
 
     // ---- dataset manager
@@ -73,12 +83,12 @@ int main(int argc, char** argv) {
     // ---- build affine ED graph (nodes+bindings+neighbors)
     EDGraph edGraph(/*K=*/args.K_bind, /*neighborK=*/args.neighborK);
     EDGraph::BuildParams p;
-    p.mode      = args.mode;
-    p.stride    = args.stride;
-    p.voxel_size= args.voxel_size;
-    p.fps_target= args.fps_target;
-    p.K_bind    = args.K_bind;
-    p.neighborK = args.neighborK;
+    p.mode       = args.mode;
+    p.stride     = args.stride;
+    p.voxel_size = args.voxel_size;
+    p.fps_target = args.fps_target;
+    p.K_bind     = args.K_bind;
+    p.neighborK  = args.neighborK;
 
     if (!edGraph.initializeGraph(V, p, /*build_neighbors=*/true)) {
         std::cerr << "[main] Failed to initialize EDGraph" << std::endl;
@@ -102,10 +112,10 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    // ---- poses: use ONLY ground-truth (fixed during optimization)
+    // ---- poses: use ONLY ground‑truth (fixed during optimization)
     std::vector<Eigen::Matrix4d> gt_camera_poses;
     if (!dataset_manager.loadPoses(gt_camera_poses, "poses_gt")) {
-        std::cerr << "[main] Failed to load ground-truth poses" << std::endl;
+        std::cerr << "[main] Failed to load ground‑truth poses" << std::endl;
         return -1;
     }
 
@@ -126,20 +136,35 @@ int main(int argc, char** argv) {
         sampled_gt_poses.push_back(gt_camera_poses[i]);
     }
 
-    std::cout << "[main] Sampled " << sampled_images.size()
-              << " frames (interval=" << args.sampling_interval << ")" << std::endl;
+    if (args.max_frames > 0 && (int)sampled_images.size() > args.max_frames) {
+        sampled_images.resize(args.max_frames);
+        sampled_gt_poses.resize(args.max_frames);
+    }
 
-    // ---- optimizer (data + smooth + rotation + temporal)
+    std::cout << "[main] Sampled " << sampled_images.size()
+              << " frames (interval=" << args.sampling_interval
+              << (args.max_frames>0? ", limit="+std::to_string(args.max_frames):"")
+              << ")" << std::endl;
+
+    if (sampled_images.size() < 2) {
+        std::cerr << "[main] Need at least 2 frames (frame 0 = template, frame 1 = optimized)." << std::endl;
+        return -1;
+    }
+
+    // ---- optimizer (data + smooth + rotation + optional temporal)
     const double w_data        = 1.0;   // photometric weight
-    const int    maxStages     = 6;    // outer stages (refit BVH, update anchors)
-    const int    maxIterations = 1;     // inner GN iters per stage
-    const double lambda_smooth = 0.23;   // spatial smoothness between neighbor nodes
-    const double lambda_rot    = 0.52;   // rotation (A^T A - I)
+    const int    maxStages     = 6;     // outer stages (kept for compatibility)
+    const int    maxIterations = 2;     // inner GN iters per stage
+    const double lambda_smooth = 0.23;  // spatial smoothness between neighbor nodes
+    const double lambda_rot    = 0.52;  // rotation (A^T A - I)
 
     Optimizer optimizer(w_data, maxStages, maxIterations, lambda_smooth, lambda_rot);
-    optimizer.setTemporalWeight(0.0);   // temporal consistency between adjacent frames
+    optimizer.setTemporalWeight(0.0);   // set >0 to enable temporal consistency between (f-1,f) when both have variables
 
-    std::cout << "[main] Start optimization..." << std::endl;
+    std::cout << "[main] Start optimization...\n"
+                 "[main] Note: frame 0 is used ONLY to sample template intensities;\n"
+                 "              no data term / variables are created for frame 0.\n";
+
     optimizer.optimize(
         V,
         F,
@@ -148,6 +173,7 @@ int main(int argc, char** argv) {
         sampled_gt_poses,   // fixed GT poses (not optimized)
         edGraph
     );
+
     std::cout << "[main] Optimization complete." << std::endl;
 
     // (Optional) TODO: export deformed mesh / per-frame results
