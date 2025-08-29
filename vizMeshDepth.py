@@ -16,6 +16,7 @@ import imageio
 
 # ==== USER INPUTS ====
 mesh_path   = "./data/halfDef/1/results/deformed_mesh_f1.ply"
+# mesh_path   = "./data/halfDef/1/mesh.obj"
 depth_path  = "./data/halfDef/1/results/1.png"
 pose_txt    = "./data/halfDef/1/results/poses_gt.txt"  # 4x4 or 3x4 matrix
 pose_format = "tcw"              # "twc" (T_wc) or "tcw" (T_cw)
