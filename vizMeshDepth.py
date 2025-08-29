@@ -26,8 +26,8 @@ cx, cy = 160.0, 120.0
 
 # depth options
 depth_scale = 1000.0   # e.g., if PNG uint16 in millimeters
-depth_trunc = 4.0      # meters; 0 or negative to disable
-subsample   = 2        # take 1 of every N pixels
+depth_trunc = 0      # meters; 0 or negative to disable
+subsample   = 1        # take 1 of every N pixels
 
 # colors
 pc_color   = [0.0, 1.0, 0.0]  # green for point cloud
