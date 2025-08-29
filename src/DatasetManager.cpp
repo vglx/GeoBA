@@ -7,6 +7,7 @@
 #include <Eigen/Core>
 #include <Eigen/SVD>
 #include <Eigen/Geometry>
+#include <iomanip>
 
 namespace fs = std::filesystem;
 
@@ -243,4 +244,84 @@ bool DatasetManager::loadPoses(std::vector<Eigen::Matrix4d>& poses, const std::s
 
     std::cout << "Loaded " << poses.size() << " poses.\n";
     return true;
+}
+
+bool DatasetManager::saveMeshAsPLY(const std::string& path,
+                                   const std::vector<MeshModel::Vertex>& V,
+                                   const std::vector<MeshModel::Triangle>& F,
+                                   const std::vector<Eigen::Vector3f>* colors) const
+{
+    std::ofstream ofs(path);
+    if (!ofs.is_open()) {
+        std::cerr << "[DatasetManager] Failed to open PLY for write: " << path << std::endl;
+        return false;
+    }
+
+    const bool with_color = (colors && colors->size() == V.size());
+
+    ofs << "ply\nformat ascii 1.0\n";
+    ofs << "element vertex " << V.size() << "\n";
+    ofs << "property float x\nproperty float y\nproperty float z\n";
+    if (with_color) {
+        ofs << "property uchar red\nproperty uchar green\nproperty uchar blue\n";
+    }
+    ofs << "element face " << F.size() << "\n";
+    ofs << "property list uchar int vertex_index\n";
+    ofs << "end_header\n";
+
+    ofs << std::fixed << std::setprecision(6);
+    for (size_t i = 0; i < V.size(); ++i) {
+        ofs << V[i].x << " " << V[i].y << " " << V[i].z;
+        if (with_color) {
+            Eigen::Vector3f c = (*colors)[i].cwiseMax(0.0f).cwiseMin(1.0f);
+            ofs << " " << int(c.x() * 255.0f + 0.5f)
+                << " " << int(c.y() * 255.0f + 0.5f)
+                << " " << int(c.z() * 255.0f + 0.5f);
+        }
+        ofs << "\n";
+    }
+    for (const auto& t : F) {
+        ofs << "3 " << t.v0 << " " << t.v1 << " " << t.v2 << "\n";
+    }
+    std::cout << "[DatasetManager] Wrote PLY: " << path
+              << " (V=" << V.size() << ", F=" << F.size()
+              << (with_color ? ", color=Y" : ", color=N") << ")\n";
+    return true;
+}
+
+bool DatasetManager::saveMeshAsOBJ(const std::string& path,
+                                   const std::vector<MeshModel::Vertex>& V,
+                                   const std::vector<MeshModel::Triangle>& F) const
+{
+    std::ofstream ofs(path);
+    if (!ofs.is_open()) {
+        std::cerr << "[DatasetManager] Failed to open OBJ for write: " << path << std::endl;
+        return false;
+    }
+    ofs << std::fixed << std::setprecision(6);
+    for (const auto& v : V) ofs << "v " << v.x << " " << v.y << " " << v.z << "\n";
+    for (const auto& f : F) ofs << "f "
+        << (f.v0 + 1) << " " << (f.v1 + 1) << " " << (f.v2 + 1) << "\n"; // OBJ is 1-based
+    std::cout << "[DatasetManager] Wrote OBJ: " << path
+              << " (V=" << V.size() << ", F=" << F.size() << ")\n";
+    return true;
+}
+
+bool DatasetManager::saveDeformedMeshAsPLY(const std::string& path,
+                                           const MeshModel& mesh,
+                                           const EDGraph& edGraph,
+                                           const std::vector<Eigen::Vector3f>* colors) const
+{
+    const auto& Vin = mesh.getVertices();
+    const auto& Fin = mesh.getTriangles();
+
+    std::vector<MeshModel::Vertex> Vdef(Vin.size());
+    #pragma omp parallel for
+    for (int i = 0; i < (int)Vin.size(); ++i) {
+        Eigen::Vector3d p = edGraph.deformVertex(Vin[i], i);
+        Vdef[i].x = (float)p.x();
+        Vdef[i].y = (float)p.y();
+        Vdef[i].z = (float)p.z();
+    }
+    return saveMeshAsPLY(path, Vdef, Fin, colors);
 }

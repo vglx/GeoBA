@@ -176,6 +176,9 @@ int main(int argc, char** argv) {
 
     std::cout << "[main] Optimization complete." << std::endl;
 
-    // (Optional) TODO: export deformed mesh / per-frame results
+    dataset_manager.saveDeformedMeshAsPLY(args.dataset_root + "/deformed_mesh_f1.ply",
+                                          mesh_model,
+                                          edGraph /* already updated by optimizer */);
+
     return 0;
 }

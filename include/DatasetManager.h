@@ -31,6 +31,22 @@ public:
     // 加载 Ground Truth 位姿
     bool loadPoses(std::vector<Eigen::Matrix4d>& poses, const std::string& fileName);
 
+    // ========== Mesh export ==========
+    bool saveMeshAsPLY(const std::string& path,
+                    const std::vector<MeshModel::Vertex>& vertices,
+                    const std::vector<MeshModel::Triangle>& faces,
+                    const std::vector<Eigen::Vector3f>* colors = nullptr) const;
+
+    bool saveMeshAsOBJ(const std::string& path,
+                    const std::vector<MeshModel::Vertex>& vertices,
+                    const std::vector<MeshModel::Triangle>& faces) const;
+
+    // Convenience: deform then save
+    bool saveDeformedMeshAsPLY(const std::string& path,
+                            const MeshModel& mesh,
+                            const EDGraph& edGraph,
+                            const std::vector<Eigen::Vector3f>* colors = nullptr) const;
+
 private:
     std::string dataset_path_;
 
