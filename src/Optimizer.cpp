@@ -406,5 +406,5 @@ void Optimizer::optimize(
 
     // NOTE: For compatibility with previous behavior, export frame 0 back to edGraph.
     // If you prefer exporting frame 1 (the optimized frame in a 2‑frame setup), change index below to 1.
-    if (F > 0) edGraph.updateFromStateVector(Xfull[0], /*offset=*/0);
+    if (F > 0) edGraph.updateFromStateVector(Xfull[1], /*offset=*/0);
 }
