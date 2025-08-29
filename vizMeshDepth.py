@@ -15,13 +15,13 @@ import open3d as o3d
 import imageio
 
 # ==== USER INPUTS ====
-mesh_path   = "results/deformed_mesh_f1.ply"
-depth_path  = "depth_f1.png"
-pose_txt    = "poses_gt_f1.txt"  # 4x4 or 3x4 matrix
+mesh_path   = "./data/halfDef/1/results/deformed_mesh_f1.ply"
+depth_path  = "./data/halfDef/1/results/1.png"
+pose_txt    = "./data/halfDef/1/results/poses_gt.txt"  # 4x4 or 3x4 matrix
 pose_format = "tcw"              # "twc" (T_wc) or "tcw" (T_cw)
 
-fx, fy = 520.0, 520.0
-cx, cy = 320.0, 240.0
+fx, fy = 155.0030, 155.0030
+cx, cy = 160.0, 120.0
 
 # depth options
 depth_scale = 1000.0   # e.g., if PNG uint16 in millimeters
@@ -49,9 +49,15 @@ def load_pose_txt(path):
     arr = []
     with open(path, 'r') as f:
         for line in f:
-            parts = line.strip().split()
-            if parts:
-                arr.extend([float(x) for x in parts])
+            line = line.strip()
+            if not line:
+                continue
+            # 同时支持空格或逗号分隔
+            if ',' in line:
+                parts = line.split(',')
+            else:
+                parts = line.split()
+            arr.extend([float(x) for x in parts if x])
     arr = np.array(arr, dtype=np.float64)
     if arr.size == 16:
         T = arr.reshape(4,4)
