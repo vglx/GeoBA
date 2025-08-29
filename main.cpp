@@ -20,7 +20,7 @@
 
 struct Args {
     std::string dataset_root = "../data/sim_rectum/";
-    int sampling_interval = 6;      // sample every k frames
+    int sampling_interval = 1;      // sample every k frames
     int max_frames = 0;             // 0 = use all after sampling; >0 = cap after sampling
 
     // EDGraph params
@@ -154,7 +154,7 @@ int main(int argc, char** argv) {
     // ---- optimizer (data + smooth + rotation + optional temporal)
     const double w_data        = 1.0;   // photometric weight
     const int    maxStages     = 6;     // outer stages (kept for compatibility)
-    const int    maxIterations = 2;     // inner GN iters per stage
+    const int    maxIterations = 20;     // inner GN iters per stage
     const double lambda_smooth = 0.23;  // spatial smoothness between neighbor nodes
     const double lambda_rot    = 0.52;  // rotation (A^T A - I)
 

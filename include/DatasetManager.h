@@ -6,6 +6,7 @@
 #include <opencv2/opencv.hpp>
 #include <Eigen/Core>
 #include "MeshModel.h"
+#include "EDGraph.h"
 
 struct FrameData {
     cv::Mat rgb_image;
