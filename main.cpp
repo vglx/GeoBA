@@ -19,7 +19,7 @@
 // -----------------------------------------------------------------------------
 
 struct Args {
-    std::string dataset_root = "../data/sim_rectum/";
+    std::string dataset_root = "../data/halfDef/1/";
     int sampling_interval = 1;      // sample every k frames
     int max_frames = 0;             // 0 = use all after sampling; >0 = cap after sampling
 
