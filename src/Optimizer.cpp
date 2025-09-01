@@ -290,6 +290,17 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
         if (cost > prev_cost * (1.0 - 1e-9)) break; prev_cost = cost;
         Eigen::SparseMatrix<double> At = J.transpose();
         Eigen::SparseMatrix<double> AtA = At * J; Eigen::VectorXd Atb = -At * Fv;
+
+        // --- Simple Gauss-Newton damping (LM-style diagonal boost) ---
+        // We add a small scalar to the diagonal of AtA. The scale is tied to the
+        // average diagonal magnitude to keep the damping roughly unitless.
+        Eigen::VectorXd diagA = AtA.diagonal();
+        double mean_abs_diag = (diagA.size() > 0) ? diagA.cwiseAbs().mean() : 1.0;
+        double damping = std::max(1e-12, 1e-6 * std::max(1.0, mean_abs_diag));
+        AtA.diagonal().array() += damping;  // AtA <- AtA + damping * I
+        std::cout << "[GN it=" << it << "] damping=" << damping << std::endl;
+        // --- end damping ---
+
         Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver; solver.compute(AtA);
         if (solver.info()!=Eigen::Success){ std::cerr << "[Optimizer] LDLT factorization failed.\n"; break; }
         Eigen::VectorXd dx = solver.solve(Atb); if (solver.info()!=Eigen::Success){ std::cerr << "[Optimizer] Linear solve failed.\n"; break; }
