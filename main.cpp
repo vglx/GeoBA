@@ -176,7 +176,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[main] Optimization complete." << std::endl;
 
-    dataset_manager.saveDeformedMeshAsPLY(args.dataset_root + "/deformed_mesh_f1.ply",
+    dataset_manager.saveDeformedMeshAsPLY(args.dataset_root + "deformed_mesh_f1.ply",
                                           mesh_model,
                                           edGraph /* already updated by optimizer */);
 
