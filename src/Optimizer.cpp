@@ -123,9 +123,14 @@ void Optimizer::optimize(
             std::vector<int> vis_local; vis_local.reserve(256);
             #pragma omp for nowait
             for (int i = 0; i < (int)N; ++i) {
-                if (Projection::isVertexVisible(mesh_vertices[i], K, R, t,
-                                                bvhs[f], img.cols, img.rows, i, &edGraph)) {
-                    vis_local.push_back(i);
+                Eigen::Vector3d pw = edGraph.deformVertex(mesh_vertices[i], i);
+                Eigen::Vector3d pc = R.transpose() * (pw - t);
+                if (pc.z() > 1e-8) {
+                    float u = (float)(K(0,0) * (pc.x()/pc.z()) + K(0,2));
+                    float v = (float)(K(1,1) * (pc.y()/pc.z()) + K(1,2));
+                    if (u >= 0 && u < img.cols && v >= 0 && v < img.rows) {
+                        vis_local.push_back(i);
+                    }
                 }
             }
             #pragma omp critical

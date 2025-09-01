@@ -161,9 +161,7 @@ int main(int argc, char** argv) {
     Optimizer optimizer(w_data, maxStages, maxIterations, lambda_smooth, lambda_rot);
     optimizer.setTemporalWeight(0.0);   // set >0 to enable temporal consistency between (f-1,f) when both have variables
 
-    std::cout << "[main] Start optimization...\n"
-                 "[main] Note: frame 0 is used ONLY to sample template intensities;\n"
-                 "              no data term / variables are created for frame 0.\n";
+    std::cout << "[main] Start optimization...\n";
 
     optimizer.optimize(
         V,
