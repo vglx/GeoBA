@@ -52,7 +52,7 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
     // ED state per frame (full 12*G per frame). Frame 0 will remain fixed (no columns)
     const int edDimPerFrameFull = 12 * G;
     std::vector<Eigen::VectorXd> Xfull(F, Eigen::VectorXd::Zero(edDimPerFrameFull));
-    for (int f=0; f<F; ++f) edGraph.writeToStateVector(Xfull[f]);
+    for (int f=0; f<F; ++f) edGraph.writeToStateVector(Xfull[f], /*offset=*/0);
 
     const auto& bindings = edGraph.getBindings();   // [N] -> node ids
     const auto& edges    = edGraph.getEdges();      // graph edges
@@ -66,7 +66,7 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
                                            const Eigen::Vector3d& t,
                                            std::vector<int>& vis_out){
         vis_out.clear(); vis_out.reserve(N/2);
-        edGraph.updateFromStateVector(Xf);
+        edGraph.updateFromStateVector(Xf, /*offset=*/0);
         #pragma omp parallel
         {
             std::vector<int> vis_local; vis_local.reserve(256);
@@ -88,11 +88,10 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
 
     // ----------------------------------------------------------------------------
     // (1) One-time: build dummy BVHs (Evaluate ignores them) using persistent vertex buffers
-    //     We avoid assignment (BVH is non-assignable) by emplacing with reserved capacity.
     // ----------------------------------------------------------------------------
     std::vector<std::vector<MeshModel::Vertex>> Vdef_init(F, std::vector<MeshModel::Vertex>(N));
     for (int f=0; f<F; ++f) {
-        edGraph.updateFromStateVector(Xfull[f]);
+        edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
         auto& Vd = Vdef_init[f];
         #pragma omp parallel for
         for (int i=0; i<N; ++i) {
@@ -227,7 +226,7 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
         #pragma omp parallel for schedule(static)
         for (int f=0; f<F; ++f){
             int tid = omp_get_thread_num(); auto& Tlocal = triplets_thr[tid];
-            edGraph.updateFromStateVector(Xfull[f]);
+            edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
             const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
             const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
             const cv::Mat& img = imgs_gray[f];
