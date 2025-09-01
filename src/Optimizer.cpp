@@ -151,92 +151,10 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
     for (int i=0;i<N;++i) if (colI[i]>=0) I_var[colI[i]] = std::isfinite(I_init[i]) ? I_init[i] : 0.0;
 
     const double lambda_I = 0.0; // set >0 for soft prior if desired
-
-    // ==========================
-    // LM-like damping parameters
-    // ==========================
-    double mu = 1e-3;              // initial damping
-    const double mu_decrease = 1.0/3.0;
-    const double mu_increase = 10.0;
-    const int    mu_max_trials = 5; // inner attempts per outer iter
-
-    auto evaluate_cost_only = [&](const std::vector<Eigen::VectorXd>& Xcur,
-                                  const std::vector<double>& Icur)->double{
-        // recompute visibility
-        std::vector<std::vector<int>> visible_vertices(F);
-        for (int f=0; f<F; ++f){
-            compute_visibility_boundary(Xcur[f], imgs_gray[f],
-                                        camera_poses_gt[f].block<3,3>(0,0),
-                                        camera_poses_gt[f].block<3,1>(0,3),
-                                        visible_vertices[f]);
-        }
-        // build active sets
-        std::vector<std::vector<char>> active_node(F, std::vector<char>(G,0));
-        std::vector<std::vector<std::pair<int,int>>> active_edges(F);
-        std::vector<int> Sf(F,0);
-        for (int f=1; f<F; ++f){
-            for (int vid : visible_vertices[f]){ if (colI[vid] < 0) continue; for (int nid : bindings[vid]) active_node[f][nid]=1; }
-            int acc=0; for (int j=0;j<G;++j) if (active_node[f][j]) ++acc; Sf[f]=acc;
-            std::vector<std::pair<int,int>> Ef; Ef.reserve(edges.size());
-            for (const auto& e: edges) if (active_node[f][e.first] && active_node[f][e.second]) Ef.push_back(e);
-            active_edges[f].swap(Ef);
-        }
-        // row counts
-        int total_data_rows=0; for (int f=0; f<F; ++f) for (int vid: visible_vertices[f]) if (colI[vid]>=0) ++total_data_rows;
-        int smooth_rows=0, rot_rows=0; for (int f=1; f<F; ++f){ smooth_rows += (int)active_edges[f].size()*(9+3); rot_rows += Sf[f]*9; }
-        int temporal_rows=0; for (int f=2; f<F; ++f) for (int j=0;j<G;++j) if (active_node[f-1][j] && active_node[f][j]) temporal_rows += 12;
-        int Iprior_rows=0; for (int i=0;i<N;++i) if (colI[i]>=0 && std::isfinite(I_prior[i])) ++Iprior_rows;
-        const int total_rows = total_data_rows + smooth_rows + rot_rows + temporal_rows + Iprior_rows;
-        if (total_rows==0) return 0.0;
-
-        std::vector<double> Fvec(total_rows, 0.0);
-        const double sqrt_w   = std::sqrt(std::max(0.0, w_data_));
-        const double sqrt_ls  = std::sqrt(std::max(0.0, lambda_smooth_));
-        const double sqrt_lr  = std::sqrt(std::max(0.0, lambda_rot_));
-        const double sqrt_ltp = std::sqrt(std::max(0.0, lambda_temporal_));
-        const double sqrt_lI  = std::sqrt(std::max(0.0, lambda_I));
-
-        // data rows
-        int row_ptr = 0;
-        for (int f=0; f<F; ++f){
-            edGraph.updateFromStateVector(const_cast<Eigen::VectorXd&>(Xcur[f]), /*offset=*/0);
-            const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
-            const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
-            const cv::Mat& img = imgs_gray[f];
-            const BVH& bvh = bvhs[f];
-            for (int vid : visible_vertices[f]){
-                int ci = colI[vid]; if (ci < 0) { ++row_ptr; continue; }
-                double residual=0.0, JI=0.0; Eigen::VectorXd dummy(1); dummy.setZero();
-                PhotometricError cost(mesh_vertices[vid], vid, mesh_triangles, K, img, bvh, sqrt_w, &edGraph);
-                cost.Evaluate(Icur[ci], residual, &JI, (f==0? nullptr: &dummy), R, t);
-                Fvec[row_ptr++] = residual;
-            }
-        }
-        // smooth
-        for (int f=1; f<F; ++f){
-            for (const auto& e: active_edges[f]){
-                int i=e.first, j=e.second;
-                for (int m=0;m<9;++m){ Fvec[row_ptr++] = sqrt_ls * ( Xcur[f][12*i+m] - Xcur[f][12*j+m] ); }
-                for (int m=0;m<3;++m){ Fvec[row_ptr++] = sqrt_ls * ( Xcur[f][12*i+9+m] - Xcur[f][12*j+9+m] ); }
-            }
-        }
-        // rot
-        for (int f=1; f<F; ++f){ for (int j=0;j<G;++j){ for (int k=0;k<9;++k){ Fvec[row_ptr++] = sqrt_lr * ( Xcur[f][12*j+k] - ((k==0||k==4||k==8)?1.0:0.0) ); } } }
-        // temporal
-        for (int f=2; f<F; ++f){ for (int j=0;j<G;++j){ for (int m=0;m<12;++m){ Fvec[row_ptr++] = sqrt_ltp * ( Xcur[f][12*j+m] - Xcur[f-1][12*j+m] ); } } }
-        // intensity prior
-        for (int i=0; i<N; ++i) if (colI[i]>=0 && std::isfinite(I_prior[i])){
-            int ci = colI[i]; Fvec[row_ptr++] = sqrt_lI * ( Icur[ci] - I_prior[i] );
-        }
-        Eigen::VectorXd Fv(total_rows); for (int r=0;r<total_rows;++r) Fv[r]=Fvec[r];
-        return 0.5 * Fv.squaredNorm();
-    };
-
     double prev_cost = std::numeric_limits<double>::max();
 
     for (int it=0; it<maxIterations_; ++it){
-        // ================= current J, F at (Xfull, I_var) =================
-        // (A) Recompute visibility, active sets, layout
+        // (3) Recompute visibility for ALL frames under current Xfull
         std::vector<std::vector<int>> visible_vertices(F);
         for (int f=0; f<F; ++f){
             compute_visibility_boundary(Xfull[f], imgs_gray[f],
@@ -244,14 +162,21 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
                                         camera_poses_gt[f].block<3,1>(0,3),
                                         visible_vertices[f]);
         }
+
+        // (4) Build active nodes/edges and compact index per frame (f>=1)
         std::vector<std::vector<char>> active_node(F, std::vector<char>(G,0));
         std::vector<std::vector<std::pair<int,int>>> active_edges(F);
         std::vector<std::vector<int>> compact_idx(F, std::vector<int>(G,-1));
         std::vector<int> Sf(F,0);
         for (int f=1; f<F; ++f){
-            for (int vid : visible_vertices[f]){ if (colI[vid] < 0) continue; for (int nid : bindings[vid]) active_node[f][nid]=1; }
+            for (int vid : visible_vertices[f]){
+                if (colI[vid] < 0) continue;
+                const auto& b = bindings[vid];
+                for (int nid : b) active_node[f][nid]=1;
+            }
             int acc=0; for (int j=0;j<G;++j) if (active_node[f][j]) compact_idx[f][j]=acc++;
-            Sf[f]=acc; std::vector<std::pair<int,int>> Ef; Ef.reserve(edges.size());
+            Sf[f]=acc;
+            std::vector<std::pair<int,int>> Ef; Ef.reserve(edges.size());
             for (const auto& e: edges) if (active_node[f][e.first] && active_node[f][e.second]) Ef.push_back(e);
             active_edges[f].swap(Ef);
         }
@@ -259,6 +184,7 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
         auto colA_c  = [&](int f,int node,int k){ int ci=compact_idx[f][node]; if (ci<0) return -1; return offsEDc(f)+12*ci+k; };
         auto colt_c  = [&](int f,int node,int k){ int ci=compact_idx[f][node]; if (ci<0) return -1; return offsEDc(f)+12*ci+9+k; };
 
+        // (5) Row layout with current visibility
         std::vector<int> data_row_ofs(F,0);
         int total_data_rows=0; for (int f=0; f<F; ++f){ data_row_ofs[f]=total_data_rows; for (int vid: visible_vertices[f]) if (colI[vid]>=0) ++total_data_rows; }
         int smooth_rows=0, rot_rows=0; for (int f=1; f<F; ++f){ smooth_rows += (int)active_edges[f].size()*(9+3); rot_rows += Sf[f]*9; }
@@ -284,6 +210,7 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
                   << ", intens=" << intensDim
                   << ", total=" << stateDimCompact << std::endl;
 
+        // (6) Assemble normal equations
         const double sqrt_w   = std::sqrt(std::max(0.0, w_data_));
         const double sqrt_ls  = std::sqrt(std::max(0.0, lambda_smooth_));
         const double sqrt_lr  = std::sqrt(std::max(0.0, lambda_rot_));
@@ -354,55 +281,28 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
         for (int i=0, rI=row_Iprior_begin; i<N; ++i) if (colI[i]>=0 && std::isfinite(I_prior[i])){
             int ci = colI[i]; Fvec[rI] = sqrt_lI * (I_var[ci] - I_prior[i]); int gc = edDimCompact + ci; triplets_thr[0].emplace_back(rI,gc,sqrt_lI); ++rI; }
 
-        // Assemble J, F
+        // Solve normal equations
         std::vector<Eigen::Triplet<double>> triplets; size_t tot=0; for (auto& t: triplets_thr) tot += t.size(); triplets.reserve(tot); for (auto& t: triplets_thr) { triplets.insert(triplets.end(), t.begin(), t.end()); }
         Eigen::SparseMatrix<double> J(total_rows, stateDimCompact); J.setFromTriplets(triplets.begin(), triplets.end());
         Eigen::VectorXd Fv(total_rows); for (int r=0;r<total_rows;++r) Fv[r]=Fvec[r];
-        double cost_old = 0.5 * Fv.squaredNorm();
-        std::cout << "[GN it=" << it << "] cost(raw)=" << cost_old << std::endl;
+        double cost = 0.5 * Fv.squaredNorm();
+        std::cout << "[GN it=" << it << "] cost(raw)=" << cost << std::endl;
+        if (cost > prev_cost * (1.0 - 1e-9)) break; prev_cost = cost;
+        Eigen::SparseMatrix<double> At = J.transpose();
+        Eigen::SparseMatrix<double> AtA = At * J; Eigen::VectorXd Atb = -At * Fv;
+        Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver; solver.compute(AtA);
+        if (solver.info()!=Eigen::Success){ std::cerr << "[Optimizer] LDLT factorization failed.\n"; break; }
+        Eigen::VectorXd dx = solver.solve(Atb); if (solver.info()!=Eigen::Success){ std::cerr << "[Optimizer] Linear solve failed.\n"; break; }
 
-        // ================= LM-like inner loop =================
-        bool accepted = false;
-        for (int trial=0; trial<mu_max_trials; ++trial){
-            Eigen::SparseMatrix<double> At = J.transpose();
-            Eigen::SparseMatrix<double> AtA = At * J;
-            // diagonal damping: AtA += mu * diag(AtA)
-            Eigen::VectorXd diag = AtA.diagonal();
-            for (int k=0; k<diag.size(); ++k) if (diag[k] > 0) diag[k] *= mu; else diag[k] = mu; // safeguard
-            Eigen::SparseMatrix<double> D(stateDimCompact, stateDimCompact);
-            std::vector<Eigen::Triplet<double>> Dtrip; Dtrip.reserve(diag.size());
-            for (int k=0; k<diag.size(); ++k) if (diag[k]!=0.0) Dtrip.emplace_back(k,k,diag[k]);
-            D.setFromTriplets(Dtrip.begin(), Dtrip.end());
-            AtA += D;
-
-            Eigen::VectorXd Atb = -At * Fv;
-            Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver; solver.compute(AtA);
-            if (solver.info()!=Eigen::Success){ mu *= mu_increase; continue; }
-            Eigen::VectorXd dx = solver.solve(Atb); if (solver.info()!=Eigen::Success){ mu *= mu_increase; continue; }
-
-            // trial state
-            auto X_try = Xfull; auto I_try = I_var;
-            // apply intensity update
-            for (int i=0;i<N;++i) if (colI[i]>=0){ int gc = edDimCompact + colI[i]; I_try[colI[i]] += dx[gc]; }
-            // apply ED update (f>=1)
-            for (int f=1; f<F; ++f){
-                for (int j=0;j<G;++j){ int base = 12*j; for (int k=0;k<9;++k){ int col = colA_c(f,j,k); if (col>=0) X_try[f][base+k] += dx[col]; } for (int k=0;k<3;++k){ int col = colt_c(f,j,k); if (col>=0) X_try[f][base+9+k] += dx[col]; } }
-            }
-
-            double cost_new = evaluate_cost_only(X_try, I_try);
-            if (cost_new < cost_old){
-                // accept
-                Xfull.swap(X_try); I_var.swap(I_try);
-                accepted = true;
-                mu = std::max(mu * mu_decrease, 1e-12);
-                break;
-            } else {
-                mu *= mu_increase; // reject and increase damping
+        // Apply update: intensities + ED (f>=1)
+        for (int i=0;i<N;++i) if (colI[i]>=0){ int gc = edDimCompact + colI[i]; I_var[colI[i]] += dx[gc]; }
+        for (int f=1; f<F; ++f){
+            for (int j=0;j<G;++j) if (active_node[f][j]){
+                int base = 12*j;
+                for (int k=0;k<9;++k){ int col = colA_c(f,j,k); if (col>=0) Xfull[f][base+k] += dx[col]; }
+                for (int k=0;k<3;++k){ int col = colt_c(f,j,k); if (col>=0) Xfull[f][base+9+k] += dx[col]; }
             }
         }
-        if (!accepted) {
-            std::cout << "[LM] step rejected after trials, stopping." << std::endl;
-            break;
-        }
+        // loop, next iteration will recompute visibility
     }
 }
