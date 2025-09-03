@@ -226,8 +226,9 @@ def main():
           f"median={m1['median']:.6f}  p95={m1['p95']:.6f}  (unit={m1['unit']})")
 
     m2 = chamfer_symmetric(mesh, pcd, mesh_unit=mesh_unit, num_samples=200000)
-    print(f\"[METRIC chamfer] mean={m2['mean']:.6f}  rmse={m2['rmse']:.6f}  p95(sum)={m2['p95_sum']:.6f}  "
-          f\"(unit={m2['unit']}, samples={m2['samples']})\" )
+    print(f"[METRIC chamfer] mean={m2['mean']:.6f}  rmse={m2['rmse']:.6f}  "
+          f"p95(sum)={m2['p95_sum']:.6f}  (unit={m2['unit']}, samples={m2['samples']})")
+
 
     # 7) Save a JSON report next to the PNG path
     stem, _ = os.path.splitext(png_path)
