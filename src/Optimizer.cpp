@@ -103,44 +103,38 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
     for (int f=0; f<F; ++f) { bvhs.emplace_back(mesh_triangles, Vdef_init[f]); }
 
     // ----------------------------------------------------------------------------
-    // (2) Initialize visibility for f=0 and f=1, then map intensities (I_init/I_prior)
+    // (2) Initialize visibility for f=0, then map intensities from FRAME 0 ONLY
+    //     改动点：只要第0帧可见，就用第0帧（模板帧）的投影灰度作为 I_init / I_prior；
+    //           不再使用第1帧或二者均值。
     // ----------------------------------------------------------------------------
-    std::vector<int> vis0, vis1;
+    std::vector<int> vis0;
     compute_visibility_boundary(Xfull[0], imgs_gray[0],
                                 camera_poses_gt[0].block<3,3>(0,0),
                                 camera_poses_gt[0].block<3,1>(0,3), vis0);
-    compute_visibility_boundary(Xfull[1], imgs_gray[1],
-                                camera_poses_gt[1].block<3,3>(0,0),
-                                camera_poses_gt[1].block<3,1>(0,3), vis1);
 
     std::vector<double> I_init(N, std::numeric_limits<double>::quiet_NaN());
     std::vector<double> I_prior(N, std::numeric_limits<double>::quiet_NaN());
     {
-        const double w0 = 0.5, w1 = 0.5;
-        std::vector<char> m0(N,0), m1(N,0);
-        for (int id: vis0) m0[id]=1; for (int id: vis1) m1[id]=1;
+        std::vector<char> m0(N,0);
+        for (int id: vis0) m0[id]=1;
         const Eigen::Matrix3d R0 = camera_poses_gt[0].block<3,3>(0,0);
         const Eigen::Vector3d t0 = camera_poses_gt[0].block<3,1>(0,3);
-        const Eigen::Matrix3d R1 = camera_poses_gt[1].block<3,3>(0,0);
-        const Eigen::Vector3d t1 = camera_poses_gt[1].block<3,1>(0,3);
         #pragma omp parallel for
         for (int i=0; i<N; ++i){
             double v0 = std::numeric_limits<double>::quiet_NaN();
-            double v1 = std::numeric_limits<double>::quiet_NaN();
             if (m0[i]){
                 Eigen::Vector3d pw = edGraph.deformVertex(mesh_vertices[i], i);
                 Eigen::Vector3d pc = R0.transpose() * (pw - t0);
-                if (pc.z()>1e-8){ float u=(float)(K(0,0)*(pc.x()/pc.z())+K(0,2)); float v=(float)(K(1,1)*(pc.y()/pc.z())+K(1,2)); v0 = bilinearSample(imgs_gray[0],u,v); }
+                if (pc.z()>1e-8){
+                    float u=(float)(K(0,0)*(pc.x()/pc.z())+K(0,2));
+                    float v=(float)(K(1,1)*(pc.y()/pc.z())+K(1,2));
+                    v0 = bilinearSample(imgs_gray[0],u,v);
+                }
             }
-            if (m1[i]){
-                Eigen::Vector3d pw = edGraph.deformVertex(mesh_vertices[i], i);
-                Eigen::Vector3d pc = R1.transpose() * (pw - t1);
-                if (pc.z()>1e-8){ float u=(float)(K(0,0)*(pc.x()/pc.z())+K(0,2)); float v=(float)(K(1,1)*(pc.y()/pc.z())+K(1,2)); v1 = bilinearSample(imgs_gray[1],u,v); }
+            if (std::isfinite(v0)){
+                I_init[i]  = v0;   // 初值：模板帧灰度
+                I_prior[i] = v0;   // 先验：模板帧灰度（若 lambda_I>0 可作为软约束）
             }
-            bool ok0 = std::isfinite(v0), ok1 = std::isfinite(v1);
-            if (ok0 && ok1) I_init[i] = I_prior[i] = 0.5*(v0+v1);
-            else if (ok0)   I_init[i] = I_prior[i] = v0;
-            else if (ok1)   I_init[i] = I_prior[i] = v1;
         }
     }
 
@@ -170,7 +164,7 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
         std::vector<int> Sf(F,0);
         for (int f=1; f<F; ++f){
             for (int vid : visible_vertices[f]){
-                if (colI[vid] < 0) continue;
+                // if (colI[vid] < 0) continue; // 仍然保持：只有有强度变量的观测点才激活结点
                 const auto& b = bindings[vid];
                 for (int nid : b) active_node[f][nid]=1;
             }
