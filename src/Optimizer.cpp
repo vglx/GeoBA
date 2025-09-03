@@ -331,11 +331,10 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
         // Intensity prior (optional)
         if (lambda_I > 0.0){
             int r = row_Iprior_begin;
-            auto &T0 = triplets_thr[0]; // use thread 0's bucket outside parallel regions
             for (int i=0;i<N;++i){
                 const int ci = colI[i]; if (ci<0 || !std::isfinite(I_prior[i])) continue;
                 Fvec[r] = sqrt_lI * I_prior[i];
-                T0.emplace_back(r, edDimCompact + ci, sqrt_lI);
+                Tlocal.emplace_back(r, edDimCompact + ci, sqrt_lI);
                 ++r;
             }
         }
