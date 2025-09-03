@@ -218,15 +218,10 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
         for (auto& v: triplets_thr) v.reserve((size_t)std::max(1,total_data_rows/std::max(1,num_threads))*48);
 
         // DATA term (f>=0; f=0 has NO ED columns)
-        // NOTE: avoid data races on edGraph by cloning a local EDGraph per thread/frame
         #pragma omp parallel for schedule(static)
         for (int f=0; f<F; ++f){
             int tid = omp_get_thread_num(); auto& Tlocal = triplets_thr[tid];
-
-            // thread-local snapshot of ED state for frame f
-            EDGraph edLocal = edGraph;               // deep copy (bindings/edges shared logically)
-            edLocal.updateFromStateVector(Xfull[f], /*offset=*/0);
-
+            edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
             const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
             const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
             const cv::Mat& img = imgs_gray[f];
@@ -237,7 +232,7 @@ void Optimizer::optimize(const std::vector<MeshModel::Vertex>& mesh_vertices,
                 const int ci = colI[i]; if (ci < 0) { ++r; continue; }
                 const double Icurr = I_var[ci];
                 PhotometricError cost(mesh_vertices[i], i, mesh_triangles,
-                                      K, img, bvh, sqrt_w, &edLocal);
+                                      K, img, bvh, sqrt_w, &edGraph);
                 double res; double dI; Eigen::VectorXd Jed;
                 const bool ok = cost.Evaluate(Icurr, res, &dI, (f==0? nullptr : &Jed), R, t);
                 if (!ok) { ++r; continue; }
