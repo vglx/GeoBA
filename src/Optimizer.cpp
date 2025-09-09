@@ -198,31 +198,44 @@ void Optimizer::optimize(
         for (auto& v : triplets_thr) v.reserve((size_t)std::max(1,total_data_rows/std::max(1,num_threads))*48);
 
         // ---- DATA (Projective ICP) ----
-        #pragma omp parallel for schedule(static)
+        // 外层按帧顺序，避免并发写 edGraph；每帧内部按可见顶点并行
         for (int f = 1; f < F; ++f) {
-            int tid = omp_get_thread_num(); auto& Tlocal = triplets_thr[tid];
+            // 串行写：将该帧的 Xfull 写入 edGraph
             edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
             const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
             const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
-            int r = data_row_ofs[f];
-            for (int idx = 0; idx < (int)visible_vertices[f].size(); ++idx) {
+
+            const int nvis = (int)visible_vertices[f].size();
+            const int r0   = data_row_ofs[f];
+
+            #pragma omp parallel for schedule(static)
+            for (int idx = 0; idx < nvis; ++idx) {
                 const int i = visible_vertices[f][idx];
+                const int r = r0 + idx; // 行号由 idx 唯一决定，避免共享自增
+
+                int tid = omp_get_thread_num();
+                auto& Tlocal = triplets_thr[tid];
+
                 ProjectiveICPError cost(mesh_vertices[i], i,
                                         depth_images[f], &edGraph, K,
                                         normals_w_per_frame[f][i],
                                         sqrt_w);
-                // cost.setDepthGate(/*optional e.g.*/ 5e-3);
                 double residual = 0.0; Eigen::VectorXd J_ed(12*G); J_ed.setZero();
                 if (cost.Evaluate(residual, &J_ed, R, t)) {
                     Fvec[r] = residual;
                     const auto& b = bindings[i];
                     for (int nid : b) {
                         const int base = 12 * nid;
-                        for (int c = 0; c < 9; ++c) { double v = J_ed[base + c]; if (v == 0.0) continue; int col = colA_c(f, nid, c); if (col >= 0) Tlocal.emplace_back(r, col, v); }
-                        for (int c = 0; c < 3; ++c) { double v = J_ed[base + 9 + c]; if (v == 0.0) continue; int col = colt_c(f, nid, c); if (col >= 0) Tlocal.emplace_back(r, col, v); }
+                        for (int c = 0; c < 9; ++c) {
+                            double v = J_ed[base + c]; if (v == 0.0) continue;
+                            int col = colA_c(f, nid, c); if (col >= 0) Tlocal.emplace_back(r, col, v);
+                        }
+                        for (int c = 0; c < 3; ++c) {
+                            double v = J_ed[base + 9 + c]; if (v == 0.0) continue;
+                            int col = colt_c(f, nid, c); if (col >= 0) Tlocal.emplace_back(r, col, v);
+                        }
                     }
                 }
-                ++r;
             }
         }
 
