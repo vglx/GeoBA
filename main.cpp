@@ -164,13 +164,13 @@ int main(int argc, char** argv) {
     std::cout << "[main] Start optimization...\n";
 
     optimizer.optimize(
-        V,
-        F,
-        K,
-        sampled_depths,      // << depth maps (CV_32F)
-        sampled_gt_poses,    // fixed GT poses (not optimized)
+        mesh_model,          // 直接传整个 MeshModel，以便写回变形和重算法线
+        sampled_depths,      // 深度帧 (CV_32F, mm)
+        K,                  // 相机内参
+        sampled_gt_poses,    // 位姿 (frame0固定)
         edGraph
     );
+
 
     std::cout << "[main] Optimization complete." << std::endl;
 

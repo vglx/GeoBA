@@ -1,42 +1,59 @@
-#ifndef OPTIMIZER_H
-#define OPTIMIZER_H
+#pragma once
 
-#include "MeshModel.h"
 #include <vector>
 #include <Eigen/Core>
-#include <Eigen/Dense>
-#include <opencv2/opencv.hpp>
-#include "EDGraph.h"
+#include <opencv2/core.hpp>
+
+class MeshModel;   // forward decl
+class EDGraph;     // forward decl
 
 class Optimizer {
 public:
+    // Constructor
+    // w_data          : data term weight (projective ICP)
+    // maxStages       : kept for compatibility (unused in this variant)
+    // maxIterations   : Gauss-Newton outer iterations
+    // lambda_smooth   : ED graph smoothness (edge-wise A,t differences)
+    // lambda_rot      : rotation orthogonality regularization
+    // lambda_temporal : per-node temporal consistency between consecutive frames
     Optimizer(double w_data,
-              int maxStages,
-              int maxIterations,
-              double lambda_smooth = 1.0,
-              double lambda_rot = 0.1)
-        : w_data_(w_data), lambda_smooth_(lambda_smooth), lambda_rot_(lambda_rot),
-          maxStages_(maxStages), maxIterations_(maxIterations) {}
+              int    maxStages,
+              int    maxIterations,
+              double lambda_smooth,
+              double lambda_rot,
+              double lambda_temporal = 0.0);
 
-    void setTemporalWeight(double lambda_temporal) { lambda_temporal_ = lambda_temporal; }
-
-    // Projective ICP (point-to-plane on depth). Frame 0 is template (no ED columns).
-    // observed_images must be CV_32FC1 depth maps with unified units.
+    // Main entry: FOV-only + ProjectiveICP residuals.
+    // - mesh: will be updated each iteration (deformed vertices written back, normals recomputed)
+    // - observed_images: depth frames (CV_32F, in mm; invalid as NaN)
+    // - camera_intrinsics: 3x3 K
+    // - camera_poses_gt: per-frame world-to-camera 4x4 (R|t) with our convention pc = R^T (pw - t)
+    // - edGraph: ED graph whose per-frame node states are optimized (frame 0 fixed)
     void optimize(
-        const std::vector<MeshModel::Vertex>& mesh_vertices,
-        const std::vector<MeshModel::Triangle>& mesh_triangles,
+        MeshModel& mesh,
+        const std::vector<cv::Mat>& observed_images,
         const Eigen::Matrix3d& camera_intrinsics,
-        const std::vector<cv::Mat>& observed_images,   // depth: CV_32F 1ch
         const std::vector<Eigen::Matrix4d>& camera_poses_gt,
         EDGraph& edGraph);
 
-private:
-    double w_data_;
-    double lambda_smooth_;
-    double lambda_rot_;
-    double lambda_temporal_ = 1.0;   // temporal smoothness between adjacent frames
-    int maxStages_;
-    int maxIterations_;
-};
+    // Optional setters/getters
+    void setDataWeight(double w)          { w_data_ = w; }
+    void setSmoothWeight(double w)        { lambda_smooth_ = w; }
+    void setRotWeight(double w)           { lambda_rot_ = w; }
+    void setTemporalWeight(double w)      { lambda_temporal_ = w; }
 
-#endif // OPTIMIZER_H
+    double dataWeight()        const { return w_data_; }
+    double smoothWeight()      const { return lambda_smooth_; }
+    double rotWeight()         const { return lambda_rot_; }
+    double temporalWeight()    const { return lambda_temporal_; }
+
+private:
+    // weights / hyper-parameters
+    double w_data_          = 1.0;
+    double lambda_smooth_   = 0.0;
+    double lambda_rot_      = 0.0;
+    double lambda_temporal_ = 0.0;
+
+    int maxStages_      = 1;   // kept for API compatibility
+    int maxIterations_  = 10;  // outer GN iterations
+};
