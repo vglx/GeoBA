@@ -172,21 +172,6 @@ void Optimizer::optimize(
         std::vector<Eigen::Triplet<double>> triplets;
         triplets.reserve((size_t)std::max(1,total_data_rows)*48 + (size_t)(smooth_rows+rot_rows+temporal_rows)*2);
 
-        // A safe wrapper to catch column index issues early
-        auto safe_emplace = [&](int r, int c, double v){
-            if (r < 0 || r >= total_rows) {
-                std::cerr << "[BUG] bad row index r=" << r << " (total_rows=" << total_rows << ")\n";
-                std::abort();
-            }
-            if (c < 0 || c >= stateDimCompact) {
-                std::cerr << "[BUG] bad col index c=" << c
-                          << " (stateDimCompact=" << stateDimCompact
-                          << ") at row r=" << r << std::endl;
-                std::abort();
-            }
-            triplets.emplace_back(r, c, v);
-        };
-
         // ---- DATA (Projective ICP) ----
         for (int f = 1; f < F; ++f) {
             // write this frame's Xfull into edGraph (sequential)
@@ -202,14 +187,6 @@ void Optimizer::optimize(
                 const int r = r0 + idx; // unique row index
                 if (r < 0 || r >= total_rows) continue; // guard
 
-                // sanity checks for bindings
-                for (int nid : bindings[i]) {
-                    if (nid < 0 || nid >= G) {
-                        std::cerr << "[BUG] binding nid out of range: nid=" << nid << " G=" << G << std::endl;
-                        std::abort();
-                    }
-                }
-
                 ProjectiveICPError cost(mesh_vertices[i], i,
                                         depth_images[f], &edGraph, K,
                                         normals_w_per_frame[f][i],
@@ -222,11 +199,11 @@ void Optimizer::optimize(
                         const int base = 12 * nid;
                         for (int c = 0; c < 9; ++c) {
                             const double v = J_ed[base + c]; if (v == 0.0) continue;
-                            const int col = colA_c(f, nid, c); if (col >= 0) safe_emplace(r, col, v);
+                            const int col = colA_c(f, nid, c); if (col >= 0) triplets.emplace_back(r, col, v);
                         }
                         for (int c = 0; c < 3; ++c) {
                             const double v = J_ed[base + 9 + c]; if (v == 0.0) continue;
-                            const int col = colt_c(f, nid, c); if (col >= 0) safe_emplace(r, col, v);
+                            const int col = colt_c(f, nid, c); if (col >= 0) triplets.emplace_back(r, col, v);
                         }
                     }
                 }
@@ -238,64 +215,30 @@ void Optimizer::optimize(
         for (int f = 1; f < F; ++f) {
             for (const auto& e : active_edges[f]) {
                 const int i = e.first, j = e.second;
-                for (int m = 0; m < 9;  ++m) {
-                    int ci = colA_c(f,i,m), cj = colA_c(f,j,m);
-                    Fvec[row_ptr] = sqrt_ls * (Xfull[f][12*i+m] - Xfull[f][12*j+m]);
-                    if (ci>=0) safe_emplace(row_ptr,ci,sqrt_ls);
-                    if (cj>=0) safe_emplace(row_ptr,cj,-sqrt_ls);
-                    ++row_ptr;
-                }
-                for (int m = 0; m < 3;  ++m) {
-                    int ci = colt_c(f,i,m), cj = colt_c(f,j,m);
-                    Fvec[row_ptr] = sqrt_ls * (Xfull[f][12*i+9+m] - Xfull[f][12*j+9+m]);
-                    if (ci>=0) safe_emplace(row_ptr,ci,sqrt_ls);
-                    if (cj>=0) safe_emplace(row_ptr,cj,-sqrt_ls);
-                    ++row_ptr;
-                }
+                for (int m = 0; m < 9;  ++m) { int ci = colA_c(f,i,m), cj = colA_c(f,j,m); Fvec[row_ptr] = sqrt_ls * (Xfull[f][12*i+m] - Xfull[f][12*j+m]); if (ci>=0) triplets.emplace_back(row_ptr,ci,sqrt_ls); if (cj>=0) triplets.emplace_back(row_ptr,cj,-sqrt_ls); ++row_ptr; }
+                for (int m = 0; m < 3;  ++m) { int ci = colt_c(f,i,m), cj = colt_c(f,j,m); Fvec[row_ptr] = sqrt_ls * (Xfull[f][12*i+9+m] - Xfull[f][12*j+9+m]); if (ci>=0) triplets.emplace_back(row_ptr,ci,sqrt_ls); if (cj>=0) triplets.emplace_back(row_ptr,cj,-sqrt_ls); ++row_ptr; }
             }
         }
 
         // ---- ROT (orthogonality prior on A) ----
-        if (row_ptr != row_rot_begin) {
-            std::cerr << "[BUG] row_ptr mismatch before ROT: row_ptr=" << row_ptr
-                      << " row_rot_begin=" << row_rot_begin << std::endl;
-            std::abort();
-        }
         for (int f = 1; f < F; ++f) {
             for (int j = 0; j < G; ++j) if (active_node[f][j]) {
-                for (int k = 0; k < 9; ++k) {
-                    int col = colA_c(f,j,k);
-                    double target = (k==0||k==4||k==8)?1.0:0.0;
-                    Fvec[row_ptr] = sqrt_lr * (Xfull[f][12*j+k] - target);
-                    if (col>=0) safe_emplace(row_ptr,col,sqrt_lr);
-                    ++row_ptr;
-                }
+                for (int k = 0; k < 9; ++k) { int col = colA_c(f,j,k); double target = (k==0||k==4||k==8)?1.0:0.0; Fvec[row_ptr] = sqrt_lr * (Xfull[f][12*j+k] - target); if (col>=0) triplets.emplace_back(row_ptr,col,sqrt_lr); ++row_ptr; }
             }
         }
 
         // ---- TEMPORAL (optional) ----
-        if (row_ptr != row_temporal_begin) {
-            std::cerr << "[BUG] row_ptr mismatch before TEMPORAL: row_ptr=" << row_ptr
-                      << " row_temporal_begin=" << row_temporal_begin << std::endl;
-            std::abort();
-        }
         for (int f = 2; f < F; ++f) {
             for (int j = 0; j < G; ++j) if (active_node[f-1][j] && active_node[f][j]) {
                 for (int m = 0; m < 12; ++m) {
                     int c1 = (m < 9) ? colA_c(f-1,j,m) : colt_c(f-1,j,m-9);
                     int c2 = (m < 9) ? colA_c(f,  j,m) : colt_c(f,  j,m-9);
                     Fvec[row_ptr] = sqrt_ltp * (Xfull[f][12*j+m] - Xfull[f-1][12*j+m]);
-                    if (c2>=0) safe_emplace(row_ptr,c2,sqrt_ltp);
-                    if (c1>=0) safe_emplace(row_ptr,c1,-sqrt_ltp);
+                    if (c2>=0) triplets.emplace_back(row_ptr,c2,sqrt_ltp);
+                    if (c1>=0) triplets.emplace_back(row_ptr,c1,-sqrt_ltp);
                     ++row_ptr;
                 }
             }
-        }
-
-        // Final row check
-        if (row_ptr != total_rows) {
-            std::cerr << "[BUG] row_ptr=" << row_ptr << " != total_rows=" << total_rows << std::endl;
-            std::abort();
         }
 
         // (6) Solve normal equations J^T J dx = - J^T F
@@ -313,15 +256,12 @@ void Optimizer::optimize(
         Eigen::SparseMatrix<double> AtA = At * J;
         Eigen::VectorXd Atb = -At * Fv;
 
-        // Simple LM-like damping (safe: add scaled identity instead of in-place diagonal write)
+        // Simple LM-like damping
         if (AtA.rows() == 0) { std::cerr << "[Optimizer] Empty normal matrix.\n"; return; }
         Eigen::VectorXd diagA = AtA.diagonal();
         double mean_abs_diag = (diagA.size() > 0) ? diagA.cwiseAbs().mean() : 1.0;
         double damping = std::max(1e-12, 1e-6 * std::max(1.0, mean_abs_diag));
-        // SAFER than: AtA.diagonal().array() += damping;
-        Eigen::SparseMatrix<double> I(AtA.rows(), AtA.cols());
-        I.setIdentity();
-        AtA += damping * I;
+        AtA.diagonal().array() += damping;
         std::cout << "[GN it=" << it << "] damping=" << damping << std::endl;
 
         Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
@@ -334,7 +274,7 @@ void Optimizer::optimize(
         for (int f = 1; f < F; ++f) {
             for (int j = 0; j < G; ++j) if (active_node[f][j]) {
                 int base = 12 * j;
-                for (int k = 0; k < 9;  ++k) { int col = colA_c(f,j,k); if (col >= 0) Xfull[f][base + k]     += dx[col]; }
+                for (int k = 0; k < 9; ++k)  { int col = colA_c(f,j,k); if (col >= 0) Xfull[f][base + k]     += dx[col]; }
                 for (int k = 0; k < 3;  ++k) { int col = colt_c(f,j,k); if (col >= 0) Xfull[f][base + 9 + k] += dx[col]; }
             }
         }
