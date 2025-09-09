@@ -47,38 +47,45 @@ bool DatasetManager::loadAllDepthImages(std::vector<cv::Mat>& depth_images) {
     depth_images.clear();
     std::string depth_path = dataset_path_ + "depth/";
 
-    // 1. 收集文件路径
     std::vector<std::string> depth_filenames;
     for (const auto& entry : fs::directory_iterator(depth_path)) {
-        if (entry.path().extension() == ".png" || entry.path().extension() == ".tiff") {
+        if (entry.path().extension() == ".png" || entry.path().extension() == ".tiff")
             depth_filenames.push_back(entry.path().string());
-        }
     }
-
-    // 2. 对文件名进行排序（字典序）
     std::sort(depth_filenames.begin(), depth_filenames.end());
 
-    // 3. 依次读取并处理深度图
     for (const auto& filename : depth_filenames) {
-        cv::Mat image = cv::imread(filename, cv::IMREAD_UNCHANGED);
-        if (image.empty()) {
+        cv::Mat im16 = cv::imread(filename, cv::IMREAD_UNCHANGED);
+        if (im16.empty()) {
             std::cerr << "Failed to load depth image: " << filename << std::endl;
             return false;
         }
-
-        if (image.type() != CV_16U) {  // 确保是 16-bit 深度图
-            std::cerr << "Unexpected depth image format (expected CV_16U): " 
-                      << filename << std::endl;
+        if (im16.type() != CV_16U) {
+            std::cerr << "Unexpected depth image format (expected CV_16U): " << filename << std::endl;
             return false;
         }
-        cv::Mat depth_in_mm;
-        // 假设这里你想把 0~65535 的深度值线性缩放到 0~100mm
-        image.convertTo(depth_in_mm, CV_32F, 1.0);
 
-        depth_images.push_back(depth_in_mm);
+        // 假设单位 = 微米(um)，直接转换到毫米
+        cv::Mat depth32f;
+        im16.convertTo(depth32f, CV_32F, 1.0);  // 保留原始数值 (单位: µm)
+        depth32f *= 1e-3f;                      // µm -> mm
+
+        // 无效值处理: <=0 或 非有限置 NaN
+        const float nanv = std::numeric_limits<float>::quiet_NaN();
+        for (int y = 0; y < depth32f.rows; ++y) {
+            float* row = depth32f.ptr<float>(y);
+            for (int x = 0; x < depth32f.cols; ++x) {
+                float& z = row[x];
+                if (!(z > 0.f) || !std::isfinite(z))
+                    z = nanv;
+            }
+        }
+
+        depth_images.push_back(std::move(depth32f));
     }
 
-    std::cout << "Loaded " << depth_images.size() << " depth images.\n";
+    std::cout << "Loaded " << depth_images.size()
+              << " depth images (CV_32F, assumed unit=µm → converted to mm)." << std::endl;
     return true;
 }
 
