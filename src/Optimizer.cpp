@@ -119,6 +119,8 @@ void Optimizer::optimize(
     // Gauss-Newton loop
     double prev_cost = std::numeric_limits<double>::max();
     const double sqrt_w = std::sqrt(std::max(0.0, w_data_));
+    const double depth_gate_mm = 3.0; // 改进4：以毫米为单位的深度门限（可视情况调参）
+
     for (int it = 0; it < maxIterations_; ++it) {
         // (1) visibility per frame
         std::vector<std::vector<int>> visible_vertices(F);
@@ -149,9 +151,9 @@ void Optimizer::optimize(
         auto colA_c  = [&](int f,int node,int k){ int ci = compact_idx[f][node]; if (ci < 0) return -1; return offsEDc(f) + 12*ci + k; };
         auto colt_c  = [&](int f,int node,int k){ int ci = compact_idx[f][node]; if (ci < 0) return -1; return offsEDc(f) + 12*ci + 9 + k; };
 
-        // (3) 每迭代、每帧重算法向（世界系）
+        // (3) 只为 f>=1 的帧重算法向（改进8：减少无用计算）
         std::vector<std::vector<Eigen::Vector3d>> normals_w_per_frame(F);
-        for (int f = 0; f < F; ++f) {
+        for (int f = 1; f < F; ++f) {
             edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
             std::vector<Eigen::Vector3d> Vw, Nw;
             warpVerticesAndComputeNormals(mesh_vertices, mesh_triangles, edGraph, Vw, Nw);
@@ -194,31 +196,42 @@ void Optimizer::optimize(
         for (auto& v : triplets_thr) v.reserve((size_t)std::max(1,total_data_rows/std::max(1,num_threads))*48);
 
         // ---- DATA (Projective ICP) ----
-        #pragma omp parallel for schedule(static)
         for (int f = 1; f < F; ++f) {
-            int tid = omp_get_thread_num(); auto& Tlocal = triplets_thr[tid];
+            // 改进1：每帧先单线程固化ED状态，避免数据竞争
             edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
             const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
             const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
-            int r = data_row_ofs[f];
-            for (int idx = 0; idx < (int)visible_vertices[f].size(); ++idx) {
-                const int i = visible_vertices[f][idx];
-                ProjectiveICPError cost(mesh_vertices[i], i,
-                                        depth_images[f], &edGraph, K,
-                                        normals_w_per_frame[f][i],
-                                        sqrt_w);
-                // cost.setDepthGate(/*optional e.g.*/ 5e-3);
-                double residual = 0.0; Eigen::VectorXd J_ed(12*G); J_ed.setZero();
-                if (cost.Evaluate(residual, &J_ed, R, t)) {
-                    Fvec[r] = residual;
-                    const auto& b = bindings[i];
-                    for (int nid : b) {
-                        const int base = 12 * nid;
-                        for (int c = 0; c < 9; ++c) { double v = J_ed[base + c]; if (v == 0.0) continue; int col = colA_c(f, nid, c); if (col >= 0) Tlocal.emplace_back(r, col, v); }
-                        for (int c = 0; c < 3; ++c) { double v = J_ed[base + 9 + c]; if (v == 0.0) continue; int col = colt_c(f, nid, c); if (col >= 0) Tlocal.emplace_back(r, col, v); }
+            const int r0 = data_row_ofs[f];
+
+            // 改进5：为每个线程复用一次 J 缓冲，避免重复分配 12*G 向量
+            #pragma omp parallel
+            {
+                int tid = omp_get_thread_num();
+                auto& Tlocal = triplets_thr[tid];
+                static thread_local Eigen::VectorXd Jbuf; // thread-local 复用
+                if (Jbuf.size() != 12*G) Jbuf.resize(12*G);
+
+                #pragma omp for schedule(static)
+                for (int idx = 0; idx < (int)visible_vertices[f].size(); ++idx) {
+                    const int i = visible_vertices[f][idx];
+                    ProjectiveICPError cost(mesh_vertices[i], i,
+                                            depth_images[f], &edGraph, K,
+                                            normals_w_per_frame[f][i],
+                                            sqrt_w);
+                    cost.setDepthGate(depth_gate_mm); // 改进4：mm单位的深度门限
+
+                    double residual = 0.0; Jbuf.setZero();
+                    if (cost.Evaluate(residual, &Jbuf, R, t)) {
+                        const int r = r0 + idx;
+                        Fvec[r] = residual;
+                        const auto& b = bindings[i];
+                        for (int nid : b) {
+                            const int base = 12 * nid;
+                            for (int c = 0; c < 9; ++c)  { double v = Jbuf[base + c];      if (v == 0.0) continue; int col = colA_c(f, nid, c);   if (col >= 0) Tlocal.emplace_back(r, col, v); }
+                            for (int c = 0; c < 3; ++c)  { double v = Jbuf[base + 9 + c];   if (v == 0.0) continue; int col = colt_c(f, nid, c);   if (col >= 0) Tlocal.emplace_back(r, col, v); }
+                        }
                     }
                 }
-                ++r;
             }
         }
 
@@ -247,7 +260,7 @@ void Optimizer::optimize(
                     int c2 = (m < 9) ? colA_c(f,  j,m) : colt_c(f,  j,m-9);
                     Fvec[row_ptr] = sqrt_ltp * (Xfull[f][12*j+m] - Xfull[f-1][12*j+m]);
                     if (c2>=0) triplets_thr[0].emplace_back(row_ptr,c2,sqrt_ltp);
-                    if (c1>=0) triplets_thr[0].emplace_back(rowptr,c1,-sqrt_ltp);
+                    if (c1>=0) triplets_thr[0].emplace_back(row_ptr,c1,-sqrt_ltp); // 改进2：修复 row_ptr 拼写
                     ++row_ptr;
                 }
             }
@@ -284,4 +297,7 @@ void Optimizer::optimize(
         }
         // 下一轮：Xfull 会被带入 deform & normals & visibility
     }
+
+    // 改进3：优化完成后，将 edGraph 显式回写到想导出的帧（例如 f=1）
+    if (F > 1) edGraph.updateFromStateVector(Xfull[1], /*offset=*/0);
 }
