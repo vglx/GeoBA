@@ -9,7 +9,6 @@
 
 namespace {
 // Deform all vertices with current ED state and compute per-vertex world-space normals
-// NOTE: use per-thread local accumulators to avoid undefined behavior with atomics on Eigen scalars.
 static void warpVerticesAndComputeNormals(
     const std::vector<MeshModel::Vertex>& V_raw,
     const std::vector<MeshModel::Triangle>& F,
@@ -21,42 +20,39 @@ static void warpVerticesAndComputeNormals(
     Vw.resize(N);
     Nw.assign(N, Eigen::Vector3d::Zero());
 
-    // 1) Deform (thread-safe)
     #pragma omp parallel for schedule(static)
     for (int i = 0; i < N; ++i) {
         Vw[i] = ed.deformVertex(V_raw[i], i);
     }
 
-    // 2) Thread-local normal accumulation to avoid atomics on Eigen scalars
-    const int T = omp_get_max_threads();
-    std::vector<std::vector<Eigen::Vector3d>> Nlocal(T, std::vector<Eigen::Vector3d>(N, Eigen::Vector3d::Zero()));
-
-    #pragma omp parallel
-    {
-        int tid = omp_get_thread_num();
-        auto& NL = Nlocal[tid];
-
-        #pragma omp for schedule(static)
-        for (int k = 0; k < (int)F.size(); ++k) {
-            const auto& tri = F[k];
-            const Eigen::Vector3d& p0 = Vw[tri.v0];
-            const Eigen::Vector3d& p1 = Vw[tri.v1];
-            const Eigen::Vector3d& p2 = Vw[tri.v2];
-            Eigen::Vector3d n = (p1 - p0).cross(p2 - p0);
-            double ln = n.norm(); if (ln > 1e-20) n /= ln; else n = Eigen::Vector3d(0,0,1);
-            NL[tri.v0] += n;
-            NL[tri.v1] += n;
-            NL[tri.v2] += n;
-        }
+    #pragma omp parallel for schedule(static)
+    for (int k = 0; k < (int)F.size(); ++k) {
+        const auto& tri = F[k];
+        const Eigen::Vector3d& p0 = Vw[tri.v0];
+        const Eigen::Vector3d& p1 = Vw[tri.v1];
+        const Eigen::Vector3d& p2 = Vw[tri.v2];
+        Eigen::Vector3d n = (p1 - p0).cross(p2 - p0);
+        double ln = n.norm(); if (ln > 1e-20) n /= ln; else n = Eigen::Vector3d(0,0,1);
+        #pragma omp atomic
+        Nw[tri.v0].x() += n.x();
+        #pragma omp atomic
+        Nw[tri.v0].y() += n.y();
+        #pragma omp atomic
+        Nw[tri.v0].z() += n.z();
+        #pragma omp atomic
+        Nw[tri.v1].x() += n.x();
+        #pragma omp atomic
+        Nw[tri.v1].y() += n.y();
+        #pragma omp atomic
+        Nw[tri.v1].z() += n.z();
+        #pragma omp atomic
+        Nw[tri.v2].x() += n.x();
+        #pragma omp atomic
+        Nw[tri.v2].y() += n.y();
+        #pragma omp atomic
+        Nw[tri.v2].z() += n.z();
     }
 
-    // 3) Merge
-    for (int t = 0; t < T; ++t) {
-        const auto& NL = Nlocal[t];
-        for (int i = 0; i < N; ++i) Nw[i] += NL[i];
-    }
-
-    // 4) Normalize
     #pragma omp parallel for schedule(static)
     for (int i = 0; i < N; ++i) {
         double nrm = Nw[i].norm();
@@ -153,7 +149,7 @@ void Optimizer::optimize(
         auto colA_c  = [&](int f,int node,int k){ int ci = compact_idx[f][node]; if (ci < 0) return -1; return offsEDc(f) + 12*ci + k; };
         auto colt_c  = [&](int f,int node,int k){ int ci = compact_idx[f][node]; if (ci < 0) return -1; return offsEDc(f) + 12*ci + 9 + k; };
 
-        // (3) Recompute normals per frame (world)
+        // (3) 每迭代、每帧重算法向（世界系）
         std::vector<std::vector<Eigen::Vector3d>> normals_w_per_frame(F);
         for (int f = 0; f < F; ++f) {
             edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
@@ -251,7 +247,7 @@ void Optimizer::optimize(
                     int c2 = (m < 9) ? colA_c(f,  j,m) : colt_c(f,  j,m-9);
                     Fvec[row_ptr] = sqrt_ltp * (Xfull[f][12*j+m] - Xfull[f-1][12*j+m]);
                     if (c2>=0) triplets_thr[0].emplace_back(row_ptr,c2,sqrt_ltp);
-                    if (c1>=0) triplets_thr[0].emplace_back(row_ptr,c1,-sqrt_ltp);
+                    if (c1>=0) triplets_thr[0].emplace_back(rowptr,c1,-sqrt_ltp);
                     ++row_ptr;
                 }
             }
@@ -286,6 +282,6 @@ void Optimizer::optimize(
                 for (int k = 0; k < 3; ++k)  { int col = colt_c(f,j,k); if (col >= 0) Xfull[f][base + 9 + k] += dx[col]; }
             }
         }
-        // Next iter: Xfull carries over for deform & normals & visibility
+        // 下一轮：Xfull 会被带入 deform & normals & visibility
     }
 }
