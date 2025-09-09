@@ -51,13 +51,15 @@ Optimizer::Optimizer(double w_data,
       maxIterations_(maxIterations) {}
 
 void Optimizer::optimize(
-    MeshModel& mesh,                                 // we sync deformed verts & recompute normals inside
+    MeshModel& mesh,                                 // will recompute normals inside (no xyz mutation)
     const std::vector<cv::Mat>& observed_images,     // depth frames (CV_32F, in mm, NaN invalid)
     const Eigen::Matrix3d& K,
     const std::vector<Eigen::Matrix4d>& camera_poses_gt,
     EDGraph& edGraph)
 {
     auto& mesh_vertices  = mesh.getVertices();
+    const auto& mesh_tris = mesh.getTriangles();
+
     const int F = (int)observed_images.size();
     const int N = (int)mesh_vertices.size();
     const int G = edGraph.numNodes();
@@ -91,7 +93,7 @@ void Optimizer::optimize(
     int inner_no_improve = 0;
 
     for (int it = 0; it < maxIterations_; ++it) {
-        // 0) (Optional) Sync a reference state — we keep Xfull authoritative per-frame
+        // 0) Keep Xfull authoritative per-frame
         for (int f = 0; f < F; ++f) edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
 
         // 1) Build FOV lists per frame (no occlusion). No edGraph dependency here.
@@ -186,21 +188,22 @@ void Optimizer::optimize(
                 #pragma omp for schedule(static)
                 for (int idx = 0; idx < (int)fov_vertices[f].size(); ++idx) {
                     const int i = fov_vertices[f][idx];
-                    const int row = data_row_ofs[f] + idx;  // fixed row per index (no contention)
+                    const int row = data_row_ofs[f] + idx;  // fixed row per index
 
                     const auto& v = mesh_vertices[i];
                     Eigen::Vector3d n_w(v.nx, v.ny, v.nz);
 
                     ProjectiveICPError cost(
                         v, i,
-                        K(0,0), K(1,1), K(0,2), K(1,2),
                         depth,
-                        sqrt_w, &edGraph,
+                        &edGraph,
+                        K,
                         n_w,
-                        /*depth_gate=*/0.0);
+                        sqrt_w
+                    );
 
                     double residual = 0.0; Eigen::VectorXd J_ed(12 * G); J_ed.setZero();
-                    if (!cost.Evaluate(residual, &J_ed, R, t)) continue; // keep row allocated but zero (already 0)
+                    if (!cost.Evaluate(residual, &J_ed, R, t)) continue; // row stays 0
 
                     Fvec[row] = residual;
                     const auto& b = bindings[i];
@@ -349,14 +352,49 @@ void Optimizer::optimize(
         prev_cost = cost;
         if (inner_no_improve >= 3) { std::cout << "Early stop at iter " << it << std::endl; }
 
-        // 8) Sync deformed vertices into MeshModel and recompute normals for next iteration
-        if (F > 1) edGraph.updateFromStateVector(Xfull[1], /*offset=*/0); // choose frame-1 as reference
-        mesh.updateVerticesByED(edGraph);
-        mesh.computeVertexNormals();
+        // 8) Recompute vertex normals from DEFORMED positions (without mutating xyz)
+        //    We evaluate deformed positions via edGraph.deformVertex and accumulate face normals.
+        {
+            auto& verts = mesh.getVertices();
+            // zero normals
+            #pragma omp parallel for
+            for (int i = 0; i < (int)verts.size(); ++i) {
+                verts[i].nx = verts[i].ny = verts[i].nz = 0.0f;
+            }
+
+            // accumulate face normals using deformed triangle vertices
+            #pragma omp parallel for
+            for (int fti = 0; fti < (int)mesh_tris.size(); ++fti) {
+                const auto& tri = mesh_tris[fti];
+                Eigen::Vector3d p0 = edGraph.deformVertex(verts[tri.v0], tri.v0);
+                Eigen::Vector3d p1 = edGraph.deformVertex(verts[tri.v1], tri.v1);
+                Eigen::Vector3d p2 = edGraph.deformVertex(verts[tri.v2], tri.v2);
+                Eigen::Vector3d n = (p1 - p0).cross(p2 - p0);
+                double ln = n.norm();
+                if (ln < 1e-20) continue;
+                n /= ln;
+                // accumulate to vertices (critical for simplicity)
+                #pragma omp critical
+                {
+                    verts[tri.v0].nx += (float)n.x(); verts[tri.v0].ny += (float)n.y(); verts[tri.v0].nz += (float)n.z();
+                    verts[tri.v1].nx += (float)n.x(); verts[tri.v1].ny += (float)n.y(); verts[tri.v1].nz += (float)n.z();
+                    verts[tri.v2].nx += (float)n.x(); verts[tri.v2].ny += (float)n.y(); verts[tri.v2].nz += (float)n.z();
+                }
+            }
+
+            // normalize vertex normals
+            #pragma omp parallel for
+            for (int i = 0; i < (int)verts.size(); ++i) {
+                Eigen::Vector3f nn(verts[i].nx, verts[i].ny, verts[i].nz);
+                float l = nn.norm();
+                if (l > 1e-12f) nn /= l; else nn = Eigen::Vector3f(0,0,1);
+                verts[i].nx = nn.x(); verts[i].ny = nn.y(); verts[i].nz = nn.z();
+            }
+        }
 
         if (inner_no_improve >= 3) break;
     }
 
-    // Export frame 1 state back to EDGraph (typical 2-frame use); change if you prefer a different frame.
+    // Optionally keep a reference frame's state in edGraph (e.g., frame 1)
     if (F > 1) edGraph.updateFromStateVector(Xfull[1], /*offset=*/0);
 }
