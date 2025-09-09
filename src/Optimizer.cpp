@@ -3,13 +3,11 @@
 #include <iostream>
 #include <limits>
 #include <cmath>
-#include <omp.h>
 #include <Eigen/Sparse>
 #include <Eigen/SparseCholesky>
 
 namespace {
 // Deform all vertices with current ED state and compute per-vertex world-space normals
-// NOTE: use per-thread local accumulators to avoid undefined behavior with atomics on Eigen scalars.
 static void warpVerticesAndComputeNormals(
     const std::vector<MeshModel::Vertex>& V_raw,
     const std::vector<MeshModel::Triangle>& F,
@@ -21,43 +19,26 @@ static void warpVerticesAndComputeNormals(
     Vw.resize(N);
     Nw.assign(N, Eigen::Vector3d::Zero());
 
-    // 1) Deform (thread-safe)
-    #pragma omp parallel for schedule(static)
+    // 1) Deform (sequential for safety)
     for (int i = 0; i < N; ++i) {
         Vw[i] = ed.deformVertex(V_raw[i], i);
     }
 
-    // 2) Thread-local normal accumulation to avoid atomics on Eigen scalars
-    const int T = omp_get_max_threads();
-    std::vector<std::vector<Eigen::Vector3d>> Nlocal(T, std::vector<Eigen::Vector3d>(N, Eigen::Vector3d::Zero()));
-
-    #pragma omp parallel
-    {
-        int tid = omp_get_thread_num();
-        auto& NL = Nlocal[tid];
-
-        #pragma omp for schedule(static)
-        for (int k = 0; k < (int)F.size(); ++k) {
-            const auto& tri = F[k];
-            const Eigen::Vector3d& p0 = Vw[tri.v0];
-            const Eigen::Vector3d& p1 = Vw[tri.v1];
-            const Eigen::Vector3d& p2 = Vw[tri.v2];
-            Eigen::Vector3d n = (p1 - p0).cross(p2 - p0);
-            double ln = n.norm(); if (ln > 1e-20) n /= ln; else n = Eigen::Vector3d(0,0,1);
-            NL[tri.v0] += n;
-            NL[tri.v1] += n;
-            NL[tri.v2] += n;
-        }
+    // 2) Face normals accumulation (sequential, thread-safe)
+    for (int k = 0; k < (int)F.size(); ++k) {
+        const auto& tri = F[k];
+        const Eigen::Vector3d& p0 = Vw[tri.v0];
+        const Eigen::Vector3d& p1 = Vw[tri.v1];
+        const Eigen::Vector3d& p2 = Vw[tri.v2];
+        Eigen::Vector3d n = (p1 - p0).cross(p2 - p0);
+        double ln = n.norm();
+        if (ln > 1e-20) n /= ln; else n = Eigen::Vector3d(0,0,1);
+        if (tri.v0 >= 0 && tri.v0 < N) Nw[tri.v0] += n;
+        if (tri.v1 >= 0 && tri.v1 < N) Nw[tri.v1] += n;
+        if (tri.v2 >= 0 && tri.v2 < N) Nw[tri.v2] += n;
     }
 
-    // 3) Merge
-    for (int t = 0; t < T; ++t) {
-        const auto& NL = Nlocal[t];
-        for (int i = 0; i < N; ++i) Nw[i] += NL[i];
-    }
-
-    // 4) Normalize
-    #pragma omp parallel for schedule(static)
+    // 3) Normalize
     for (int i = 0; i < N; ++i) {
         double nrm = Nw[i].norm();
         if (nrm > 1e-12) Nw[i] /= nrm; else Nw[i] = Eigen::Vector3d(0,0,1);
@@ -93,7 +74,7 @@ void Optimizer::optimize(
     const auto& bindings = edGraph.getBindings();
     const auto& edges    = edGraph.getEdges();
 
-    // visibility helper (boundary only: Z>0 & in image)
+    // visibility helper (boundary only: Z>0 & in image) — sequential for safety
     auto compute_visibility_boundary = [&](const Eigen::VectorXd& Xf,
                                            const cv::Mat& img_like,
                                            const Eigen::Matrix3d& R,
@@ -101,22 +82,15 @@ void Optimizer::optimize(
                                            std::vector<int>& vis_out){
         vis_out.clear(); vis_out.reserve(N/2);
         edGraph.updateFromStateVector(Xf, /*offset=*/0);
-        #pragma omp parallel
-        {
-            std::vector<int> vis_local; vis_local.reserve(256);
-            #pragma omp for nowait
-            for (int i = 0; i < N; ++i) {
-                Eigen::Vector3d pw = edGraph.deformVertex(mesh_vertices[i], i);
-                Eigen::Vector3d pc = R.transpose() * (pw - t);
-                if (pc.z() > 1e-8) {
-                    float u = (float)(K(0,0) * (pc.x()/pc.z()) + K(0,2));
-                    float v = (float)(K(1,1) * (pc.y()/pc.z()) + K(1,2));
-                    if (u >= 0 && u < img_like.cols && v >= 0 && v < img_like.rows)
-                        vis_local.push_back(i);
-                }
+        for (int i = 0; i < N; ++i) {
+            Eigen::Vector3d pw = edGraph.deformVertex(mesh_vertices[i], i);
+            Eigen::Vector3d pc = R.transpose() * (pw - t);
+            if (pc.z() > 1e-8) {
+                float u = (float)(K(0,0) * (pc.x()/pc.z()) + K(0,2));
+                float v = (float)(K(1,1) * (pc.y()/pc.z()) + K(1,2));
+                if (u >= 0 && u < img_like.cols && v >= 0 && v < img_like.rows)
+                    vis_out.push_back(i);
             }
-            #pragma omp critical
-            vis_out.insert(vis_out.end(), vis_local.begin(), vis_local.end());
         }
     };
 
@@ -187,20 +161,20 @@ void Optimizer::optimize(
                   << ", total=" << total_rows << std::endl;
         std::cout << "[Layout] state dims  edCompact=" << stateDimCompact << std::endl;
 
+        if (stateDimCompact == 0 || total_rows == 0) { std::cerr << "[Optimizer] Nothing to optimize, bail.\n"; return; }
+
         // (5) Assemble
         const double sqrt_ls  = std::sqrt(std::max(0.0, lambda_smooth_));
         const double sqrt_lr  = std::sqrt(std::max(0.0, lambda_rot_));
         const double sqrt_ltp = std::sqrt(std::max(0.0, lambda_temporal_));
 
         std::vector<double> Fvec(total_rows, 0.0);
-        int num_threads = omp_get_max_threads();
-        std::vector<std::vector<Eigen::Triplet<double>>> triplets_thr(num_threads);
-        for (auto& v : triplets_thr) v.reserve((size_t)std::max(1,total_data_rows/std::max(1,num_threads))*48);
+        std::vector<Eigen::Triplet<double>> triplets;
+        triplets.reserve((size_t)std::max(1,total_data_rows)*48 + (size_t)(smooth_rows+rot_rows+temporal_rows)*2);
 
         // ---- DATA (Projective ICP) ----
-        // 外层按帧顺序，避免并发写 edGraph；每帧内部按可见顶点并行
         for (int f = 1; f < F; ++f) {
-            // 串行写：将该帧的 Xfull 写入 edGraph
+            // write this frame's Xfull into edGraph (sequential)
             edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
             const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
             const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
@@ -208,13 +182,10 @@ void Optimizer::optimize(
             const int nvis = (int)visible_vertices[f].size();
             const int r0   = data_row_ofs[f];
 
-            #pragma omp parallel for schedule(static)
             for (int idx = 0; idx < nvis; ++idx) {
                 const int i = visible_vertices[f][idx];
-                const int r = r0 + idx; // 行号由 idx 唯一决定，避免共享自增
-
-                int tid = omp_get_thread_num();
-                auto& Tlocal = triplets_thr[tid];
+                const int r = r0 + idx; // unique row index
+                if (r < 0 || r >= total_rows) continue; // guard
 
                 ProjectiveICPError cost(mesh_vertices[i], i,
                                         depth_images[f], &edGraph, K,
@@ -227,12 +198,12 @@ void Optimizer::optimize(
                     for (int nid : b) {
                         const int base = 12 * nid;
                         for (int c = 0; c < 9; ++c) {
-                            double v = J_ed[base + c]; if (v == 0.0) continue;
-                            int col = colA_c(f, nid, c); if (col >= 0) Tlocal.emplace_back(r, col, v);
+                            const double v = J_ed[base + c]; if (v == 0.0) continue;
+                            const int col = colA_c(f, nid, c); if (col >= 0) triplets.emplace_back(r, col, v);
                         }
                         for (int c = 0; c < 3; ++c) {
-                            double v = J_ed[base + 9 + c]; if (v == 0.0) continue;
-                            int col = colt_c(f, nid, c); if (col >= 0) Tlocal.emplace_back(r, col, v);
+                            const double v = J_ed[base + 9 + c]; if (v == 0.0) continue;
+                            const int col = colt_c(f, nid, c); if (col >= 0) triplets.emplace_back(r, col, v);
                         }
                     }
                 }
@@ -244,15 +215,15 @@ void Optimizer::optimize(
         for (int f = 1; f < F; ++f) {
             for (const auto& e : active_edges[f]) {
                 const int i = e.first, j = e.second;
-                for (int m = 0; m < 9;  ++m) { int ci = colA_c(f,i,m), cj = colA_c(f,j,m); Fvec[row_ptr] = sqrt_ls * (Xfull[f][12*i+m] - Xfull[f][12*j+m]); if (ci>=0) triplets_thr[0].emplace_back(row_ptr,ci,sqrt_ls); if (cj>=0) triplets_thr[0].emplace_back(row_ptr,cj,-sqrt_ls); ++row_ptr; }
-                for (int m = 0; m < 3;  ++m) { int ci = colt_c(f,i,m), cj = colt_c(f,j,m); Fvec[row_ptr] = sqrt_ls * (Xfull[f][12*i+9+m] - Xfull[f][12*j+9+m]); if (ci>=0) triplets_thr[0].emplace_back(row_ptr,ci,sqrt_ls); if (cj>=0) triplets_thr[0].emplace_back(row_ptr,cj,-sqrt_ls); ++row_ptr; }
+                for (int m = 0; m < 9;  ++m) { int ci = colA_c(f,i,m), cj = colA_c(f,j,m); Fvec[row_ptr] = sqrt_ls * (Xfull[f][12*i+m] - Xfull[f][12*j+m]); if (ci>=0) triplets.emplace_back(row_ptr,ci,sqrt_ls); if (cj>=0) triplets.emplace_back(row_ptr,cj,-sqrt_ls); ++row_ptr; }
+                for (int m = 0; m < 3;  ++m) { int ci = colt_c(f,i,m), cj = colt_c(f,j,m); Fvec[row_ptr] = sqrt_ls * (Xfull[f][12*i+9+m] - Xfull[f][12*j+9+m]); if (ci>=0) triplets.emplace_back(row_ptr,ci,sqrt_ls); if (cj>=0) triplets.emplace_back(row_ptr,cj,-sqrt_ls); ++row_ptr; }
             }
         }
 
         // ---- ROT (orthogonality prior on A) ----
         for (int f = 1; f < F; ++f) {
             for (int j = 0; j < G; ++j) if (active_node[f][j]) {
-                for (int k = 0; k < 9; ++k) { int col = colA_c(f,j,k); double target = (k==0||k==4||k==8)?1.0:0.0; Fvec[row_ptr] = sqrt_lr * (Xfull[f][12*j+k] - target); if (col>=0) triplets_thr[0].emplace_back(row_ptr,col,sqrt_lr); ++row_ptr; }
+                for (int k = 0; k < 9; ++k) { int col = colA_c(f,j,k); double target = (k==0||k==4||k==8)?1.0:0.0; Fvec[row_ptr] = sqrt_lr * (Xfull[f][12*j+k] - target); if (col>=0) triplets.emplace_back(row_ptr,col,sqrt_lr); ++row_ptr; }
             }
         }
 
@@ -263,40 +234,48 @@ void Optimizer::optimize(
                     int c1 = (m < 9) ? colA_c(f-1,j,m) : colt_c(f-1,j,m-9);
                     int c2 = (m < 9) ? colA_c(f,  j,m) : colt_c(f,  j,m-9);
                     Fvec[row_ptr] = sqrt_ltp * (Xfull[f][12*j+m] - Xfull[f-1][12*j+m]);
-                    if (c2>=0) triplets_thr[0].emplace_back(row_ptr,c2,sqrt_ltp);
-                    if (c1>=0) triplets_thr[0].emplace_back(row_ptr,c1,-sqrt_ltp);
+                    if (c2>=0) triplets.emplace_back(row_ptr,c2,sqrt_ltp);
+                    if (c1>=0) triplets.emplace_back(row_ptr,c1,-sqrt_ltp);
                     ++row_ptr;
                 }
             }
         }
 
         // (6) Solve normal equations J^T J dx = - J^T F
-        std::vector<Eigen::Triplet<double>> triplets; size_t tot = 0; for (auto& t : triplets_thr) tot += t.size(); triplets.reserve(tot); for (auto& t : triplets_thr) { triplets.insert(triplets.end(), t.begin(), t.end()); }
-        Eigen::SparseMatrix<double> J(total_rows, stateDimCompact); J.setFromTriplets(triplets.begin(), triplets.end());
-        Eigen::VectorXd Fv(total_rows); for (int r = 0; r < total_rows; ++r) Fv[r] = Fvec[r];
+        Eigen::SparseMatrix<double> J(total_rows, stateDimCompact);
+        if (!triplets.empty()) J.setFromTriplets(triplets.begin(), triplets.end());
+        J.makeCompressed();
+
+        Eigen::VectorXd Fv(total_rows);
+        for (int r = 0; r < total_rows; ++r) Fv[r] = Fvec[r];
         double cost = 0.5 * Fv.squaredNorm();
         std::cout << "[GN it=" << it << "] cost(raw)=" << cost << std::endl;
         if (cost > prev_cost * (1.0 - 1e-9)) break; prev_cost = cost;
-        Eigen::SparseMatrix<double> At = J.transpose();
-        Eigen::SparseMatrix<double> AtA = At * J; Eigen::VectorXd Atb = -At * Fv;
+
+        const Eigen::SparseMatrix<double> At = J.transpose();
+        Eigen::SparseMatrix<double> AtA = At * J;
+        Eigen::VectorXd Atb = -At * Fv;
 
         // Simple LM-like damping
+        if (AtA.rows() == 0) { std::cerr << "[Optimizer] Empty normal matrix.\n"; return; }
         Eigen::VectorXd diagA = AtA.diagonal();
         double mean_abs_diag = (diagA.size() > 0) ? diagA.cwiseAbs().mean() : 1.0;
         double damping = std::max(1e-12, 1e-6 * std::max(1.0, mean_abs_diag));
         AtA.diagonal().array() += damping;
         std::cout << "[GN it=" << it << "] damping=" << damping << std::endl;
 
-        Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver; solver.compute(AtA);
+        Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
+        solver.compute(AtA);
         if (solver.info() != Eigen::Success) { std::cerr << "[Optimizer] LDLT factorization failed.\n"; break; }
-        Eigen::VectorXd dx = solver.solve(Atb); if (solver.info() != Eigen::Success) { std::cerr << "[Optimizer] Linear solve failed.\n"; break; }
+        Eigen::VectorXd dx = solver.solve(Atb);
+        if (solver.info() != Eigen::Success) { std::cerr << "[Optimizer] Linear solve failed.\n"; break; }
 
         // (7) Apply update: ED (f>=1)
         for (int f = 1; f < F; ++f) {
             for (int j = 0; j < G; ++j) if (active_node[f][j]) {
                 int base = 12 * j;
                 for (int k = 0; k < 9; ++k)  { int col = colA_c(f,j,k); if (col >= 0) Xfull[f][base + k]     += dx[col]; }
-                for (int k = 0; k < 3; ++k)  { int col = colt_c(f,j,k); if (col >= 0) Xfull[f][base + 9 + k] += dx[col]; }
+                for (int k = 0; k < 3;  ++k) { int col = colt_c(f,j,k); if (col >= 0) Xfull[f][base + 9 + k] += dx[col]; }
             }
         }
         // Next iter: Xfull carries over for deform & normals & visibility
