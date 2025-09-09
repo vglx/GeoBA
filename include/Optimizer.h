@@ -2,7 +2,6 @@
 #define OPTIMIZER_H
 
 #include "MeshModel.h"
-#include "BVH.h"
 #include <vector>
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -15,17 +14,19 @@ public:
               int maxStages,
               int maxIterations,
               double lambda_smooth = 1.0,
-              double lambda_rot = 0.1);
+              double lambda_rot = 0.1)
+        : w_data_(w_data), lambda_smooth_(lambda_smooth), lambda_rot_(lambda_rot),
+          maxStages_(maxStages), maxIterations_(maxIterations) {}
 
     void setTemporalWeight(double lambda_temporal) { lambda_temporal_ = lambda_temporal; }
 
-    // Frame 0 is treated as the fixed template (no data term, no variables).
-    // Data term starts from frame 1, matching to per‑vertex template intensity sampled from frame 0.
+    // Projective ICP (point-to-plane on depth). Frame 0 is template (no ED columns).
+    // observed_images must be CV_32FC1 depth maps with unified units.
     void optimize(
         const std::vector<MeshModel::Vertex>& mesh_vertices,
         const std::vector<MeshModel::Triangle>& mesh_triangles,
         const Eigen::Matrix3d& camera_intrinsics,
-        const std::vector<cv::Mat>& observed_images,
+        const std::vector<cv::Mat>& observed_images,   // depth: CV_32F 1ch
         const std::vector<Eigen::Matrix4d>& camera_poses_gt,
         EDGraph& edGraph);
 
@@ -33,7 +34,7 @@ private:
     double w_data_;
     double lambda_smooth_;
     double lambda_rot_;
-    double lambda_temporal_ = 1.0;   // temporal smoothness between adjacent frames (only if both frames have variables)
+    double lambda_temporal_ = 1.0;   // temporal smoothness between adjacent frames
     int maxStages_;
     int maxIterations_;
 };

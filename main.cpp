@@ -12,9 +12,9 @@
 #include <cstdlib>
 
 // -----------------------------------------------------------------------------
-// This main wires the pipeline for the "frame 0 as template intensity" variant.
-// - Frame 0 is used ONLY to sample per‑vertex template intensity (fixed).
-// - Data terms start from frame 1 (>=1) and optimize only ED for those frames.
+// This main wires the pipeline for the Projective ICP (Depth) variant.
+// - Consumes CV_32F single-channel depth maps from DatasetManager::loadAllDepthImages().
+// - Frame 0 is template (no variables, no data term); optimization starts from frame 1.
 // - Poses are fixed from GT; no pose optimization.
 // -----------------------------------------------------------------------------
 
@@ -64,7 +64,7 @@ static void parse_cli(int argc, char** argv) {
 }
 
 int main(int argc, char** argv) {
-    std::cout << "==== GeoBA (Frame0 Template Intensities + Affine ED, Poses Fixed) ====\n";
+    std::cout << "==== GeoBA (Projective ICP on Depth + Affine ED, Poses Fixed) ====\n";
     parse_cli(argc, argv);
 
     // ---- dataset manager
@@ -98,13 +98,13 @@ int main(int argc, char** argv) {
               << ", K_bind=" << args.K_bind
               << ", neighborK=" << args.neighborK << std::endl;
 
-    // ---- images (RGB) & intrinsics
-    std::vector<cv::Mat> rgb_images;
-    if (!dataset_manager.loadAllRGBImages(rgb_images)) {
-        std::cerr << "[main] Failed to load RGB images" << std::endl;
+    // ---- depth images (CV_32F) & intrinsics
+    std::vector<cv::Mat> depth_images;
+    if (!dataset_manager.loadAllDepthImages(depth_images)) {
+        std::cerr << "[main] Failed to load depth images" << std::endl;
         return -1;
     }
-    std::cout << "[main] Loaded " << rgb_images.size() << " RGB frames" << std::endl;
+    std::cout << "[main] Loaded " << depth_images.size() << " depth frames" << std::endl;
 
     Eigen::Matrix3d K;
     if (!dataset_manager.loadCameraIntrinsics(K)) {
@@ -119,47 +119,47 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    if (rgb_images.size() != gt_camera_poses.size()) {
-        std::cerr << "[main] Mismatch: RGB frames (" << rgb_images.size()
+    if (depth_images.size() != gt_camera_poses.size()) {
+        std::cerr << "[main] Mismatch: depth frames (" << depth_images.size()
                   << ") vs GT poses (" << gt_camera_poses.size() << ")" << std::endl;
         return -1;
     }
 
     // ---- frame sampling
-    std::vector<cv::Mat> sampled_images;
+    std::vector<cv::Mat> sampled_depths;
     std::vector<Eigen::Matrix4d> sampled_gt_poses;
-    sampled_images.reserve((rgb_images.size() + args.sampling_interval - 1) / args.sampling_interval);
-    sampled_gt_poses.reserve(sampled_images.capacity());
+    sampled_depths.reserve((depth_images.size() + args.sampling_interval - 1) / args.sampling_interval);
+    sampled_gt_poses.reserve(sampled_depths.capacity());
 
-    for (size_t i = 0; i < rgb_images.size(); i += args.sampling_interval) {
-        sampled_images.push_back(rgb_images[i]);
+    for (size_t i = 0; i < depth_images.size(); i += args.sampling_interval) {
+        sampled_depths.push_back(depth_images[i]);
         sampled_gt_poses.push_back(gt_camera_poses[i]);
     }
 
-    if (args.max_frames > 0 && (int)sampled_images.size() > args.max_frames) {
-        sampled_images.resize(args.max_frames);
+    if (args.max_frames > 0 && (int)sampled_depths.size() > args.max_frames) {
+        sampled_depths.resize(args.max_frames);
         sampled_gt_poses.resize(args.max_frames);
     }
 
-    std::cout << "[main] Sampled " << sampled_images.size()
+    std::cout << "[main] Sampled " << sampled_depths.size()
               << " frames (interval=" << args.sampling_interval
               << (args.max_frames>0? ", limit="+std::to_string(args.max_frames):"")
               << ")" << std::endl;
 
-    if (sampled_images.size() < 2) {
+    if (sampled_depths.size() < 2) {
         std::cerr << "[main] Need at least 2 frames (frame 0 = template, frame 1 = optimized)." << std::endl;
         return -1;
     }
 
     // ---- optimizer (data + smooth + rotation + optional temporal)
-    const double w_data        = 1.0;   // photometric weight
-    const int    maxStages     = 6;     // outer stages (kept for compatibility)
-    const int    maxIterations = 20;     // inner GN iters per stage
+    const double w_data        = 1.0;   // weight of depth point-to-plane residual
+    const int    maxStages     = 6;     // kept for compatibility (outer stages not used internally)
+    const int    maxIterations = 20;    // GN iterations per stage
     const double lambda_smooth = 0.23;  // spatial smoothness between neighbor nodes
-    const double lambda_rot    = 0.52;  // rotation (A^T A - I)
+    const double lambda_rot    = 0.52;  // rotation (A close to I)
 
     Optimizer optimizer(w_data, maxStages, maxIterations, lambda_smooth, lambda_rot);
-    optimizer.setTemporalWeight(0.0);   // set >0 to enable temporal consistency between (f-1,f) when both have variables
+    optimizer.setTemporalWeight(0.0);   // set >0 to enable temporal consistency between (f-1,f)
 
     std::cout << "[main] Start optimization...\n";
 
@@ -167,8 +167,8 @@ int main(int argc, char** argv) {
         V,
         F,
         K,
-        sampled_images,
-        sampled_gt_poses,   // fixed GT poses (not optimized)
+        sampled_depths,      // << depth maps (CV_32F)
+        sampled_gt_poses,    // fixed GT poses (not optimized)
         edGraph
     );
 
