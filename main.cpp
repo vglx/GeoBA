@@ -12,10 +12,9 @@
 #include <cstdlib>
 
 // -----------------------------------------------------------------------------
-// This main wires the pipeline for the Projective ICP (Depth) variant.
-// - Consumes CV_32F single-channel depth maps from DatasetManager::loadAllDepthImages().
-// - Frame 0 is template (no variables, no data term); optimization starts from frame 1.
-// - Poses are fixed from GT; no pose optimization.
+// Updated main for the combined Photometric (RGB) + Projective-ICP (Depth)
+// optimizer API. Frame 0 is the template frame (no ED variables, no data term).
+// Poses are fixed (GT). Intensities are fixed to template sampling in optimizer.
 // -----------------------------------------------------------------------------
 
 struct Args {
@@ -30,20 +29,24 @@ struct Args {
     int    fps_target  = 1500;      // FPS only
     int    neighborK   = 3;         // graph smoothness neighborhood size
     int    K_bind      = 3;         // KNN bindings per vertex
+
+    // Optimizer weights
+    double w_photo = 1.0;           // photometric term
+    double w_icp   = 1.0;           // depth ICP term
+    double lambda_smooth = 1e-2;
+    double lambda_rot    = 1e-2;
+    double lambda_temp   = 0.0;     // start disabled
+    int    maxStages     = 1;       // kept for compatibility
+    int    maxIterations = 10;      // GN iterations
 } args;
 
 static void parse_cli(int argc, char** argv) {
-    // Usage examples:
-    //   ./GeoBA /path/to/dataset --mode voxel --voxel 0.02 --interval 3 --Kbind 3 --neighborK 6
-    //   ./GeoBA /path/to/dataset --mode fps   --fps 1200
-    //   ./GeoBA /path/to/dataset --mode stride --stride 20
-    //   ./GeoBA /path/to/dataset --limit 2   (use only 2 frames after sampling)
     if (argc > 1 && argv[1][0] != '-') {
         args.dataset_root = argv[1];
     }
     for (int i = 1; i < argc; ++i) {
         const char* a = argv[i];
-        auto next  = [&](double def)->double{ return (i+1<argc? std::atof(argv[++i]) : def); };
+        auto nextd = [&](double def)->double{ return (i+1<argc? std::atof(argv[++i]) : def); };
         auto nexti = [&](int def)->int{ return (i+1<argc? std::atoi(argv[++i]) : def); };
         if      (!std::strcmp(a, "--interval"))   args.sampling_interval = nexti(args.sampling_interval);
         else if (!std::strcmp(a, "--limit"))      args.max_frames        = nexti(args.max_frames);
@@ -55,16 +58,22 @@ static void parse_cli(int argc, char** argv) {
                 else if (!std::strcmp(m, "stride")) args.mode = EDGraph::SamplingMode::Stride;
             }
         }
-        else if (!std::strcmp(a, "--voxel"))     args.voxel_size = next(args.voxel_size);
-        else if (!std::strcmp(a, "--fps"))       args.fps_target = nexti(args.fps_target);
-        else if (!std::strcmp(a, "--stride"))    args.stride     = nexti(args.stride);
-        else if (!std::strcmp(a, "--neighborK")) args.neighborK  = nexti(args.neighborK);
-        else if (!std::strcmp(a, "--Kbind"))     args.K_bind     = nexti(args.K_bind);
+        else if (!std::strcmp(a, "--voxel"))       args.voxel_size   = nextd(args.voxel_size);
+        else if (!std::strcmp(a, "--fps"))         args.fps_target   = nexti(args.fps_target);
+        else if (!std::strcmp(a, "--stride"))      args.stride       = nexti(args.stride);
+        else if (!std::strcmp(a, "--neighborK"))   args.neighborK    = nexti(args.neighborK);
+        else if (!std::strcmp(a, "--Kbind"))       args.K_bind       = nexti(args.K_bind);
+        else if (!std::strcmp(a, "--wphoto"))      args.w_photo      = nextd(args.w_photo);
+        else if (!std::strcmp(a, "--wicp"))        args.w_icp        = nextd(args.w_icp);
+        else if (!std::strcmp(a, "--lsmooth"))     args.lambda_smooth= nextd(args.lambda_smooth);
+        else if (!std::strcmp(a, "--lrot"))        args.lambda_rot   = nextd(args.lambda_rot);
+        else if (!std::strcmp(a, "--ltemp"))       args.lambda_temp  = nextd(args.lambda_temp);
+        else if (!std::strcmp(a, "--iters"))       args.maxIterations= nexti(args.maxIterations);
     }
 }
 
 int main(int argc, char** argv) {
-    std::cout << "==== GeoBA (Projective ICP on Depth + Affine ED, Poses Fixed) ====\n";
+    std::cout << "==== GeoBA (Combined Photometric RGB + Projective ICP Depth, Poses Fixed) ====\n";
     parse_cli(argc, argv);
 
     // ---- dataset manager
@@ -98,6 +107,14 @@ int main(int argc, char** argv) {
               << ", K_bind=" << args.K_bind
               << ", neighborK=" << args.neighborK << std::endl;
 
+    // ---- RGB images (for photometric term)
+    std::vector<cv::Mat> rgb_images;
+    if (!dataset_manager.loadAllRGBImages(rgb_images)) {
+        std::cerr << "[main] Failed to load RGB images" << std::endl;
+        return -1;
+    }
+    std::cout << "[main] Loaded " << rgb_images.size() << " RGB frames" << std::endl;
+
     // ---- depth images (CV_32F) & intrinsics
     std::vector<cv::Mat> depth_images;
     if (!dataset_manager.loadAllDepthImages(depth_images)) {
@@ -105,6 +122,12 @@ int main(int argc, char** argv) {
         return -1;
     }
     std::cout << "[main] Loaded " << depth_images.size() << " depth frames" << std::endl;
+
+    if (rgb_images.size() != depth_images.size()) {
+        std::cerr << "[main] Mismatch: RGB frames (" << rgb_images.size()
+                  << ") vs Depth frames (" << depth_images.size() << ")" << std::endl;
+        return -1;
+    }
 
     Eigen::Matrix3d K;
     if (!dataset_manager.loadCameraIntrinsics(K)) {
@@ -119,64 +142,52 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    if (depth_images.size() != gt_camera_poses.size()) {
-        std::cerr << "[main] Mismatch: depth frames (" << depth_images.size()
+    if (rgb_images.size() != gt_camera_poses.size()) {
+        std::cerr << "[main] Mismatch: frames (" << rgb_images.size()
                   << ") vs GT poses (" << gt_camera_poses.size() << ")" << std::endl;
         return -1;
     }
 
-    // ---- frame sampling
-    std::vector<cv::Mat> sampled_depths;
+    // ---- frame sampling (apply the same indices to RGB/Depth/Poses)
+    std::vector<cv::Mat> sampled_rgbs, sampled_depths;
     std::vector<Eigen::Matrix4d> sampled_gt_poses;
-    sampled_depths.reserve((depth_images.size() + args.sampling_interval - 1) / args.sampling_interval);
-    sampled_gt_poses.reserve(sampled_depths.capacity());
-
-    for (size_t i = 0; i < depth_images.size(); i += args.sampling_interval) {
+    for (size_t i = 0; i < rgb_images.size(); i += args.sampling_interval) {
+        sampled_rgbs.push_back(rgb_images[i]);
         sampled_depths.push_back(depth_images[i]);
         sampled_gt_poses.push_back(gt_camera_poses[i]);
+        if (args.max_frames>0 && (int)sampled_rgbs.size() >= args.max_frames) break;
     }
 
-    if (args.max_frames > 0 && (int)sampled_depths.size() > args.max_frames) {
-        sampled_depths.resize(args.max_frames);
-        sampled_gt_poses.resize(args.max_frames);
-    }
-
-    std::cout << "[main] Sampled " << sampled_depths.size()
+    std::cout << "[main] Sampled " << sampled_rgbs.size()
               << " frames (interval=" << args.sampling_interval
               << (args.max_frames>0? ", limit="+std::to_string(args.max_frames):"")
               << ")" << std::endl;
 
-    if (sampled_depths.size() < 2) {
+    if (sampled_rgbs.size() < 2) {
         std::cerr << "[main] Need at least 2 frames (frame 0 = template, frame 1 = optimized)." << std::endl;
         return -1;
     }
 
     // ---- optimizer (data + smooth + rotation + optional temporal)
-    const double w_data        = 1.0;   // weight of depth point-to-plane residual
-    const int    maxStages     = 6;     // kept for compatibility (outer stages not used internally)
-    const int    maxIterations = 20;    // GN iterations per stage
-    const double lambda_smooth = 0.23;  // spatial smoothness between neighbor nodes
-    const double lambda_rot    = 0.52;  // rotation (A close to I)
-
-    Optimizer optimizer(w_data, maxStages, maxIterations, lambda_smooth, lambda_rot);
-    optimizer.setTemporalWeight(0.0);   // set >0 to enable temporal consistency between (f-1,f)
+    Optimizer optimizer(args.w_photo, args.w_icp,
+                        args.maxStages, args.maxIterations,
+                        args.lambda_smooth, args.lambda_rot, args.lambda_temp);
 
     std::cout << "[main] Start optimization...\n";
 
     optimizer.optimize(
-        mesh_model,          // 直接传整个 MeshModel，以便写回变形和重算法线
-        sampled_depths,      // 深度帧 (CV_32F, mm)
-        K,                  // 相机内参
-        sampled_gt_poses,    // 位姿 (frame0固定)
+        V, F,                 // mesh vertices & triangles
+        K,                    // intrinsics
+        sampled_rgbs,         // RGB frames
+        sampled_depths,       // depth frames (CV_32F, mm)
+        sampled_gt_poses,     // GT poses (frame0 fixed)
         edGraph
     );
-
 
     std::cout << "[main] Optimization complete." << std::endl;
 
     dataset_manager.saveDeformedMeshAsPLY(args.dataset_root + "deformed_mesh_f1.ply",
                                           mesh_model,
                                           edGraph /* already updated by optimizer */);
-
     return 0;
 }
