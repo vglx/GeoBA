@@ -1,6 +1,6 @@
 #include "CostFunctions.h"
 #include <algorithm>
-ac#include <cmath>
+#include <cmath>
 
 // ---------------- PhotometricError (existing) ----------------
 PhotometricError::PhotometricError(const MeshModel::Vertex& vertex,

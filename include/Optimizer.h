@@ -4,8 +4,8 @@
 #include <Eigen/Core>
 #include <opencv2/core.hpp>
 
-class MeshModel;   // fwd
-class EDGraph;     // fwd
+#include "MeshModel.h"
+#include "EDGraph.h"
 
 class Optimizer {
 public:

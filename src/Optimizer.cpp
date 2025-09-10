@@ -267,7 +267,10 @@ void Optimizer::optimize(
             int r = row_icp_begin + icp_row_ofs[f];
             for (int idx=0; idx<(int)visible_vertices[f].size(); ++idx) {
                 int i = visible_vertices[f][idx];
-                ProjectiveICPError icpCost(mesh_vertices[i], i, mesh_triangles, K, depth, bvh, sqrt_w_icp, &edGraph);
+                
+                Eigen::Vector3d n_w(mesh_vertices[i].nx, mesh_vertices[i].ny, mesh_vertices[i].nz);
+                ProjectiveICPError icpCost(mesh_vertices[i], i, depth, &edGraph, K, n_w, sqrt_w_icp);
+
                 double residual=0.0; Eigen::VectorXd J_ed(12*G); J_ed.setZero();
                 bool ok = icpCost.Evaluate(residual, &J_ed, R, t);
                 if (!ok) { ++r; continue; }
