@@ -1,6 +1,6 @@
 #include "CostFunctions.h"
 #include <algorithm>
-#include <cmath>
+ac#include <cmath>
 
 // ---------------- PhotometricError (existing) ----------------
 PhotometricError::PhotometricError(const MeshModel::Vertex& vertex,
@@ -163,7 +163,7 @@ bool ProjectiveICPError::Evaluate(double& residual,
     const double z_obs = (double)z_obs_f;
 
     // optional gate on depth disagreement along z
-    if (depth_gate_ > 0.0) {
+    if (depth_gate_ > 3) {
         if (std::abs(Z - z_obs) > depth_gate_) return false;
     }
 
@@ -179,7 +179,7 @@ bool ProjectiveICPError::Evaluate(double& residual,
     if (nrm < 1e-12) return false; 
     nc /= nrm;
     // Optional orientation stabilization (uncomment if needed):
-    // if (nc.z() < 0) nc = -nc;
+    if (nc.z() < 0) nc = -nc;
 
     // 7) residual
     const double r_raw = (pc - pobs).dot(nc);
@@ -193,37 +193,73 @@ bool ProjectiveICPError::Evaluate(double& residual,
     if (jacobian_ed) {
         jacobian_ed->setZero();
 
-        // dr/dpc = nc^T (1x3);  dpc/dpw = R^T  =>  dr/dpw = nc^T * R^T (1x3)
-        const Eigen::RowVector3d Jgeo = nc.transpose() * R_wc.transpose();
+        // —— 关键点：数值差分时固定匹配像素与鲁棒权重（IRLS 假设）
+        // 基准观测点与法线（保持不变）
+        const double uf0 = (fx_ * (pc.x()/Z) + cx_);
+        const double vf0 = (fy_ * (pc.y()/Z) + cy_);
+        const double z_obs_0 = z_obs;           // 采样到的观测深度
+        const Eigen::Vector3d pobs0 = pobs;     // 基准观测点
+        const Eigen::Vector3d nc0   = nc;       // 基准相机系法线
 
+        // 预计算：该顶点的绑定关系与每个绑定节点的“基准贡献”
         const auto& binds   = ed_->getBindings()[vidx_];
         const auto& weights = ed_->getWeights()[vidx_];
+        const auto& nodes   = ed_->getGraphNodes();
         const Eigen::Vector3d vraw(v_raw_.x, v_raw_.y, v_raw_.z);
 
+        // 基准 pw（和 deformVertex 一致）
+        Eigen::Vector3d pw0 = Eigen::Vector3d::Zero();
+        std::vector<Eigen::Vector3d> p_node0(binds.size());
         for (size_t k = 0; k < binds.size(); ++k) {
             const int nid = binds[k];
             const double w = weights[k];
-            const Eigen::Vector3d g = ed_->getGraphNodes()[nid].position;
-            const Eigen::Vector3d q = vraw - g; // (v-g)
+            const auto &node = nodes[nid];
+            const Eigen::Vector3d q = vraw - node.position; // (v - g)
+            const Eigen::Vector3d p_k = node.A * q + node.position + node.t;
+            p_node0[k] = p_k;
+            pw0 += w * p_k;
+        }
+        // 检查一致性（可省略）：pw0 与上面用 deformVertex 得到的 pw 一致
+        // assert((pw0 - pw).norm() < 1e-9);
 
-            // d p_w / d vec(A) = (q \otimes I_3)  -> 3x9;  d p_w / d t = I_3
-            double dA[9];
-            dA[0] = Jgeo(0) * q(0);
-            dA[1] = Jgeo(0) * q(1);
-            dA[2] = Jgeo(0) * q(2);
-            dA[3] = Jgeo(1) * q(0);
-            dA[4] = Jgeo(1) * q(1);
-            dA[5] = Jgeo(1) * q(2);
-            dA[6] = Jgeo(2) * q(0);
-            dA[7] = Jgeo(2) * q(1);
-            dA[8] = Jgeo(2) * q(2);
+        // 数值步长（可按尺度调）
+        const double epsA = 1e-5;  // 对 A 的分量
+        const double epsT = 1e-3;  // 对 t 的分量（单位=mm）
 
-            const int base = 12 * nid;
-            for (int c = 0; c < 9; ++c) (*jacobian_ed)(base + c) += sqrt_w_ * sqrt_wr * w * dA[c];
-            // translation t
-            (*jacobian_ed)(base + 9)  += sqrt_w_ * sqrt_wr * w * Jgeo(0);
-            (*jacobian_ed)(base + 10) += sqrt_w_ * sqrt_wr * w * Jgeo(1);
-            (*jacobian_ed)(base + 11) += sqrt_w_ * sqrt_wr * w * Jgeo(2);
+        // 对每个绑定节点的 12 个参数做前向差分
+        for (size_t kb = 0; kb < binds.size(); ++kb) {
+            const int nid = binds[kb];
+            const double w_bind = weights[kb];
+            const auto &node = nodes[nid];
+            const Eigen::Vector3d q = vraw - node.position;
+
+            // A 的 9 个分量（行主序：A(0,0)...A(2,2)）
+            for (int a = 0; a < 9; ++a) {
+                Eigen::Matrix3d A_pert = node.A;
+                A_pert(a/3, a%3) += epsA;
+
+                const Eigen::Vector3d p_k_pert = A_pert * q + node.position + node.t;
+                const Eigen::Vector3d dpw = w_bind * (p_k_pert - p_node0[kb]);
+                const Eigen::Vector3d pc_pert = R_wc.transpose() * ((pw0 + dpw) - t_wc);
+                const double r_raw_pert = (pc_pert - pobs0).dot(nc0);
+
+                const double dr = (r_raw_pert - r_raw) / epsA;
+                const int base = 12 * nid;
+                (*jacobian_ed)(base + a) += sqrt_w_ * sqrt_wr * dr;
+            }
+
+            // t 的 3 个分量
+            for (int j = 0; j < 3; ++j) {
+                Eigen::Vector3d t_pert = node.t; t_pert(j) += epsT;
+                const Eigen::Vector3d p_k_pert = node.A * q + node.position + t_pert;
+                const Eigen::Vector3d dpw = w_bind * (p_k_pert - p_node0[kb]);
+                const Eigen::Vector3d pc_pert = R_wc.transpose() * ((pw0 + dpw) - t_wc);
+                const double r_raw_pert = (pc_pert - pobs0).dot(nc0);
+
+                const double dr = (r_raw_pert - r_raw) / epsT;
+                const int base = 12 * nid;
+                (*jacobian_ed)(base + 9 + j) += sqrt_w_ * sqrt_wr * dr;
+            }
         }
     }
 
