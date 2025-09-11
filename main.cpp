@@ -33,11 +33,11 @@ struct Args {
     // Optimizer weights
     double w_photo = 1.0;           // photometric term
     double w_icp   = 1.0;           // depth ICP term
-    double lambda_smooth = 1e-2;
-    double lambda_rot    = 1e-2;
+    double lambda_smooth = 0.01;
+    double lambda_rot    = 0.01;
     double lambda_temp   = 0.0;     // start disabled
     int    maxStages     = 1;       // kept for compatibility
-    int    maxIterations = 10;      // GN iterations
+    int    maxIterations = 50;      // GN iterations
 } args;
 
 static void parse_cli(int argc, char** argv) {

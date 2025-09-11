@@ -100,7 +100,7 @@ void Optimizer::optimize(
     for (int f=0; f<F; ++f) { bvhs.emplace_back(mesh_triangles, Vdef_init[f]); }
 
     // =========================
-    // (2) Template intensities from frame 0 ONLY (fixed, no intensity variables)
+    // (2) Template intensities from frame 0 ONLY
     // =========================
     std::vector<double> I_tmpl(N, std::numeric_limits<double>::quiet_NaN());
     {
@@ -108,7 +108,6 @@ void Optimizer::optimize(
         const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
         const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
         const cv::Mat& img = imgs_gray[f];
-        // Boundary-only visibility for sampling
         #pragma omp parallel for
         for (int i=0; i<N; ++i) {
             Eigen::Vector3d pw = edGraph.deformVertex(mesh_vertices[i], i);
@@ -125,15 +124,24 @@ void Optimizer::optimize(
     }
 
     // =========================
+    // (2.5) Build global intensity mapping (storage index) & initial values
+    //        NOTE: we will COMPACT intensity columns PER-ITERATION later.
+    // =========================
+    std::vector<int> colI(N, -1); int Icount_global=0;
+    for (int i=0;i<N;++i) if (std::isfinite(I_tmpl[i])) colI[i] = Icount_global++;
+    std::vector<double> I_var(Icount_global, 0.0);
+    for (int i=0;i<N;++i) if (colI[i] >= 0) I_var[colI[i]] = I_tmpl[i];
+
+    // =========================
     // GN loop with DYNAMIC visibility/active set/row & col layout
     // =========================
     double prev_cost = std::numeric_limits<double>::max();
 
     for (int it=0; it<maxIterations_; ++it) {
-        // 0) make current X visible to edGraph for deformation
+        // 0) write current X to graph
         for (int f=0; f<F; ++f) edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
 
-        // 1) Recompute visibility (boundary-only; no occlusion)
+        // 1) Recompute visibility (boundary-only)
         std::vector<std::vector<int>> visible_vertices(F);
         for (int f = 0; f < F; ++f) {
             const cv::Mat& img = imgs_gray[f];
@@ -159,16 +167,15 @@ void Optimizer::optimize(
             visible_vertices[f].swap(vis);
         }
 
-        // 2) Active nodes/edges & compact index for f>=1 (NO dependency on I_tmpl)
+        // 2) Active nodes/edges (f>=1) & compact index
         std::vector<std::vector<char>> active_node(F, std::vector<char>(G,0));
         std::vector<std::vector<std::pair<int,int>>> active_edges(F);
         std::vector<std::vector<int>> compact_idx(F, std::vector<int>(G,-1));
         std::vector<int> Sf(F,0);
 
         for (int f=1; f<F; ++f) {
-            for (int vid : visible_vertices[f]) {
+            for (int vid : visible_vertices[f])
                 for (int nid : bindings[vid]) active_node[f][nid] = 1;
-            }
             int acc=0; for (int j=0;j<G;++j) if (active_node[f][j]) compact_idx[f][j] = acc++;
             Sf[f]=acc;
             std::vector<std::pair<int,int>> Ef; Ef.reserve(edges.size());
@@ -180,14 +187,26 @@ void Optimizer::optimize(
         auto colA_c  = [&](int f,int node,int k){ int ci=compact_idx[f][node]; if (ci<0) return -1; return offsEDc(f)+12*ci+k; };
         auto colt_c  = [&](int f,int node,int k){ int ci=compact_idx[f][node]; if (ci<0) return -1; return offsEDc(f)+12*ci+9+k; };
 
-        // 3) Row layout (with weight gating)
+        // 2.5) *** Intensity columns: per-iteration COMPACT mapping ***
+        std::vector<char> I_active(N, 0);
+        for (int f=0; f<F; ++f) {
+            for (int vid : visible_vertices[f]) {
+                if (colI[vid] >= 0) I_active[vid] = 1; // visible & has global I storage
+            }
+        }
+        std::vector<int> colI_it(N, -1); int Icount_it = 0;
+        for (int i=0; i<N; ++i) if (I_active[i]) colI_it[i] = Icount_it++;
+
+        // 3) Row/col layout (with weight gating). PHOTO uses f=0..F-1 now.
         const bool use_photo = (w_photo_ > 1e-12);
         const bool use_icp   = (w_icp_   > 1e-12);
 
         std::vector<int> photo_row_ofs(F,0), icp_row_ofs(F,0);
         int photo_rows=0, icp_rows=0;
-        for (int f=1; f<F; ++f) {
+        for (int f=0; f<F; ++f) { // include f=0
             photo_row_ofs[f] = photo_rows; if (use_photo) photo_rows += (int)visible_vertices[f].size();
+        }
+        for (int f=1; f<F; ++f) {
             icp_row_ofs[f]   = icp_rows;   if (use_icp)   icp_rows   += (int)visible_vertices[f].size();
         }
 
@@ -203,7 +222,7 @@ void Optimizer::optimize(
         const int total_rows         = row_temporal_begin + temporal_rows;
 
         int edDimCompact=0; for (int f=0; f<F; ++f) edDimCompact += 12 * Sf[f];
-        const int stateDimCompact = edDimCompact; // no intensity variables
+        const int stateDimCompact = edDimCompact + Icount_it; // *** per-iteration I columns ***
 
         std::cout << "[Layout it="<<it<<"] rows photo="<<photo_rows
                   << ", icp="<<icp_rows
@@ -211,7 +230,9 @@ void Optimizer::optimize(
                   << ", rot="<<rot_rows
                   << ", temporal="<<temporal_rows
                   << ", total="<<total_rows << std::endl;
-        std::cout << "[Layout it="<<it<<"] cols edCompact="<< stateDimCompact << std::endl;
+        std::cout << "[Layout it="<<it<<"] cols edCompact="<< edDimCompact
+                  << ", intens="<< Icount_it
+                  << ", total="<< stateDimCompact << std::endl;
 
         // 4) Assemble J & F
         std::vector<double> Fvec(total_rows, 0.0);
@@ -224,10 +245,10 @@ void Optimizer::optimize(
         int num_threads = omp_get_max_threads();
         std::vector<std::vector<Eigen::Triplet<double>>> triplets_thr(num_threads);
 
-        // PHOTO
+        // PHOTO (f=0..F-1)
         if (use_photo) {
             #pragma omp parallel for schedule(static)
-            for (int f=1; f<F; ++f) {
+            for (int f=0; f<F; ++f) {
                 int tid = omp_get_thread_num(); auto& T = triplets_thr[tid];
                 edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
                 const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
@@ -237,23 +258,34 @@ void Optimizer::optimize(
                 int r = row_photo_begin + photo_row_ofs[f];
                 for (int idx=0; idx<(int)visible_vertices[f].size(); ++idx) {
                     int i = visible_vertices[f][idx];
-                    if (!std::isfinite(I_tmpl[i])) { ++r; continue; }
+                    int ci_global = colI[i];
+                    int ci_it     = colI_it[i];
+                    if (ci_global < 0 || ci_it < 0) { ++r; continue; }
+                    const double Icurr = I_var[ci_global];
                     PhotometricError cost(mesh_vertices[i], i, mesh_triangles, K, img, bvh, sqrt_w_photo, &edGraph);
                     double residual=0.0; Eigen::VectorXd J_ed(12*G); J_ed.setZero();
-                    cost.Evaluate(I_tmpl[i], residual, /*J_I*/nullptr, &J_ed, R, t);
+                    // f==0: no ED columns (nullptr); f>=1: write ED jacobians
+                    cost.Evaluate(Icurr, residual, /*J_I*/nullptr, (f==0? nullptr : &J_ed), R, t);
                     Fvec[r] = residual;
-                    const auto& b = bindings[i];
-                    for (int nid : b) {
-                        const int base = 12*nid;
-                        for (int c=0;c<9;++c)  { double v=J_ed[base+c];    if (v==0.0) continue; int col=colA_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
-                        for (int c=0;c<3;++c)  { double v=J_ed[base+9+c];  if (v==0.0) continue; int col=colt_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
+
+                    // I column derivative: ∂r/∂I = +sqrt_w_photo  (per-iteration compact column)
+                    const int colIglob = edDimCompact + ci_it;
+                    T.emplace_back(r, colIglob, sqrt_w_photo);
+
+                    if (f>=1) {
+                        const auto& bnd = bindings[i];
+                        for (int nid : bnd) {
+                            const int base = 12*nid;
+                            for (int c=0;c<9;++c)  { double v=J_ed[base+c];    if (!v) continue; int col=colA_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
+                            for (int c=0;c<3;++c)  { double v=J_ed[base+9+c];  if (!v) continue; int col=colt_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
+                        }
                     }
                     ++r;
                 }
             }
         }
 
-        // ICP
+        // ICP (f>=1)
         if (use_icp) {
             #pragma omp parallel for schedule(static)
             for (int f=1; f<F; ++f) {
@@ -262,7 +294,6 @@ void Optimizer::optimize(
                 const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
                 const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
                 const cv::Mat& depth = observed_depth[f];
-                const BVH& bvh = bvhs[f]; (void)bvh; // not used
                 int r = row_icp_begin + icp_row_ofs[f];
                 for (int idx=0; idx<(int)visible_vertices[f].size(); ++idx) {
                     int i = visible_vertices[f][idx];
@@ -272,11 +303,11 @@ void Optimizer::optimize(
                     bool ok = icpCost.Evaluate(residual, &J_ed, R, t);
                     if (!ok) { ++r; continue; }
                     Fvec[r] = residual;
-                    const auto& b = bindings[i];
-                    for (int nid : b) {
+                    const auto& bnd = bindings[i];
+                    for (int nid : bnd) {
                         const int base = 12*nid;
-                        for (int c=0;c<9;++c)  { double v=J_ed[base+c];    if (v==0.0) continue; int col=colA_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
-                        for (int c=0;c<3;++c)  { double v=J_ed[base+9+c];  if (v==0.0) continue; int col=colt_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
+                        for (int c=0;c<9;++c)  { double v=J_ed[base+c];    if (!v) continue; int col=colA_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
+                        for (int c=0;c<3;++c)  { double v=J_ed[base+9+c];  if (!v) continue; int col=colt_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
                     }
                     ++r;
                 }
@@ -345,7 +376,7 @@ void Optimizer::optimize(
         if (H.rows()>0) {
             Eigen::VectorXd d = H.diagonal();
             double scale = (d.size()>0)? d.cwiseAbs().mean() : 1.0;
-            double lm = std::max(1e-12, 1e-3 * std::max(1.0, scale)); // stronger damping for stability
+            double lm = std::max(1e-12, 1e-3 * std::max(1.0, scale));
             H.diagonal().array() += lm;
         }
 
@@ -353,7 +384,7 @@ void Optimizer::optimize(
         if (solver.info()!=Eigen::Success){ std::cerr << "[Optimizer] LDLT factorization failed.\n"; break; }
         Eigen::VectorXd dx = solver.solve(b); if (solver.info()!=Eigen::Success){ std::cerr << "[Optimizer] Linear solve failed.\n"; break; }
 
-        // Apply update: only f>=1 and only active nodes
+        // Apply update: ED (f>=1)
         for (int f=1; f<F; ++f) {
             const int ofs = offsEDc(f);
             for (int j=0;j<G;++j) if (active_node[f][j]) {
@@ -362,6 +393,15 @@ void Optimizer::optimize(
                 for (int c=0;c<9;++c)  Xfull[f][12*j + c]     += dx[base + c];
                 for (int c=0;c<3;++c)  Xfull[f][12*j + 9 + c] += dx[base + 9 + c];
             }
+        }
+        // Apply update: intensity variables (per-iteration columns)
+        for (int i=0;i<N;++i) {
+            int ci_it = colI_it[i];
+            int ci_global = colI[i];
+            if (ci_it < 0 || ci_global < 0) continue;
+            I_var[ci_global] += dx[edDimCompact + ci_it];
+            // Optional: clamp to [0,1]
+            // I_var[ci_global] = std::min(1.0, std::max(0.0, I_var[ci_global]));
         }
 
         std::cout << "[GN it="<<it<<"] cost="<<cost<<", |dx|="<<dx.norm() << std::endl;
