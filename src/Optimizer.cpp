@@ -44,7 +44,7 @@ void Optimizer::optimize(
     const std::vector<cv::Mat>& observed_depth,
     const std::vector<Eigen::Matrix4d>& camera_poses_gt,
     EDGraph& edGraph,
-    SaveCallback on_save = nullptr) {
+    SaveCallback on_save) {
 
     const int F  = (int)observed_rgb.size();
     const int Fd = (int)observed_depth.size();
