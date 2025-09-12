@@ -263,14 +263,18 @@ void Optimizer::optimize(
                     if (ci_global < 0 || ci_it < 0) { ++r; continue; }
                     const double Icurr = I_var[ci_global];
                     PhotometricError cost(mesh_vertices[i], i, mesh_triangles, K, img, bvh, sqrt_w_photo, &edGraph);
-                    double residual=0.0; Eigen::VectorXd J_ed(12*G); J_ed.setZero();
-                    // f==0: no ED columns (nullptr); f>=1: write ED jacobians
-                    cost.Evaluate(Icurr, residual, /*J_I*/nullptr, (f==0? nullptr : &J_ed), R, t);
+
+                    double residual = 0.0;
+                    Eigen::VectorXd J_ed(12*G); J_ed.setZero();
+                    double J_I = 0.0; // use Evaluate’s correct d r / d I (includes -sqrt_w * sqrt_wr)
+
+                    // f==0: 不写 ED 列；f>=1: 写 ED 雅可比
+                    cost.Evaluate(Icurr, residual, &J_I, (f==0? nullptr : &J_ed), R, t);
                     Fvec[r] = residual;
 
-                    // I column derivative: ∂r/∂I = +sqrt_w_photo  (per-iteration compact column)
+                    // I 列雅可比：直接用 Evaluate 返回的 J_I（已含鲁棒权与正确符号）
                     const int colIglob = edDimCompact + ci_it;
-                    T.emplace_back(r, colIglob, sqrt_w_photo);
+                    T.emplace_back(r, colIglob, J_I);
 
                     if (f>=1) {
                         const auto& bnd = bindings[i];
@@ -404,7 +408,8 @@ void Optimizer::optimize(
             // I_var[ci_global] = std::min(1.0, std::max(0.0, I_var[ci_global]));
         }
 
-        std::cout << "[GN it="<<it<<"] cost="<<cost<<", |dx|="<<dx.norm() << std::endl;
+        const double mean_cost = (total_rows>0)? (2.0*cost / (double)total_rows) : cost;
+        std::cout << "[GN it="<<it<<"] cost="<<cost<<" (mean "<<mean_cost<<"), |dx|="<<dx.norm() << std::endl;
         if (std::abs(cost - prev_cost) < 1e-6) break; prev_cost = cost;
     }
 
