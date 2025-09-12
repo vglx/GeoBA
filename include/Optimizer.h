@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <functional>
 #include <Eigen/Core>
 #include <opencv2/core.hpp>
 
@@ -25,6 +26,8 @@ public:
               double lambda_rot,
               double lambda_temporal = 0.0);
 
+    using SaveCallback = std::function<void(int /*frameIdx*/, const EDGraph&)>;
+
     // Combined optimizer: build one system that includes BOTH photometric and ICP terms.
     // - mesh_vertices / mesh_triangles: static template mesh in model space
     // - K: 3x3 intrinsics
@@ -39,7 +42,8 @@ public:
         const std::vector<cv::Mat>& observed_rgb,
         const std::vector<cv::Mat>& observed_depth,
         const std::vector<Eigen::Matrix4d>& camera_poses_gt,
-        EDGraph& edGraph);
+        EDGraph& edGraph,
+        SaveCallback on_save = nullptr);
 
     // Optional setters/getters
     void setPhotoWeight(double w)       { w_photo_ = w; }

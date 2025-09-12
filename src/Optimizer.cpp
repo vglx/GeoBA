@@ -43,7 +43,8 @@ void Optimizer::optimize(
     const std::vector<cv::Mat>& observed_rgb,
     const std::vector<cv::Mat>& observed_depth,
     const std::vector<Eigen::Matrix4d>& camera_poses_gt,
-    EDGraph& edGraph) {
+    EDGraph& edGraph,
+    SaveCallback on_save = nullptr) {
 
     const int F  = (int)observed_rgb.size();
     const int Fd = (int)observed_depth.size();
@@ -413,6 +414,12 @@ void Optimizer::optimize(
         if (std::abs(cost - prev_cost) < 1e-6) break; prev_cost = cost;
     }
 
-    // Export one frame state back to edGraph (for downstream use)
-    if (F>1) edGraph.updateFromStateVector(Xfull[1], /*offset=*/0);
+    if (on_save) {
+        for (int f = 1; f < F; ++f) {
+            edGraph.updateFromStateVector(Xfull[f], 0);
+            on_save(f, edGraph);
+        }
+    } else {
+        if (F > 1) edGraph.updateFromStateVector(Xfull[1], 0);
+    }
 }

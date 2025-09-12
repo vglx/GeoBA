@@ -181,13 +181,16 @@ int main(int argc, char** argv) {
         sampled_rgbs,         // RGB frames
         sampled_depths,       // depth frames (CV_32F, mm)
         sampled_gt_poses,     // GT poses (frame0 fixed)
-        edGraph
+        edGraph,
+        [&](int f, const EDGraph& g){
+            dataset_manager.saveDeformedMeshAsPLY(
+                args.dataset_root + "results/PLYs/deformed_mesh_f" + std::to_string(f) + ".ply",
+                mesh_model, g);
+        }
     );
 
     std::cout << "[main] Optimization complete." << std::endl;
 
-    dataset_manager.saveDeformedMeshAsPLY(args.dataset_root + "deformed_mesh_f1.ply",
-                                          mesh_model,
-                                          edGraph /* already updated by optimizer */);
     return 0;
 }
+
