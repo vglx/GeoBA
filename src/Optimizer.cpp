@@ -12,6 +12,7 @@
 #include <omp.h>
 
 namespace {
+
 inline float bilinearSample(const cv::Mat& img, float u, float v){
     int x = (int)std::floor(u), y = (int)std::floor(v);
     int x1 = x + 1, y1 = y + 1;
@@ -23,7 +24,33 @@ inline float bilinearSample(const cv::Mat& img, float u, float v){
     float I11 = img.at<float>(y1, x1);
     return (1-a)*(1-b)*I00 + a*(1-b)*I10 + (1-a)*b*I01 + a*b*I11;
 }
+
+// Area-weighted vertex normals from a *deformed* vertex set and face list.
+inline void computeVertexNormals(
+    const std::vector<Eigen::Vector3d>& Vdef,
+    const std::vector<MeshModel::Triangle>& F,
+    std::vector<Eigen::Vector3d>& Nout)
+{
+    const int N = (int)Vdef.size();
+    Nout.assign(N, Eigen::Vector3d::Zero());
+
+    for (const auto& tri : F) {
+        const int i0 = tri.v0, i1 = tri.v1, i2 = tri.v2;
+        const Eigen::Vector3d& p0 = Vdef[i0];
+        const Eigen::Vector3d& p1 = Vdef[i1];
+        const Eigen::Vector3d& p2 = Vdef[i2];
+        Eigen::Vector3d n = (p1 - p0).cross(p2 - p0); // 2*area * face normal
+        if (n.squaredNorm() < 1e-20) continue;
+        Nout[i0] += n; Nout[i1] += n; Nout[i2] += n;
+    }
+
+    for (int i = 0; i < N; ++i) {
+        double nrm = Nout[i].norm();
+        if (nrm > 1e-20) Nout[i] /= nrm; else Nout[i].setZero();
+    }
 }
+
+} // namespace
 
 Optimizer::Optimizer(double w_photo,
                      double w_icp,
@@ -142,25 +169,46 @@ void Optimizer::optimize(
         // 0) write current X to graph
         for (int f=0; f<F; ++f) edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
 
-        // 1) Recompute visibility (boundary-only)
+        // 0.5) Build per-frame deformed vertices and *per-iteration* vertex normals
+        std::vector<std::vector<Eigen::Vector3d>> Vdef(F, std::vector<Eigen::Vector3d>(N));
+        std::vector<std::vector<Eigen::Vector3d>> normals_w(F, std::vector<Eigen::Vector3d>(N));
+        #pragma omp parallel for schedule(static)
+        for (int f = 0; f < F; ++f) {
+            for (int i = 0; i < N; ++i) {
+                Vdef[f][i] = edGraph.deformVertex(mesh_vertices[i], i);
+            }
+            // compute normals serially per frame (robust & simple)
+            computeVertexNormals(Vdef[f], mesh_triangles, normals_w[f]);
+        }
+
+        // 1) Recompute visibility (FOV + depth-consistent gate)
+        const float vis_depth_gate = 5.0f; // mm; tune alongside ICP gate
         std::vector<std::vector<int>> visible_vertices(F);
         for (int f = 0; f < F; ++f) {
-            const cv::Mat& img = imgs_gray[f];
+            const cv::Mat& img   = imgs_gray[f];
+            const cv::Mat& depth = observed_depth[f];
             const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
             const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
             std::vector<int> vis; vis.reserve(N/2);
+
             #pragma omp parallel
             {
                 std::vector<int> local; local.reserve(256);
                 #pragma omp for nowait
                 for (int i = 0; i < N; ++i) {
-                    Eigen::Vector3d pw = edGraph.deformVertex(mesh_vertices[i], i);
+                    const Eigen::Vector3d& pw = Vdef[f][i];
                     Eigen::Vector3d pc = R.transpose() * (pw - t);
                     if (pc.z() <= 1e-8) continue;
                     float u = static_cast<float>(K(0,0) * (pc.x() / pc.z()) + K(0,2));
                     float v = static_cast<float>(K(1,1) * (pc.y() / pc.z()) + K(1,2));
-                    if (u >= 0 && u < img.cols && v >= 0 && v < img.rows)
-                        local.push_back(i);
+                    if (u < 1 || v < 1 || u > img.cols - 2 || v > img.rows - 2) continue;
+
+                    // Depth-consistent gating
+                    float z_obs = bilinearSample(depth, u, v);
+                    if (!(z_obs > 0.f) || !std::isfinite(z_obs)) continue;
+                    if (std::fabs((float)pc.z() - z_obs) > vis_depth_gate) continue;
+
+                    local.push_back(i);
                 }
                 #pragma omp critical
                 vis.insert(vis.end(), local.begin(), local.end());
@@ -188,26 +236,24 @@ void Optimizer::optimize(
         auto colA_c  = [&](int f,int node,int k){ int ci=compact_idx[f][node]; if (ci<0) return -1; return offsEDc(f)+12*ci+k; };
         auto colt_c  = [&](int f,int node,int k){ int ci=compact_idx[f][node]; if (ci<0) return -1; return offsEDc(f)+12*ci+9+k; };
 
-        // 2.5) *** Intensity columns: per-iteration COMPACT mapping ***
+        // 2.5) Intensity columns: per-iteration COMPACT mapping
         std::vector<char> I_active(N, 0);
         for (int f=0; f<F; ++f) {
-            for (int vid : visible_vertices[f]) {
-                if (colI[vid] >= 0) I_active[vid] = 1; // visible & has global I storage
-            }
+            for (int vid : visible_vertices[f]) if (colI[vid] >= 0) I_active[vid] = 1;
         }
         std::vector<int> colI_it(N, -1); int Icount_it = 0;
         for (int i=0; i<N; ++i) if (I_active[i]) colI_it[i] = Icount_it++;
 
-        // 3) Row/col layout (with weight gating). PHOTO uses f=0..F-1 now.
+        // 3) Row/col layout
         const bool use_photo = (w_photo_ > 1e-12);
         const bool use_icp   = (w_icp_   > 1e-12);
 
         std::vector<int> photo_row_ofs(F,0), icp_row_ofs(F,0);
         int photo_rows=0, icp_rows=0;
-        for (int f=0; f<F; ++f) { // include f=0
+        for (int f=0; f<F; ++f) { // include f=0 for photo
             photo_row_ofs[f] = photo_rows; if (use_photo) photo_rows += (int)visible_vertices[f].size();
         }
-        for (int f=1; f<F; ++f) {
+        for (int f=1; f<F; ++f) { // ICP from f=1
             icp_row_ofs[f]   = icp_rows;   if (use_icp)   icp_rows   += (int)visible_vertices[f].size();
         }
 
@@ -223,7 +269,7 @@ void Optimizer::optimize(
         const int total_rows         = row_temporal_begin + temporal_rows;
 
         int edDimCompact=0; for (int f=0; f<F; ++f) edDimCompact += 12 * Sf[f];
-        const int stateDimCompact = edDimCompact + Icount_it; // *** per-iteration I columns ***
+        const int stateDimCompact = edDimCompact + Icount_it; // per-iteration I columns
 
         std::cout << "[Layout it="<<it<<"] rows photo="<<photo_rows
                   << ", icp="<<icp_rows
@@ -267,13 +313,12 @@ void Optimizer::optimize(
 
                     double residual = 0.0;
                     Eigen::VectorXd J_ed(12*G); J_ed.setZero();
-                    double J_I = 0.0; // use Evaluate’s correct d r / d I (includes -sqrt_w * sqrt_wr)
+                    double J_I = 0.0;
 
-                    // f==0: 不写 ED 列；f>=1: 写 ED 雅可比
                     cost.Evaluate(Icurr, residual, &J_I, (f==0? nullptr : &J_ed), R, t);
                     Fvec[r] = residual;
 
-                    // I 列雅可比：直接用 Evaluate 返回的 J_I（已含鲁棒权与正确符号）
+                    // intensity column (per-iteration compact)
                     const int colIglob = edDimCompact + ci_it;
                     T.emplace_back(r, colIglob, J_I);
 
@@ -290,7 +335,7 @@ void Optimizer::optimize(
             }
         }
 
-        // ICP (f>=1)
+        // ICP (f>=1) — **use per-iteration normals**
         if (use_icp) {
             #pragma omp parallel for schedule(static)
             for (int f=1; f<F; ++f) {
@@ -302,7 +347,7 @@ void Optimizer::optimize(
                 int r = row_icp_begin + icp_row_ofs[f];
                 for (int idx=0; idx<(int)visible_vertices[f].size(); ++idx) {
                     int i = visible_vertices[f][idx];
-                    Eigen::Vector3d n_w(mesh_vertices[i].nx, mesh_vertices[i].ny, mesh_vertices[i].nz);
+                    const Eigen::Vector3d n_w = normals_w[f][i];
                     ProjectiveICPError icpCost(mesh_vertices[i], i, depth, &edGraph, K, n_w, sqrt_w_icp);
                     double residual=0.0; Eigen::VectorXd J_ed(12*G); J_ed.setZero();
                     bool ok = icpCost.Evaluate(residual, &J_ed, R, t);
@@ -329,24 +374,24 @@ void Optimizer::optimize(
             }
         }
 
-        // Rotation regularization (rigorous A^T A - I)
+        // Rotation regularization: A^T A - I = 0
         int row_rot = row_rot_begin;
         for (int f=1; f<F; ++f) {
             for (int j=0; j<G; ++j) if (active_node[f][j]) {
                 double A_[3][3];
-                for (int r=0; r<3; ++r)
-                    for (int c=0; c<3; ++c)
-                        A_[r][c] = Xfull[f][12*j + (r*3 + c)];
+                for (int rr=0; rr<3; ++rr)
+                    for (int cc=0; cc<3; ++cc)
+                        A_[rr][cc] = Xfull[f][12*j + (rr*3 + cc)];
                 for (int p=0; p<3; ++p) {
                     for (int q=0; q<3; ++q) {
                         double AtA_pq = 0.0; for (int k=0; k<3; ++k) AtA_pq += A_[k][p] * A_[k][q];
                         const double target = (p==q)? 1.0 : 0.0;
                         Fvec[row_rot] = sqrt_lr * (AtA_pq - target);
-                        for (int r=0; r<3; ++r) {
-                            int col_p = colA_c(f, j, r*3 + p);
-                            if (col_p >= 0) triplets_thr[0].emplace_back(row_rot, col_p, sqrt_lr * A_[r][q]);
-                            int col_q = colA_c(f, j, r*3 + q);
-                            if (col_q >= 0) triplets_thr[0].emplace_back(row_rot, col_q, sqrt_lr * A_[r][p]);
+                        for (int rr=0; rr<3; ++rr) {
+                            int col_p = colA_c(f, j, rr*3 + p);
+                            if (col_p >= 0) triplets_thr[0].emplace_back(row_rot, col_p, sqrt_lr * A_[rr][q]);
+                            int col_q = colA_c(f, j, rr*3 + q);
+                            if (col_q >= 0) triplets_thr[0].emplace_back(row_rot, col_q, sqrt_lr * A_[rr][p]);
                         }
                         ++row_rot;
                     }
@@ -354,7 +399,7 @@ void Optimizer::optimize(
             }
         }
 
-        // Temporal regularization
+        // Temporal
         int row_tmp = row_temporal_begin;
         for (int f=2; f<F; ++f) {
             for (int j=0;j<G;++j) if (active_node[f-1][j] && active_node[f][j]) {
@@ -405,8 +450,7 @@ void Optimizer::optimize(
             int ci_global = colI[i];
             if (ci_it < 0 || ci_global < 0) continue;
             I_var[ci_global] += dx[edDimCompact + ci_it];
-            // Optional: clamp to [0,1]
-            // I_var[ci_global] = std::min(1.0, std::max(0.0, I_var[ci_global]));
+            // Optional clamp: I_var[ci_global] = std::min(1.0, std::max(0.0, I_var[ci_global]));
         }
 
         const double mean_cost = (total_rows>0)? (2.0*cost / (double)total_rows) : cost;
