@@ -18,7 +18,7 @@
 // -----------------------------------------------------------------------------
 
 struct Args {
-    std::string dataset_root = "../data/halfDef/5/";
+    std::string dataset_root = "../data/halfDef/6/";
     int sampling_interval = 1;      // sample every k frames
     int max_frames = 0;             // 0 = use all after sampling; >0 = cap after sampling
 
@@ -31,13 +31,13 @@ struct Args {
     int    K_bind      = 3;         // KNN bindings per vertex
 
     // Optimizer weights
-    double w_photo = 1.0;           // photometric term
+    double w_photo = 0.3;           // photometric term
     double w_icp   = 1.0;           // depth ICP term
     double lambda_smooth = 0.01;
     double lambda_rot    = 0.01;
     double lambda_temp   = 0.0;     // start disabled
     int    maxStages     = 1;       // kept for compatibility
-    int    maxIterations = 50;      // GN iterations
+    int    maxIterations = 1;      // GN iterations
 } args;
 
 static void parse_cli(int argc, char** argv) {
@@ -193,4 +193,3 @@ int main(int argc, char** argv) {
 
     return 0;
 }
-
