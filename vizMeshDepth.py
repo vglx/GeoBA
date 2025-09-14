@@ -12,11 +12,12 @@ import imageio.v2 as imageio
 import open3d as o3d
 
 # ==== 用户配置区 ====
-png_path   = "./data/halfDef/5/results/2.png"
-pose_txt   = "./data/halfDef/5/results/poses_gt.txt"  # 3x4 或 4x4，支持逗号或空格分隔
+dataset     = "6"
+png_path   = f"./data/halfDef/{dataset}/results/1.png"
+pose_txt   = f"./data/halfDef/{dataset}/results/poses_gt.txt"  # 3x4 或 4x4，支持逗号或空格分隔
 pose_format = "tcw"   # "twc" or "tcw"
-# mesh_path  = "./data/halfDef/5/deformed_mesh_f1.ply"
-mesh_path  = "./data/halfDef/5/mesh.obj"
+mesh_path  = f"./data/halfDef/{dataset}/results/PLYs/deformed_mesh_f1.ply"
+# mesh_path  = f"./data/halfDef/{dataset}/mesh.obj"
 mesh_unit  = "mm"     # 网格单位: "m" 或 "mm"
 
 fx, fy = 155.0030, 155.0030
