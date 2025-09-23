@@ -128,28 +128,62 @@ void Optimizer::optimize(
     for (int f=0; f<F; ++f) { bvhs.emplace_back(mesh_triangles, Vdef_init[f]); }
 
     // =========================
-    // (2) Template intensities from frame 0 ONLY
+    // (2) Intensity init from ALL VISIBLE FRAMES (mean per vertex)
+    //     Replaces the old "frame 0 ONLY" template sampling.
     // =========================
     std::vector<double> I_tmpl(N, std::numeric_limits<double>::quiet_NaN());
-    {
-        const int f=0;
+    std::vector<int>    I_cnt (N, 0);
+    const float init_depth_gate = 5.0f; // mm; consistent with vis_depth_gate below
+
+    for (int f = 0; f < F; ++f) {
         const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
         const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
-        const cv::Mat& img = imgs_gray[f];
-        #pragma omp parallel for
-        for (int i=0; i<N; ++i) {
-            Eigen::Vector3d pw = edGraph.deformVertex(mesh_vertices[i], i);
-            Eigen::Vector3d pc = R.transpose() * (pw - t);
-            if (pc.z() <= 1e-8) continue;
-            float u = (float)(K(0,0)*(pc.x()/pc.z()) + K(0,2));
-            float v = (float)(K(1,1)*(pc.y()/pc.z()) + K(1,2));
-            if (u >= 0 && u < img.cols && v >= 0 && v < img.rows) {
-                I_tmpl[i] = (double)bilinearSample(img, u, v);
+        const cv::Mat& img   = imgs_gray[f];
+        const cv::Mat& depth = observed_depth[f];
+
+        #pragma omp parallel
+        {
+            std::vector<double> local_sum(N, 0.0);
+            std::vector<int>    local_cnt(N, 0);
+
+            #pragma omp for nowait
+            for (int i = 0; i < N; ++i) {
+                // Using identity ED (current Xfull) at init stage
+                Eigen::Vector3d pw = edGraph.deformVertex(mesh_vertices[i], i);
+                Eigen::Vector3d pc = R.transpose() * (pw - t);
+                if (pc.z() <= 1e-8) continue;
+
+                float u = (float)(K(0,0)*(pc.x()/pc.z()) + K(0,2));
+                float v = (float)(K(1,1)*(pc.y()/pc.z()) + K(1,2));
+                if (u < 1 || v < 1 || u > img.cols - 2 || v > img.rows - 2) continue;
+
+                // Depth-consistent gating to avoid occlusion/mismatch
+                float z_obs = bilinearSample(depth, u, v);
+                if (!(z_obs > 0.f) || !std::isfinite(z_obs)) continue;
+                if (std::fabs((float)pc.z() - z_obs) > init_depth_gate) continue;
+
+                float I = bilinearSample(img, u, v);
+                local_sum[i] += (double)I;
+                local_cnt[i]  += 1;
+            }
+
+            #pragma omp critical
+            {
+                for (int i = 0; i < N; ++i) {
+                    if (local_cnt[i] == 0) continue;
+                    if (!std::isfinite(I_tmpl[i])) I_tmpl[i] = 0.0;
+                    I_tmpl[i] += local_sum[i];
+                    I_cnt[i]  += local_cnt[i];
+                }
             }
         }
-        int cnt = (int)std::count_if(I_tmpl.begin(), I_tmpl.end(), [](double x){return std::isfinite(x);} );
-        std::cout << "[Init] Template intensities assigned for " << cnt << " / " << N << " vertices." << std::endl;
     }
+
+    int assigned_cnt = 0;
+    for (int i = 0; i < N; ++i) {
+        if (I_cnt[i] > 0) { I_tmpl[i] /= (double)I_cnt[i]; ++assigned_cnt; }
+    }
+    std::cout << "[Init] Intensity mean assigned for " << assigned_cnt << " / " << N << " vertices." << std::endl;
 
     // =========================
     // (2.5) Build global intensity mapping (storage index) & initial values
