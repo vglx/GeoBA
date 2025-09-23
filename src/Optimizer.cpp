@@ -201,7 +201,6 @@ void Optimizer::optimize(
     std::vector<double> delta(F, 0.0);        // per-frame micro log-scale, delta[0] kept at 0 by design
     const double lambda_scale_prior   = 0.05; // L2 prior on per-frame deltas (small, keeps deltas tiny)
     const double lambda_scale_temporal= 0.00; // optional temporal smooth (0 -> disabled)
-    const double lambda_scale_global_prior = 1e-4; // NEW: tiny prior on global log-scale to avoid singular H when no data rows
 
     auto s_eff = [&](int f){ return std::exp(gamma_global + delta[f]); };
 
@@ -329,8 +328,7 @@ void Optimizer::optimize(
         const int row_temporal_begin    = row_rot_begin    + rot_rows;
         const int row_scale_prior_begin = row_temporal_begin + temporal_rows;
         const int row_scale_temp_begin  = row_scale_prior_begin + scale_prior_rows;
-        const int row_scale_gamma_prior_begin = row_scale_temp_begin + scale_tempor_rows; // NEW
-        const int total_rows            = row_scale_gamma_prior_begin + 1; // +1 row for global-scale prior
+        const int total_rows            = row_scale_temp_begin + scale_tempor_rows;
 
         int edDimCompact=0; for (int f=0; f<F; ++f) edDimCompact += 12 * Sf[f];
         const int scaleCols = 1 + std::max(0, F-1); // global + (F-1) deltas
@@ -343,7 +341,6 @@ void Optimizer::optimize(
                   << ", temporal="<<temporal_rows
                   << ", scale_prior="<<scale_prior_rows
                   << ", scale_temp="<<scale_tempor_rows
-                  << ", scale_gamma=1"
                   << ", total="<<total_rows << std::endl;
         std::cout << "[Layout it="<<it<<"] cols edCompact="<< edDimCompact
                   << ", intens="<< Icount_it
@@ -359,7 +356,6 @@ void Optimizer::optimize(
         const double sqrt_ltp= std::sqrt(std::max(0.0, lambda_temporal_));
         const double sqrt_lsp= std::sqrt(std::max(0.0, lambda_scale_prior));
         const double sqrt_lst= std::sqrt(std::max(0.0, lambda_scale_temporal));
-        const double sqrt_lsg= std::sqrt(std::max(0.0, lambda_scale_global_prior)); // NEW
 
         int num_threads = omp_get_max_threads();
         std::vector<std::vector<Eigen::Triplet<double>>> triplets_thr(num_threads);
@@ -539,14 +535,6 @@ void Optimizer::optimize(
                 if (c0 >= 0) triplets_thr[0].emplace_back(row_st, c0, -sqrt_lst);
                 ++row_st;
             }
-        }
-
-        // Global-scale prior: sqrt_lsg * gamma_global
-        {
-            const int row_sg = row_scale_gamma_prior_begin;
-            const int cGlob = colScaleGlob(edDimCompact, Icount_it);
-            Fvec[row_sg] = sqrt_lsg * (gamma_global);
-            if (cGlob >= 0) triplets_thr[0].emplace_back(row_sg, cGlob, sqrt_lsg);
         }
 
         // Build J and solve
