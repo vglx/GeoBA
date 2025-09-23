@@ -195,6 +195,16 @@ void Optimizer::optimize(
     for (int i=0;i<N;++i) if (colI[i] >= 0) I_var[colI[i]] = I_tmpl[i];
 
     // =========================
+    // Scale variables: global + per-frame micro-adjustments (delta_f for f>=1)
+    // =========================
+    double gamma_global = 0.0;                // log global scale
+    std::vector<double> delta(F, 0.0);        // per-frame micro log-scale, delta[0] kept at 0 by design
+    const double lambda_scale_prior   = 0.05; // L2 prior on per-frame deltas (small, keeps deltas tiny)
+    const double lambda_scale_temporal= 0.00; // optional temporal smooth (0 -> disabled)
+
+    auto s_eff = [&](int f){ return std::exp(gamma_global + delta[f]); };
+
+    // =========================
     // GN loop with DYNAMIC visibility/active set/row & col layout
     // =========================
     double prev_cost = std::numeric_limits<double>::max();
@@ -202,6 +212,13 @@ void Optimizer::optimize(
     for (int it=0; it<maxIterations_; ++it) {
         // 0) write current X to graph
         for (int f=0; f<F; ++f) edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
+
+        // 0.25) Build *scaled* depth images for this iteration (apply current s_eff)
+        std::vector<cv::Mat> depth_scaled(F);
+        for (int f=0; f<F; ++f) {
+            const float s = static_cast<float>(s_eff(f));
+            observed_depth[f].convertTo(depth_scaled[f], CV_32F, s, 0.0);
+        }
 
         // 0.5) Build per-frame deformed vertices and *per-iteration* vertex normals
         std::vector<std::vector<Eigen::Vector3d>> Vdef(F, std::vector<Eigen::Vector3d>(N));
@@ -215,12 +232,12 @@ void Optimizer::optimize(
             computeVertexNormals(Vdef[f], mesh_triangles, normals_w[f]);
         }
 
-        // 1) Recompute visibility (FOV + depth-consistent gate)
+        // 1) Recompute visibility (FOV + depth-consistent gate) using *scaled* depth
         const float vis_depth_gate = 5.0f; // mm; tune alongside ICP gate
         std::vector<std::vector<int>> visible_vertices(F);
         for (int f = 0; f < F; ++f) {
             const cv::Mat& img   = imgs_gray[f];
-            const cv::Mat& depth = observed_depth[f];
+            const cv::Mat& depth = depth_scaled[f];
             const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
             const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
             std::vector<int> vis; vis.reserve(N/2);
@@ -237,7 +254,7 @@ void Optimizer::optimize(
                     float v = static_cast<float>(K(1,1) * (pc.y() / pc.z()) + K(1,2));
                     if (u < 1 || v < 1 || u > img.cols - 2 || v > img.rows - 2) continue;
 
-                    // Depth-consistent gating
+                    // Depth-consistent gating with scaled observed depth
                     float z_obs = bilinearSample(depth, u, v);
                     if (!(z_obs > 0.f) || !std::isfinite(z_obs)) continue;
                     if (std::fabs((float)pc.z() - z_obs) > vis_depth_gate) continue;
@@ -278,6 +295,11 @@ void Optimizer::optimize(
         std::vector<int> colI_it(N, -1); int Icount_it = 0;
         for (int i=0; i<N; ++i) if (I_active[i]) colI_it[i] = Icount_it++;
 
+        // 2.6) Scale columns (compact layout): 1 global + (F-1) frame deltas for f>=1
+        auto scaleColsBase = [&](int edDimCompact_, int Icount_it_){ return edDimCompact_ + Icount_it_; };
+        auto colScaleGlob  = [&](int edDimCompact_, int Icount_it_){ return scaleColsBase(edDimCompact_, Icount_it_); };
+        auto colScaleFrame = [&](int edDimCompact_, int Icount_it_, int f){ return scaleColsBase(edDimCompact_, Icount_it_) + 1 + (f-1); }; // f>=1
+
         // 3) Row/col layout
         const bool use_photo = (w_photo_ > 1e-12);
         const bool use_icp   = (w_icp_   > 1e-12);
@@ -295,24 +317,34 @@ void Optimizer::optimize(
         for (int f=1; f<F; ++f) { smooth_rows += (int)active_edges[f].size()*(9+3); rot_rows += Sf[f]*9; }
         for (int f=2; f<F; ++f) for (int j=0;j<G;++j) if (active_node[f-1][j] && active_node[f][j]) temporal_rows += 12;
 
-        const int row_photo_begin    = 0;
-        const int row_icp_begin      = row_photo_begin + photo_rows;
-        const int row_smooth_begin   = row_icp_begin   + icp_rows;
-        const int row_rot_begin      = row_smooth_begin + smooth_rows;
-        const int row_temporal_begin = row_rot_begin    + rot_rows;
-        const int total_rows         = row_temporal_begin + temporal_rows;
+        // scale priors and (optional) temporal smooth rows
+        int scale_prior_rows   = (F>=2)? (F-1) : 0;              // delta_f for f=1..F-1
+        int scale_tempor_rows  = (F>=3 && lambda_scale_temporal>0.0)? (F-2) : 0; // (delta_f - delta_{f-1}) for f=2..F-1
+
+        const int row_photo_begin       = 0;
+        const int row_icp_begin         = row_photo_begin + photo_rows;
+        const int row_smooth_begin      = row_icp_begin   + icp_rows;
+        const int row_rot_begin         = row_smooth_begin + smooth_rows;
+        const int row_temporal_begin    = row_rot_begin    + rot_rows;
+        const int row_scale_prior_begin = row_temporal_begin + temporal_rows;
+        const int row_scale_temp_begin  = row_scale_prior_begin + scale_prior_rows;
+        const int total_rows            = row_scale_temp_begin + scale_tempor_rows;
 
         int edDimCompact=0; for (int f=0; f<F; ++f) edDimCompact += 12 * Sf[f];
-        const int stateDimCompact = edDimCompact + Icount_it; // per-iteration I columns
+        const int scaleCols = 1 + std::max(0, F-1); // global + (F-1) deltas
+        const int stateDimCompact = edDimCompact + Icount_it + scaleCols; // add scale columns
 
         std::cout << "[Layout it="<<it<<"] rows photo="<<photo_rows
                   << ", icp="<<icp_rows
                   << ", smooth="<<smooth_rows
                   << ", rot="<<rot_rows
                   << ", temporal="<<temporal_rows
+                  << ", scale_prior="<<scale_prior_rows
+                  << ", scale_temp="<<scale_tempor_rows
                   << ", total="<<total_rows << std::endl;
         std::cout << "[Layout it="<<it<<"] cols edCompact="<< edDimCompact
                   << ", intens="<< Icount_it
+                  << ", scale="<< scaleCols
                   << ", total="<< stateDimCompact << std::endl;
 
         // 4) Assemble J & F
@@ -322,6 +354,8 @@ void Optimizer::optimize(
         const double sqrt_ls = std::sqrt(std::max(0.0, lambda_smooth_));
         const double sqrt_lr = std::sqrt(std::max(0.0, lambda_rot_));
         const double sqrt_ltp= std::sqrt(std::max(0.0, lambda_temporal_));
+        const double sqrt_lsp= std::sqrt(std::max(0.0, lambda_scale_prior));
+        const double sqrt_lst= std::sqrt(std::max(0.0, lambda_scale_temporal));
 
         int num_threads = omp_get_max_threads();
         std::vector<std::vector<Eigen::Triplet<double>>> triplets_thr(num_threads);
@@ -369,7 +403,7 @@ void Optimizer::optimize(
             }
         }
 
-        // ICP (f>=1) — **use per-iteration normals**
+        // ICP (f>=1) — **use per-iteration normals** and **scaled depth** + add scale Jacobians
         if (use_icp) {
             #pragma omp parallel for schedule(static)
             for (int f=1; f<F; ++f) {
@@ -377,22 +411,57 @@ void Optimizer::optimize(
                 edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
                 const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
                 const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
-                const cv::Mat& depth = observed_depth[f];
+                const cv::Mat& depth = depth_scaled[f];
                 int r = row_icp_begin + icp_row_ofs[f];
                 for (int idx=0; idx<(int)visible_vertices[f].size(); ++idx) {
                     int i = visible_vertices[f][idx];
                     const Eigen::Vector3d n_w = normals_w[f][i];
+
                     ProjectiveICPError icpCost(mesh_vertices[i], i, depth, &edGraph, K, n_w, sqrt_w_icp);
                     double residual=0.0; Eigen::VectorXd J_ed(12*G); J_ed.setZero();
                     bool ok = icpCost.Evaluate(residual, &J_ed, R, t);
                     if (!ok) { ++r; continue; }
                     Fvec[r] = residual;
+
+                    // ==== ED Jacobians ====
                     const auto& bnd = bindings[i];
                     for (int nid : bnd) {
                         const int base = 12*nid;
                         for (int c=0;c<9;++c)  { double v=J_ed[base+c];    if (!v) continue; int col=colA_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
                         for (int c=0;c<3;++c)  { double v=J_ed[base+9+c];  if (!v) continue; int col=colt_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
                     }
+
+                    // ==== Scale Jacobians (global + frame) ====
+                    // Recompute pixel (u,v) and z_rel at that pixel from *original* relative depth
+                    const Eigen::Vector3d& pw = Vdef[f][i];
+                    Eigen::Vector3d pc = R.transpose() * (pw - t);
+                    if (pc.z() <= 1e-8) { ++r; continue; }
+                    float u = static_cast<float>(K(0,0) * (pc.x() / pc.z()) + K(0,2));
+                    float v = static_cast<float>(K(1,1) * (pc.y() / pc.z()) + K(1,2));
+                    // if out of bound, derivative ~0 (skip)
+                    if (!(u >= 1 && v >= 1 && u <= observed_depth[f].cols - 2 && v <= observed_depth[f].rows - 2)) { ++r; continue; }
+                    float z_rel = bilinearSample(observed_depth[f], u, v);
+                    if (!(z_rel > 0.f) || !std::isfinite(z_rel)) { ++r; continue; }
+
+                    // p_rel in camera (from K^{-1}[u,v,1]^T * z_rel)
+                    const double fx = K(0,0), fy = K(1,1), cx = K(0,2), cy = K(1,2);
+                    Eigen::Vector3d p_rel;
+                    p_rel.z() = (double)z_rel;
+                    p_rel.x() = ((double)u - cx) * p_rel.z() / fx;
+                    p_rel.y() = ((double)v - cy) * p_rel.z() / fy;
+
+                    // normal in camera
+                    Eigen::Vector3d n_c = R.transpose() * n_w; double nrm = n_c.norm(); if (nrm>1e-20) n_c/=nrm;
+
+                    const double sEf = s_eff(f);
+                    const double dr_dseff = - sqrt_w_icp * (p_rel.dot(n_c)); // residual already weighted by sqrt_w_icp
+                    const int cGlob = colScaleGlob(edDimCompact, Icount_it);
+                    T.emplace_back(r, cGlob, dr_dseff * sEf); // d r / d gamma = d r / d s * s
+                    if (f>=1) {
+                        const int cFrm = colScaleFrame(edDimCompact, Icount_it, f);
+                        T.emplace_back(r, cFrm, dr_dseff * sEf); // d r / d delta_f = same as gamma
+                    }
+
                     ++r;
                 }
             }
@@ -433,12 +502,38 @@ void Optimizer::optimize(
             }
         }
 
-        // Temporal
+        // Temporal (ED)
         int row_tmp = row_temporal_begin;
         for (int f=2; f<F; ++f) {
             for (int j=0;j<G;++j) if (active_node[f-1][j] && active_node[f][j]) {
                 for (int m=0;m<9;++m){ int c1=colA_c(f,j,m), c0=colA_c(f-1,j,m); Fvec[row_tmp]=sqrt_ltp*(Xfull[f][12*j+m]-Xfull[f-1][12*j+m]); if (c1>=0) triplets_thr[0].emplace_back(row_tmp,c1,sqrt_ltp); if (c0>=0) triplets_thr[0].emplace_back(row_tmp,c0,-sqrt_ltp); ++row_tmp; }
                 for (int m=0;m<3;++m){ int c1=colt_c(f,j,m), c0=colt_c(f-1,j,m); Fvec[row_tmp]=sqrt_ltp*(Xfull[f][12*j+9+m]-Xfull[f-1][12*j+9+m]); if (c1>=0) triplets_thr[0].emplace_back(row_tmp,c1,sqrt_ltp); if (c0>=0) triplets_thr[0].emplace_back(row_tmp,c0,-sqrt_ltp); ++row_tmp; }
+            }
+        }
+
+        // Scale priors: sqrt_lsp * delta_f
+        int row_sp = row_scale_prior_begin;
+        if (scale_prior_rows > 0 && sqrt_lsp > 0.0) {
+            const int cGlob = colScaleGlob(edDimCompact, Icount_it);
+            (void)cGlob; // not used here, but kept for clarity
+            for (int f=1; f<F; ++f) {
+                const int cFrm = colScaleFrame(edDimCompact, Icount_it, f);
+                Fvec[row_sp] = sqrt_lsp * (delta[f]);
+                if (cFrm >= 0) triplets_thr[0].emplace_back(row_sp, cFrm, sqrt_lsp);
+                ++row_sp;
+            }
+        }
+
+        // Scale temporal smooth: sqrt_lst * (delta_f - delta_{f-1})
+        int row_st = row_scale_temp_begin;
+        if (scale_tempor_rows > 0 && sqrt_lst > 0.0) {
+            for (int f=2; f<F; ++f) {
+                const int c1 = colScaleFrame(edDimCompact, Icount_it, f);
+                const int c0 = colScaleFrame(edDimCompact, Icount_it, f-1);
+                Fvec[row_st] = sqrt_lst * (delta[f] - delta[f-1]);
+                if (c1 >= 0) triplets_thr[0].emplace_back(row_st, c1, sqrt_lst);
+                if (c0 >= 0) triplets_thr[0].emplace_back(row_st, c0, -sqrt_lst);
+                ++row_st;
             }
         }
 
@@ -485,6 +580,14 @@ void Optimizer::optimize(
             if (ci_it < 0 || ci_global < 0) continue;
             I_var[ci_global] += dx[edDimCompact + ci_it];
             // Optional clamp: I_var[ci_global] = std::min(1.0, std::max(0.0, I_var[ci_global]));
+        }
+
+        // Apply update: scales
+        const int baseScale = edDimCompact + Icount_it;
+        gamma_global += dx[baseScale + 0];
+        for (int f=1; f<F; ++f) {
+            const int cFrm = baseScale + 1 + (f-1);
+            delta[f] += dx[cFrm];
         }
 
         const double mean_cost = (total_rows>0)? (2.0*cost / (double)total_rows) : cost;
