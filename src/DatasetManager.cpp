@@ -67,8 +67,8 @@ bool DatasetManager::loadAllDepthImages(std::vector<cv::Mat>& depth_images) {
 
         // 假设单位 = 微米(um)，直接转换到毫米
         cv::Mat depth32f;
-        im16.convertTo(depth32f, CV_32F, 1.0);  // 保留原始数值 (单位: µm)
-        depth32f *= (1e-3f)*0.9;                      // µm -> mm
+        im16.convertTo(depth32f, CV_32F, 0.1f);  // 保留原始数值 (单位: µm)
+        // depth32f *= (1e-3f)*0.9;                      // µm -> mm
 
         // 无效值处理: <=0 或 非有限置 NaN
         const float nanv = std::numeric_limits<float>::quiet_NaN();
