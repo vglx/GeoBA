@@ -403,7 +403,7 @@ void Optimizer::optimize(
             }
         }
 
-        // ICP (f>=1) — **use per-iteration normals** and **scaled depth** + add scale Jacobians
+        // ICP (f>=1) — use per-iteration normals and scaled depth; scale-Jacobian from CostFunction
         if (use_icp) {
             #pragma omp parallel for schedule(static)
             for (int f=1; f<F; ++f) {
@@ -419,7 +419,8 @@ void Optimizer::optimize(
 
                     ProjectiveICPError icpCost(mesh_vertices[i], i, depth, &edGraph, K, n_w, sqrt_w_icp);
                     double residual=0.0; Eigen::VectorXd J_ed(12*G); J_ed.setZero();
-                    bool ok = icpCost.Evaluate(residual, &J_ed, R, t);
+                    double J_logs = 0.0; // d residual / d log(s_eff)
+                    bool ok = icpCost.Evaluate(residual, &J_ed, R, t, &J_logs);
                     if (!ok) { ++r; continue; }
                     Fvec[r] = residual;
 
@@ -431,35 +432,12 @@ void Optimizer::optimize(
                         for (int c=0;c<3;++c)  { double v=J_ed[base+9+c];  if (!v) continue; int col=colt_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
                     }
 
-                    // ==== Scale Jacobians (global + frame) ====
-                    // Recompute pixel (u,v) and z_rel at that pixel from *original* relative depth
-                    const Eigen::Vector3d& pw = Vdef[f][i];
-                    Eigen::Vector3d pc = R.transpose() * (pw - t);
-                    if (pc.z() <= 1e-8) { ++r; continue; }
-                    float u = static_cast<float>(K(0,0) * (pc.x() / pc.z()) + K(0,2));
-                    float v = static_cast<float>(K(1,1) * (pc.y() / pc.z()) + K(1,2));
-                    // if out of bound, derivative ~0 (skip)
-                    if (!(u >= 1 && v >= 1 && u <= observed_depth[f].cols - 2 && v <= observed_depth[f].rows - 2)) { ++r; continue; }
-                    float z_rel = bilinearSample(observed_depth[f], u, v);
-                    if (!(z_rel > 0.f) || !std::isfinite(z_rel)) { ++r; continue; }
-
-                    // p_rel in camera (from K^{-1}[u,v,1]^T * z_rel)
-                    const double fx = K(0,0), fy = K(1,1), cx = K(0,2), cy = K(1,2);
-                    Eigen::Vector3d p_rel;
-                    p_rel.z() = (double)z_rel;
-                    p_rel.x() = ((double)u - cx) * p_rel.z() / fx;
-                    p_rel.y() = ((double)v - cy) * p_rel.z() / fy;
-
-                    // normal in camera
-                    Eigen::Vector3d n_c = R.transpose() * n_w; double nrm = n_c.norm(); if (nrm>1e-20) n_c/=nrm;
-
-                    const double sEf = s_eff(f);
-                    const double dr_dseff = - sqrt_w_icp * (p_rel.dot(n_c)); // residual already weighted by sqrt_w_icp
+                    // ==== Scale Jacobians (global + frame): both equal to J_logs ====
                     const int cGlob = colScaleGlob(edDimCompact, Icount_it);
-                    T.emplace_back(r, cGlob, dr_dseff * sEf); // d r / d gamma = d r / d s * s
+                    T.emplace_back(r, cGlob, J_logs);
                     if (f>=1) {
                         const int cFrm = colScaleFrame(edDimCompact, Icount_it, f);
-                        T.emplace_back(r, cFrm, dr_dseff * sEf); // d r / d delta_f = same as gamma
+                        T.emplace_back(r, cFrm, J_logs);
                     }
 
                     ++r;

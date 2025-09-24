@@ -142,7 +142,8 @@ bool PhotometricError::Evaluate(double intensity_i,
 bool ProjectiveICPError::Evaluate(double& residual,
                                   Eigen::VectorXd* jacobian_ed,
                                   const Eigen::Matrix3d& R_wc,
-                                  const Eigen::Vector3d& t_wc) const {
+                                  const Eigen::Vector3d& t_wc,
+                                  double* jacobian_logscale) const {
     // 1) deform vertex (world)
     const Eigen::Vector3d pw = ed_->deformVertex(v_raw_, vidx_);
 
@@ -157,12 +158,12 @@ bool ProjectiveICPError::Evaluate(double& residual,
     if (uf < 1.0f || vf < 1.0f || uf > (float)depth_.cols - 2.0f || vf > (float)depth_.rows - 2.0f)
         return false; // out of bounds
 
-    // 4) sample observed depth
+    // 4) sample observed depth (this is ALREADY the per-iteration scaled depth)
     const float z_obs_f = sampleDepthBilinear(uf, vf);
     if (!(z_obs_f > 0.f) || !std::isfinite(z_obs_f)) return false; // invalid depth
     const double z_obs = (double)z_obs_f;
 
-    // optional gate on depth disagreement along z
+    // optional gate on depth disagreement along z (kept here for local pruning)
     if (depth_gate_ > 3) {
         if (std::abs(Z - z_obs) > depth_gate_) return false;
     }
@@ -173,41 +174,29 @@ bool ProjectiveICPError::Evaluate(double& residual,
     pobs.x() = ( (double)uf - cx_ ) * z_obs / fx_;
     pobs.y() = ( (double)vf - cy_ ) * z_obs / fy_;
 
-    // 6) normal: world -> camera; ensure unit length
+    // 6) normal: world -> camera; ensure unit length and orientation stability
     Eigen::Vector3d nc = R_wc.transpose() * n_w_;
     const double nrm = nc.norm();
-    if (nrm < 1e-12) return false; 
+    if (nrm < 1e-12) return false;
     nc /= nrm;
-    // Optional orientation stabilization (uncomment if needed):
     if (nc.z() < 0) nc = -nc;
 
-    // 7) residual
+    // 7) residual (raw and weighted)
     const double r_raw = (pc - pobs).dot(nc);
-
-    // 8) robust weight (Huber)
     const double w_rob = huberWeight(r_raw, huber_delta_);
     const double sqrt_wr = std::sqrt(w_rob);
     residual = sqrt_w_ * sqrt_wr * r_raw;
 
-    // 9) Jacobian wrt ED affine parameters
+    // 8) Jacobian wrt ED affine parameters (kept as in your version, numeric FD)
     if (jacobian_ed) {
         jacobian_ed->setZero();
 
-        // —— 关键点：数值差分时固定匹配像素与鲁棒权重（IRLS 假设）
-        // 基准观测点与法线（保持不变）
-        const double uf0 = (fx_ * (pc.x()/Z) + cx_);
-        const double vf0 = (fy_ * (pc.y()/Z) + cy_);
-        const double z_obs_0 = z_obs;           // 采样到的观测深度
-        const Eigen::Vector3d pobs0 = pobs;     // 基准观测点
-        const Eigen::Vector3d nc0   = nc;       // 基准相机系法线
-
-        // 预计算：该顶点的绑定关系与每个绑定节点的“基准贡献”
         const auto& binds   = ed_->getBindings()[vidx_];
         const auto& weights = ed_->getWeights()[vidx_];
         const auto& nodes   = ed_->getGraphNodes();
         const Eigen::Vector3d vraw(v_raw_.x, v_raw_.y, v_raw_.z);
 
-        // 基准 pw（和 deformVertex 一致）
+        // Build baseline pw0 consistent with deformVertex
         Eigen::Vector3d pw0 = Eigen::Vector3d::Zero();
         std::vector<Eigen::Vector3d> p_node0(binds.size());
         for (size_t k = 0; k < binds.size(); ++k) {
@@ -219,48 +208,47 @@ bool ProjectiveICPError::Evaluate(double& residual,
             p_node0[k] = p_k;
             pw0 += w * p_k;
         }
-        // 检查一致性（可省略）：pw0 与上面用 deformVertex 得到的 pw 一致
-        // assert((pw0 - pw).norm() < 1e-9);
 
-        // 数值步长（可按尺度调）
-        const double epsA = 1e-5;  // 对 A 的分量
-        const double epsT = 1e-3;  // 对 t 的分量（单位=mm）
+        const double epsA = 1e-5;  // for A entries
+        const double epsT = 1e-3;  // for t entries (mm)
 
-        // 对每个绑定节点的 12 个参数做前向差分
         for (size_t kb = 0; kb < binds.size(); ++kb) {
             const int nid = binds[kb];
             const double w_bind = weights[kb];
             const auto &node = nodes[nid];
             const Eigen::Vector3d q = vraw - node.position;
 
-            // A 的 9 个分量（行主序：A(0,0)...A(2,2)）
+            // A(3x3) entries
             for (int a = 0; a < 9; ++a) {
                 Eigen::Matrix3d A_pert = node.A;
                 A_pert(a/3, a%3) += epsA;
-
                 const Eigen::Vector3d p_k_pert = A_pert * q + node.position + node.t;
                 const Eigen::Vector3d dpw = w_bind * (p_k_pert - p_node0[kb]);
                 const Eigen::Vector3d pc_pert = R_wc.transpose() * ((pw0 + dpw) - t_wc);
-                const double r_raw_pert = (pc_pert - pobs0).dot(nc0);
-
+                const double r_raw_pert = (pc_pert - pobs).dot(nc);
                 const double dr = (r_raw_pert - r_raw) / epsA;
                 const int base = 12 * nid;
                 (*jacobian_ed)(base + a) += sqrt_w_ * sqrt_wr * dr;
             }
-
-            // t 的 3 个分量
+            // t(3)
             for (int j = 0; j < 3; ++j) {
                 Eigen::Vector3d t_pert = node.t; t_pert(j) += epsT;
                 const Eigen::Vector3d p_k_pert = node.A * q + node.position + t_pert;
                 const Eigen::Vector3d dpw = w_bind * (p_k_pert - p_node0[kb]);
                 const Eigen::Vector3d pc_pert = R_wc.transpose() * ((pw0 + dpw) - t_wc);
-                const double r_raw_pert = (pc_pert - pobs0).dot(nc0);
-
+                const double r_raw_pert = (pc_pert - pobs).dot(nc);
                 const double dr = (r_raw_pert - r_raw) / epsT;
                 const int base = 12 * nid;
                 (*jacobian_ed)(base + 9 + j) += sqrt_w_ * sqrt_wr * dr;
             }
         }
+    }
+
+    // 9) Jacobian wrt log-scale (global or per-frame micro): d res / d log s_eff
+    if (jacobian_logscale) {
+        // Since p_obs ∝ z_obs and z_obs ∝ s_eff, we have dp_obs/d log s = p_obs.
+        // Thus d r_raw / d log s = - p_obs · n_c, and with weights:
+        *jacobian_logscale = sqrt_w_ * sqrt_wr * ( - pobs.dot(nc) );
     }
 
     return true;

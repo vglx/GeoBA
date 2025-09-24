@@ -85,10 +85,12 @@ struct ProjectiveICPError {
     }
 
     // Evaluate residual and Jacobian wrt ED (pose is fixed and passed in)
-    bool Evaluate(double& residual,
-                  Eigen::VectorXd* jacobian_ed,   // (optional)
-                  const Eigen::Matrix3d& R_wc,
-                  const Eigen::Vector3d& t_wc) const;
+    bool ProjectiveICPError::Evaluate(double& residual,
+                                     Eigen::VectorXd* jacobian_ed,
+                                     const Eigen::Matrix3d& R_wc,
+                                     const Eigen::Vector3d& t_wc,
+                                     double* jacobian_logscale /*=nullptr*/) const;
+
 
     void setHuberDelta(double d) { huber_delta_ = d; }
     void setDepthGate(double dz) { depth_gate_ = dz; } // gate on |pc.z - z_obs|
