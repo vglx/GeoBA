@@ -85,7 +85,7 @@ struct ProjectiveICPError {
     }
 
     // Evaluate residual and Jacobian wrt ED (pose is fixed and passed in)
-    bool ProjectiveICPError::Evaluate(double& residual,
+    bool Evaluate(double& residual,
                                      Eigen::VectorXd* jacobian_ed,
                                      const Eigen::Matrix3d& R_wc,
                                      const Eigen::Vector3d& t_wc,
