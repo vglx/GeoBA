@@ -138,117 +138,97 @@ bool PhotometricError::Evaluate(double intensity_i,
     return true;
 }
 
-// ---------------- ProjectiveICPError (new) ----------------
-bool ProjectiveICPError::Evaluate(double& residual,
-                                  Eigen::VectorXd* jacobian_ed,
-                                  const Eigen::Matrix3d& R_wc,
-                                  const Eigen::Vector3d& t_wc,
-                                  double* jacobian_logscale) const {
-    // 1) deform vertex (world)
+// ---------------- StereoPhotometricError (new) ----------------
+bool StereoPhotometricError::Evaluate(double& residual,
+                                      Eigen::VectorXd* jacobian_ed,
+                                      const Eigen::Matrix3d& R_wcl,
+                                      const Eigen::Vector3d& t_wcl,
+                                      const Eigen::Matrix3d& R_wcr,
+                                      const Eigen::Vector3d& t_wcr) const {
+    // 1) deform to world
     const Eigen::Vector3d pw = ed_->deformVertex(v_raw_, vidx_);
 
-    // 2) world -> camera: p_c = R^T (p_w - t)
-    const Eigen::Vector3d pc = R_wc.transpose() * (pw - t_wc);
-    const double Z = pc.z();
-    if (Z <= 1e-8) return false; // behind camera or degenerate
+    // 2) world->camera projections (T_wc convention): p_c = R^T (p_w - t)
+    const Eigen::Vector3d pcL = R_wcl.transpose() * (pw - t_wcl);
+    const Eigen::Vector3d pcR = R_wcr.transpose() * (pw - t_wcr);
+    if (pcL.z() <= 1e-8 || pcR.z() <= 1e-8) return false;
 
-    // 3) project to pixel
-    float uf = (float)(fx_ * (pc.x()/Z) + cx_);
-    float vf = (float)(fy_ * (pc.y()/Z) + cy_);
-    if (uf < 1.0f || vf < 1.0f || uf > (float)depth_.cols - 2.0f || vf > (float)depth_.rows - 2.0f)
-        return false; // out of bounds
+    const float fxL = (float)K_L_(0,0), fyL = (float)K_L_(1,1);
+    const float cxL = (float)K_L_(0,2), cyL = (float)K_L_(1,2);
+    const float fxR = (float)K_R_(0,0), fyR = (float)K_R_(1,1);
+    const float cxR = (float)K_R_(0,2), cyR = (float)K_R_(1,2);
 
-    // 4) sample observed depth (this is ALREADY the per-iteration scaled depth)
-    const float z_obs_f = sampleDepthBilinear(uf, vf);
-    if (!(z_obs_f > 0.f) || !std::isfinite(z_obs_f)) return false; // invalid depth
-    const double z_obs = (double)z_obs_f;
+    float uL = fxL * (float)(pcL.x()/pcL.z()) + cxL;
+    float vL = fyL * (float)(pcL.y()/pcL.z()) + cyL;
+    float uR = fxR * (float)(pcR.x()/pcR.z()) + cxR;
+    float vR = fyR * (float)(pcR.y()/pcR.z()) + cyR;
 
-    // optional gate on depth disagreement along z (kept here for local pruning)
-    if (depth_gate_ > 3) {
-        if (std::abs(Z - z_obs) > depth_gate_) return false;
-    }
+    // 3) sample intensities & gradients at both views (clamped)
+    float IL, dILdu, dILdv;
+    float IR, dIRdu, dIRdv;
+    sampleBilinearAndGradient(imgL_, uL, vL, IL, dILdu, dILdv);
+    sampleBilinearAndGradient(imgR_, uR, vR, IR, dIRdu, dIRdv);
 
-    // 5) backproject observed to camera coordinates
-    Eigen::Vector3d pobs;
-    pobs.z() = z_obs;
-    pobs.x() = ( (double)uf - cx_ ) * z_obs / fx_;
-    pobs.y() = ( (double)vf - cy_ ) * z_obs / fy_;
-
-    // 6) normal: world -> camera; ensure unit length and orientation stability
-    Eigen::Vector3d nc = R_wc.transpose() * n_w_;
-    const double nrm = nc.norm();
-    if (nrm < 1e-12) return false;
-    nc /= nrm;
-    if (nc.z() < 0) nc = -nc;
-
-    // 7) residual (raw and weighted)
-    const double r_raw = (pc - pobs).dot(nc);
+    // 4) residual with robust weight
+    const double r_raw = (double)IL - (double)IR;
     const double w_rob = huberWeight(r_raw, huber_delta_);
     const double sqrt_wr = std::sqrt(w_rob);
     residual = sqrt_w_ * sqrt_wr * r_raw;
 
-    // 8) Jacobian wrt ED affine parameters (kept as in your version, numeric FD)
+    // 5) Jacobian wrt ED affine parameters (Left term - Right term)
     if (jacobian_ed) {
         jacobian_ed->setZero();
 
+        // Left projection jacobian du/dp, dv/dp
+        const double XL = pcL.x(), YL = pcL.y(), ZL = pcL.z();
+        const double invZL = 1.0 / ZL, invZL2 = invZL * invZL;
+        Eigen::Matrix<double,2,3> JprojL;
+        JprojL(0,0) = fxL * invZL;         JprojL(0,1) = 0.0;            JprojL(0,2) = -fxL * XL * invZL2;
+        JprojL(1,0) = 0.0;                  JprojL(1,1) = fyL * invZL;     JprojL(1,2) = -fyL * YL * invZL2;
+        Eigen::RowVector2d JimgPixL; JimgPixL << dILdu, dILdv;    // [dI/du, dI/dv]
+        const Eigen::RowVector3d JimgL = JimgPixL * JprojL * R_wcl.transpose();
+
+        // Right projection
+        const double XR = pcR.x(), YR = pcR.y(), ZR = pcR.z();
+        const double invZR = 1.0 / ZR, invZR2 = invZR * invZR;
+        Eigen::Matrix<double,2,3> JprojR;
+        JprojR(0,0) = fxR * invZR;         JprojR(0,1) = 0.0;            JprojR(0,2) = -fxR * XR * invZR2;
+        JprojR(1,0) = 0.0;                  JprojR(1,1) = fyR * invZR;     JprojR(1,2) = -fyR * YR * invZR2;
+        Eigen::RowVector2d JimgPixR; JimgPixR << dIRdu, dIRdv;
+        const Eigen::RowVector3d JimgR = JimgPixR * JprojR * R_wcr.transpose();
+
+        // Chain rule: d(IL - IR)/dp_w = JimgL - JimgR
+        const Eigen::RowVector3d Jimg = JimgL - JimgR;
+
+        // accumulate over bound nodes
         const auto& binds   = ed_->getBindings()[vidx_];
         const auto& weights = ed_->getWeights()[vidx_];
-        const auto& nodes   = ed_->getGraphNodes();
         const Eigen::Vector3d vraw(v_raw_.x, v_raw_.y, v_raw_.z);
 
-        // Build baseline pw0 consistent with deformVertex
-        Eigen::Vector3d pw0 = Eigen::Vector3d::Zero();
-        std::vector<Eigen::Vector3d> p_node0(binds.size());
         for (size_t k = 0; k < binds.size(); ++k) {
             const int nid = binds[k];
             const double w = weights[k];
-            const auto &node = nodes[nid];
-            const Eigen::Vector3d q = vraw - node.position; // (v - g)
-            const Eigen::Vector3d p_k = node.A * q + node.position + node.t;
-            p_node0[k] = p_k;
-            pw0 += w * p_k;
+            const Eigen::Vector3d g = ed_->getGraphNodes()[nid].position;
+            const Eigen::Vector3d q = vraw - g; // (v-g)
+
+            double dA[9];
+            dA[0] = Jimg(0) * q(0);
+            dA[1] = Jimg(0) * q(1);
+            dA[2] = Jimg(0) * q(2);
+            dA[3] = Jimg(1) * q(0);
+            dA[4] = Jimg(1) * q(1);
+            dA[5] = Jimg(1) * q(2);
+            dA[6] = Jimg(2) * q(0);
+            dA[7] = Jimg(2) * q(1);
+            dA[8] = Jimg(2) * q(2);
+
+            const int base = 12 * nid;
+            const double wscale = sqrt_w_ * sqrt_wr * w;
+            for (int c = 0; c < 9; ++c) (*jacobian_ed)(base + c) += wscale * dA[c];
+            (*jacobian_ed)(base + 9)  += wscale * Jimg(0);
+            (*jacobian_ed)(base + 10) += wscale * Jimg(1);
+            (*jacobian_ed)(base + 11) += wscale * Jimg(2);
         }
-
-        const double epsA = 1e-5;  // for A entries
-        const double epsT = 1e-3;  // for t entries (mm)
-
-        for (size_t kb = 0; kb < binds.size(); ++kb) {
-            const int nid = binds[kb];
-            const double w_bind = weights[kb];
-            const auto &node = nodes[nid];
-            const Eigen::Vector3d q = vraw - node.position;
-
-            // A(3x3) entries
-            for (int a = 0; a < 9; ++a) {
-                Eigen::Matrix3d A_pert = node.A;
-                A_pert(a/3, a%3) += epsA;
-                const Eigen::Vector3d p_k_pert = A_pert * q + node.position + node.t;
-                const Eigen::Vector3d dpw = w_bind * (p_k_pert - p_node0[kb]);
-                const Eigen::Vector3d pc_pert = R_wc.transpose() * ((pw0 + dpw) - t_wc);
-                const double r_raw_pert = (pc_pert - pobs).dot(nc);
-                const double dr = (r_raw_pert - r_raw) / epsA;
-                const int base = 12 * nid;
-                (*jacobian_ed)(base + a) += sqrt_w_ * sqrt_wr * dr;
-            }
-            // t(3)
-            for (int j = 0; j < 3; ++j) {
-                Eigen::Vector3d t_pert = node.t; t_pert(j) += epsT;
-                const Eigen::Vector3d p_k_pert = node.A * q + node.position + t_pert;
-                const Eigen::Vector3d dpw = w_bind * (p_k_pert - p_node0[kb]);
-                const Eigen::Vector3d pc_pert = R_wc.transpose() * ((pw0 + dpw) - t_wc);
-                const double r_raw_pert = (pc_pert - pobs).dot(nc);
-                const double dr = (r_raw_pert - r_raw) / epsT;
-                const int base = 12 * nid;
-                (*jacobian_ed)(base + 9 + j) += sqrt_w_ * sqrt_wr * dr;
-            }
-        }
-    }
-
-    // 9) Jacobian wrt log-scale (global or per-frame micro): d res / d log s_eff
-    if (jacobian_logscale) {
-        // Since p_obs ∝ z_obs and z_obs ∝ s_eff, we have dp_obs/d log s = p_obs.
-        // Thus d r_raw / d log s = - p_obs · n_c, and with weights:
-        *jacobian_logscale = sqrt_w_ * sqrt_wr * ( - pobs.dot(nc) );
     }
 
     return true;

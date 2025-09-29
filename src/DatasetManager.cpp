@@ -89,6 +89,47 @@ bool DatasetManager::loadAllDepthImages(std::vector<cv::Mat>& depth_images) {
     return true;
 }
 
+bool DatasetManager::loadAllRGB(const std::string& rgb_dir, std::vector<cv::Mat>& rgb_images) {
+    rgb_images.clear();
+
+    fs::path dir(rgb_dir);
+    if (!fs::exists(dir) || !fs::is_directory(dir)) {
+        std::cerr << "[DatasetManager] RGB directory not found: " << dir << std::endl;
+        return false;
+    }
+
+    // Collect and lexicographically sort file names (.png / .jpg only)
+    std::vector<fs::path> files;
+    for (const auto& entry : fs::directory_iterator(dir)) {
+        if (!entry.is_regular_file()) continue;
+        const fs::path& p = entry.path();
+        if (!p.has_extension()) continue;
+        std::string ext = p.extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c){ return (char)std::tolower(c); });
+        if (ext == ".png" || ext == ".jpg") files.push_back(p);
+    }
+    std::sort(files.begin(), files.end());
+
+    if (files.empty()) {
+        std::cerr << "[DatasetManager] No RGB images (.png/.jpg) found in: " << dir << std::endl;
+        return false;
+    }
+
+    // Read all images
+    for (const auto& p : files) {
+        cv::Mat img = cv::imread(p.string(), cv::IMREAD_UNCHANGED);
+        if (img.empty()) {
+            std::cerr << "[DatasetManager] Failed to load RGB image: " << p << std::endl;
+            return false;
+        }
+        rgb_images.emplace_back(std::move(img));
+    }
+
+    std::cout << "[DatasetManager] Loaded " << rgb_images.size()
+              << " RGB images from: " << dir << "\n";
+    return true;
+}
+
 bool DatasetManager::parseOBJ(const std::string& filePath, std::vector<MeshModel::Vertex>& vertices, std::vector<MeshModel::Triangle>& triangles) {
     std::ifstream file(filePath);
     if (!file.is_open()) {

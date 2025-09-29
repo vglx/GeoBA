@@ -11,15 +11,15 @@
 class Optimizer {
 public:
     // Constructor
-    // w_photo        : weight for photometric residuals
-    // w_icp          : weight for projective-ICP residuals (point-to-plane from depth)
-    // maxStages      : kept for compatibility (unused here)
-    // maxIterations  : outer Gauss-Newton iterations
+    // w_photo   : weight for multi-frame monocular photometric residuals (per-frame vs template intensity)
+    // w_stereo  : weight for Left–Right photometric residuals (per-frame binocular consistency)
+    // maxStages : kept for compatibility (unused here)
+    // maxIterations : outer Gauss–Newton iterations
     // lambda_smooth  : ED-graph smoothness (A,t differences on edges)
-    // lambda_rot     : rotation orthogonality
+    // lambda_rot     : rotation orthogonality (A^T A ≈ I)
     // lambda_temporal: per-node temporal consistency across frames
     Optimizer(double w_photo,
-              double w_icp,
+              double w_stereo,
               int    maxStages,
               int    maxIterations,
               double lambda_smooth,
@@ -28,43 +28,44 @@ public:
 
     using SaveCallback = std::function<void(int /*frameIdx*/, const EDGraph&)>;
 
-    // Combined optimizer: build one system that includes BOTH photometric and ICP terms.
-    // - mesh_vertices / mesh_triangles: static template mesh in model space
-    // - K: 3x3 intrinsics
-    // - observed_rgb: per-frame BGR/RGB images (CV_8UC3 or CV_32FC1 gray); will be converted to gray [0,1]
-    // - observed_depth: per-frame depth (CV_32F, in mm; invalid as NaN)
-    // - camera_poses_gt: per-frame world->camera, used as pc = R^T (pw - t)
-    // - edGraph: provides bindings/edges and deformVertex/Jacobians; frame 0 kept fixed
+    // Stereo Photometric optimizer (NO depth / NO ICP / NO scale variables)
+    // - mesh_vertices / mesh_triangles: static template mesh (model space)
+    // - K_left, K_right: 3x3 intrinsics for L/R
+    // - rgb_left, rgb_right: per-frame L/R RGB images (CV_8UC3 or CV_32FC1 gray)
+    // - poses_left_w2c, poses_right_w2c: per-frame world->camera for L/R
+    // - edGraph: ED graph (frame 0 kept fixed)
     void optimize(
         const std::vector<struct MeshModel::Vertex>& mesh_vertices,
         const std::vector<struct MeshModel::Triangle>& mesh_triangles,
-        const Eigen::Matrix3d& K,
-        const std::vector<cv::Mat>& observed_rgb,
-        const std::vector<cv::Mat>& observed_depth,
-        const std::vector<Eigen::Matrix4d>& camera_poses_gt,
+        const Eigen::Matrix3d& K_left,
+        const Eigen::Matrix3d& K_right,
+        const std::vector<cv::Mat>& rgb_left,
+        const std::vector<cv::Mat>& rgb_right,
+        const std::vector<Eigen::Matrix4d>& poses_left_w2c,
+        const std::vector<Eigen::Matrix4d>& poses_right_w2c,
         EDGraph& edGraph,
         SaveCallback on_save = nullptr);
 
     // Optional setters/getters
     void setPhotoWeight(double w)       { w_photo_ = w; }
-    void setICPWeight(double w)         { w_icp_ = w; }
+    void setStereoWeight(double w)      { w_stereo_ = w; }
     void setSmoothWeight(double w)      { lambda_smooth_ = w; }
     void setRotWeight(double w)         { lambda_rot_ = w; }
     void setTemporalWeight(double w)    { lambda_temporal_ = w; }
 
     double photoWeight()     const { return w_photo_; }
-    double icpWeight()       const { return w_icp_; }
+    double stereoWeight()    const { return w_stereo_; }
     double smoothWeight()    const { return lambda_smooth_; }
     double rotWeight()       const { return lambda_rot_; }
     double temporalWeight()  const { return lambda_temporal_; }
 
 private:
     // weights / hyper-parameters
-    double w_photo_        = 1.0;
-    double w_icp_          = 1.0;
-    double lambda_smooth_  = 0.0;
-    double lambda_rot_     = 0.0;
-    double lambda_temporal_= 0.0;
+    double w_photo_         = 1.0;
+    double w_stereo_        = 1.0;
+    double lambda_smooth_   = 0.0;
+    double lambda_rot_      = 0.0;
+    double lambda_temporal_ = 0.0;
 
     int maxStages_     = 1;   // kept for API compatibility
     int maxIterations_ = 10;  // outer GN iterations

@@ -1,7 +1,5 @@
 #include "Optimizer.h"
 #include "CostFunctions.h"
-#include "Projection.h"
-#include "BVH.h"
 
 #include <iostream>
 #include <limits>
@@ -53,39 +51,42 @@ inline void computeVertexNormals(
 } // namespace
 
 Optimizer::Optimizer(double w_photo,
-                     double w_icp,
+                     double w_stereo,
                      int maxStages,
                      int maxIterations,
                      double lambda_smooth,
                      double lambda_rot,
                      double lambda_temporal)
-    : w_photo_(w_photo), w_icp_(w_icp),
+    : w_photo_(w_photo), w_stereo_(w_stereo),
       lambda_smooth_(lambda_smooth), lambda_rot_(lambda_rot), lambda_temporal_(lambda_temporal),
       maxStages_(maxStages), maxIterations_(maxIterations) {}
 
 void Optimizer::optimize(
     const std::vector<MeshModel::Vertex>& mesh_vertices,
     const std::vector<MeshModel::Triangle>& mesh_triangles,
-    const Eigen::Matrix3d& K,
-    const std::vector<cv::Mat>& observed_rgb,
-    const std::vector<cv::Mat>& observed_depth,
-    const std::vector<Eigen::Matrix4d>& camera_poses_gt,
+    const Eigen::Matrix3d& K_left,
+    const Eigen::Matrix3d& K_right,
+    const std::vector<cv::Mat>& rgb_left,
+    const std::vector<cv::Mat>& rgb_right,
+    const std::vector<Eigen::Matrix4d>& poses_left_w2c,
+    const std::vector<Eigen::Matrix4d>& poses_right_w2c,
     EDGraph& edGraph,
     SaveCallback on_save) {
 
-    const int F  = (int)observed_rgb.size();
-    const int Fd = (int)observed_depth.size();
+    const int F = (int)rgb_left.size();
+    const int Fr = (int)rgb_right.size();
     const int N  = (int)mesh_vertices.size();
     const int G  = edGraph.numNodes();
 
-    if (F <= 1 || N == 0 || G == 0 || F != Fd || (int)camera_poses_gt.size() != F) {
-        std::cout << "[Optimizer] Invalid inputs: need RGB+Depth for >=2 frames, mesh & graph non-empty, matching sizes." << std::endl;
+    if (F <= 1 || N == 0 || G == 0 || F != Fr ||
+        (int)poses_left_w2c.size()  != F ||
+        (int)poses_right_w2c.size() != F) {
+        std::cout << "[Optimizer] Invalid inputs: need L/R RGB for >=2 frames, matching sizes, mesh & graph non-empty." << std::endl;
         return;
     }
 
     // ---- grayscale images [0,1]
-    std::vector<cv::Mat> imgs_gray; imgs_gray.reserve(F);
-    for (const auto& img : observed_rgb) {
+    auto toGray01 = [](const cv::Mat& img){
         cv::Mat gray;
         if (img.type()==CV_8UC3) {
             cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
@@ -98,8 +99,11 @@ void Optimizer::optimize(
         } else {
             CV_Assert(false && "Unsupported RGB image type");
         }
-        imgs_gray.push_back(gray);
-    }
+        return gray;
+    };
+
+    std::vector<cv::Mat> L(F), R(F);
+    for (int f=0; f<F; ++f) { L[f] = toGray01(rgb_left[f]); R[f] = toGray01(rgb_right[f]); }
 
     // =========================
     // Per-frame full ED blocks (12*G). Frame 0 is fixed (no columns for it).
@@ -112,97 +116,30 @@ void Optimizer::optimize(
     const auto& edges    = edGraph.getEdges();
 
     // =========================
-    // (1) Build initial BVHs (Evaluate currently ignores them; kept for API)
-    // =========================
-    std::vector<std::vector<MeshModel::Vertex>> Vdef_init(F, std::vector<MeshModel::Vertex>(N));
-    for (int f=0; f<F; ++f) {
-        edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
-        auto& Vd = Vdef_init[f];
-        #pragma omp parallel for
-        for (int i=0; i<N; ++i) {
-            Eigen::Vector3d p = edGraph.deformVertex(mesh_vertices[i], i);
-            Vd[i].x = (float)p.x(); Vd[i].y = (float)p.y(); Vd[i].z = (float)p.z();
-        }
-    }
-    std::vector<BVH> bvhs; bvhs.reserve(F);
-    for (int f=0; f<F; ++f) { bvhs.emplace_back(mesh_triangles, Vdef_init[f]); }
-
-    // =========================
-    // (2) Intensity init from ALL VISIBLE FRAMES (mean per vertex)
-    //     Replaces the old "frame 0 ONLY" template sampling.
+    // (1) Intensity init from FRAME 0 (template view, left camera)
     // =========================
     std::vector<double> I_tmpl(N, std::numeric_limits<double>::quiet_NaN());
-    std::vector<int>    I_cnt (N, 0);
-    const float init_depth_gate = 5.0f; // mm; consistent with vis_depth_gate below
-
-    for (int f = 0; f < F; ++f) {
-        const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
-        const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
-        const cv::Mat& img   = imgs_gray[f];
-        const cv::Mat& depth = observed_depth[f];
-
-        #pragma omp parallel
-        {
-            std::vector<double> local_sum(N, 0.0);
-            std::vector<int>    local_cnt(N, 0);
-
-            #pragma omp for nowait
-            for (int i = 0; i < N; ++i) {
-                // Using identity ED (current Xfull) at init stage
-                Eigen::Vector3d pw = edGraph.deformVertex(mesh_vertices[i], i);
-                Eigen::Vector3d pc = R.transpose() * (pw - t);
-                if (pc.z() <= 1e-8) continue;
-
-                float u = (float)(K(0,0)*(pc.x()/pc.z()) + K(0,2));
-                float v = (float)(K(1,1)*(pc.y()/pc.z()) + K(1,2));
-                if (u < 1 || v < 1 || u > img.cols - 2 || v > img.rows - 2) continue;
-
-                // Depth-consistent gating to avoid occlusion/mismatch
-                float z_obs = bilinearSample(depth, u, v);
-                if (!(z_obs > 0.f) || !std::isfinite(z_obs)) continue;
-                if (std::fabs((float)pc.z() - z_obs) > init_depth_gate) continue;
-
-                float I = bilinearSample(img, u, v);
-                local_sum[i] += (double)I;
-                local_cnt[i]  += 1;
-            }
-
-            #pragma omp critical
-            {
-                for (int i = 0; i < N; ++i) {
-                    if (local_cnt[i] == 0) continue;
-                    if (!std::isfinite(I_tmpl[i])) I_tmpl[i] = 0.0;
-                    I_tmpl[i] += local_sum[i];
-                    I_cnt[i]  += local_cnt[i];
-                }
-            }
+    {
+        const Eigen::Matrix3d R0 = poses_left_w2c[0].block<3,3>(0,0);
+        const Eigen::Vector3d t0 = poses_left_w2c[0].block<3,1>(0,3);
+        const cv::Mat& img0 = L[0];
+        #pragma omp parallel for schedule(static)
+        for (int i = 0; i < N; ++i) {
+            Eigen::Vector3d pw = edGraph.deformVertex(mesh_vertices[i], i); // identity at init
+            Eigen::Vector3d pc = R0.transpose() * (pw - t0);
+            if (pc.z() <= 1e-8) continue;
+            float u = (float)(K_left(0,0)*(pc.x()/pc.z()) + K_left(0,2));
+            float v = (float)(K_left(1,1)*(pc.y()/pc.z()) + K_left(1,2));
+            if (u < 1 || v < 1 || u > img0.cols - 2 || v > img0.rows - 2) continue;
+            I_tmpl[i] = (double)bilinearSample(img0, u, v);
         }
     }
 
-    int assigned_cnt = 0;
-    for (int i = 0; i < N; ++i) {
-        if (I_cnt[i] > 0) { I_tmpl[i] /= (double)I_cnt[i]; ++assigned_cnt; }
-    }
-    std::cout << "[Init] Intensity mean assigned for " << assigned_cnt << " / " << N << " vertices." << std::endl;
-
-    // =========================
-    // (2.5) Build global intensity mapping (storage index) & initial values
-    //        NOTE: we will COMPACT intensity columns PER-ITERATION later.
-    // =========================
+    // Compact intensity storage
     std::vector<int> colI(N, -1); int Icount_global=0;
     for (int i=0;i<N;++i) if (std::isfinite(I_tmpl[i])) colI[i] = Icount_global++;
     std::vector<double> I_var(Icount_global, 0.0);
     for (int i=0;i<N;++i) if (colI[i] >= 0) I_var[colI[i]] = I_tmpl[i];
-
-    // =========================
-    // Scale variables: global + per-frame micro-adjustments (delta_f for f>=1)
-    // =========================
-    double gamma_global = 0.0;                // log global scale
-    std::vector<double> delta(F, 0.0);        // per-frame micro log-scale, delta[0] kept at 0 by design
-    const double lambda_scale_prior   = 0.05; // L2 prior on per-frame deltas (small, keeps deltas tiny)
-    const double lambda_scale_temporal= 0.00; // optional temporal smooth (0 -> disabled)
-
-    auto s_eff = [&](int f){ return std::exp(gamma_global + delta[f]); };
 
     // =========================
     // GN loop with DYNAMIC visibility/active set/row & col layout
@@ -213,33 +150,21 @@ void Optimizer::optimize(
         // 0) write current X to graph
         for (int f=0; f<F; ++f) edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
 
-        // 0.25) Build *scaled* depth images for this iteration (apply current s_eff)
-        std::vector<cv::Mat> depth_scaled(F);
-        for (int f=0; f<F; ++f) {
-            const float s = static_cast<float>(s_eff(f));
-            observed_depth[f].convertTo(depth_scaled[f], CV_32F, s, 0.0);
-        }
-
-        // 0.5) Build per-frame deformed vertices and *per-iteration* vertex normals
+        // 0.5) Build per-frame deformed vertices and normals (world)
         std::vector<std::vector<Eigen::Vector3d>> Vdef(F, std::vector<Eigen::Vector3d>(N));
         std::vector<std::vector<Eigen::Vector3d>> normals_w(F, std::vector<Eigen::Vector3d>(N));
         #pragma omp parallel for schedule(static)
         for (int f = 0; f < F; ++f) {
-            for (int i = 0; i < N; ++i) {
-                Vdef[f][i] = edGraph.deformVertex(mesh_vertices[i], i);
-            }
-            // compute normals serially per frame (robust & simple)
+            for (int i = 0; i < N; ++i) Vdef[f][i] = edGraph.deformVertex(mesh_vertices[i], i);
             computeVertexNormals(Vdef[f], mesh_triangles, normals_w[f]);
         }
 
-        // 1) Recompute visibility (FOV + depth-consistent gate) using *scaled* depth
-        const float vis_depth_gate = 5.0f; // mm; tune alongside ICP gate
+        // 1) Visibility (FOV-only) for LEFT view; also used for stereo residual selection
         std::vector<std::vector<int>> visible_vertices(F);
         for (int f = 0; f < F; ++f) {
-            const cv::Mat& img   = imgs_gray[f];
-            const cv::Mat& depth = depth_scaled[f];
-            const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
-            const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
+            const cv::Mat& imgL = L[f];
+            const Eigen::Matrix3d R = poses_left_w2c[f].block<3,3>(0,0);
+            const Eigen::Vector3d t = poses_left_w2c[f].block<3,1>(0,3);
             std::vector<int> vis; vis.reserve(N/2);
 
             #pragma omp parallel
@@ -250,15 +175,9 @@ void Optimizer::optimize(
                     const Eigen::Vector3d& pw = Vdef[f][i];
                     Eigen::Vector3d pc = R.transpose() * (pw - t);
                     if (pc.z() <= 1e-8) continue;
-                    float u = static_cast<float>(K(0,0) * (pc.x() / pc.z()) + K(0,2));
-                    float v = static_cast<float>(K(1,1) * (pc.y() / pc.z()) + K(1,2));
-                    if (u < 1 || v < 1 || u > img.cols - 2 || v > img.rows - 2) continue;
-
-                    // Depth-consistent gating with scaled observed depth
-                    float z_obs = bilinearSample(depth, u, v);
-                    if (!(z_obs > 0.f) || !std::isfinite(z_obs)) continue;
-                    if (std::fabs((float)pc.z() - z_obs) > vis_depth_gate) continue;
-
+                    float u = static_cast<float>(K_left(0,0) * (pc.x() / pc.z()) + K_left(0,2));
+                    float v = static_cast<float>(K_left(1,1) * (pc.y() / pc.z()) + K_left(1,2));
+                    if (u < 1 || v < 1 || u > imgL.cols - 2 || v > imgL.rows - 2) continue;
                     local.push_back(i);
                 }
                 #pragma omp critical
@@ -268,6 +187,8 @@ void Optimizer::optimize(
         }
 
         // 2) Active nodes/edges (f>=1) & compact index
+        const auto& edges = edGraph.getEdges();
+        const int G = edGraph.numNodes();
         std::vector<std::vector<char>> active_node(F, std::vector<char>(G,0));
         std::vector<std::vector<std::pair<int,int>>> active_edges(F);
         std::vector<std::vector<int>> compact_idx(F, std::vector<int>(G,-1));
@@ -287,89 +208,67 @@ void Optimizer::optimize(
         auto colA_c  = [&](int f,int node,int k){ int ci=compact_idx[f][node]; if (ci<0) return -1; return offsEDc(f)+12*ci+k; };
         auto colt_c  = [&](int f,int node,int k){ int ci=compact_idx[f][node]; if (ci<0) return -1; return offsEDc(f)+12*ci+9+k; };
 
-        // 2.5) Intensity columns: per-iteration COMPACT mapping
+        // 2.5) Intensity columns: per-iteration COMPACT mapping（只为可见顶点）
         std::vector<char> I_active(N, 0);
-        for (int f=0; f<F; ++f) {
-            for (int vid : visible_vertices[f]) if (colI[vid] >= 0) I_active[vid] = 1;
-        }
+        for (int f=0; f<F; ++f) for (int vid : visible_vertices[f]) if (colI[vid] >= 0) I_active[vid] = 1;
         std::vector<int> colI_it(N, -1); int Icount_it = 0;
         for (int i=0; i<N; ++i) if (I_active[i]) colI_it[i] = Icount_it++;
 
-        // 2.6) Scale columns (compact layout): 1 global + (F-1) frame deltas for f>=1
-        auto scaleColsBase = [&](int edDimCompact_, int Icount_it_){ return edDimCompact_ + Icount_it_; };
-        auto colScaleGlob  = [&](int edDimCompact_, int Icount_it_){ return scaleColsBase(edDimCompact_, Icount_it_); };
-        auto colScaleFrame = [&](int edDimCompact_, int Icount_it_, int f){ return scaleColsBase(edDimCompact_, Icount_it_) + 1 + (f-1); }; // f>=1
-
         // 3) Row/col layout
-        const bool use_photo = (w_photo_ > 1e-12);
-        const bool use_icp   = (w_icp_   > 1e-12);
+        const bool use_photo  = (w_photo_  > 1e-12);
+        const bool use_stereo = (w_stereo_ > 1e-12);
 
-        std::vector<int> photo_row_ofs(F,0), icp_row_ofs(F,0);
-        int photo_rows=0, icp_rows=0;
-        for (int f=0; f<F; ++f) { // include f=0 for photo
-            photo_row_ofs[f] = photo_rows; if (use_photo) photo_rows += (int)visible_vertices[f].size();
-        }
-        for (int f=1; f<F; ++f) { // ICP from f=1
-            icp_row_ofs[f]   = icp_rows;   if (use_icp)   icp_rows   += (int)visible_vertices[f].size();
+        std::vector<int> photo_row_ofs(F,0), stereo_row_ofs(F,0);
+        int photo_rows=0, stereo_rows=0;
+        for (int f=0; f<F; ++f) { // include f=0 for photo against template intensity
+            photo_row_ofs[f] = photo_rows; if (use_photo)  photo_rows  += (int)visible_vertices[f].size();
+            stereo_row_ofs[f]= stereo_rows; if (use_stereo) stereo_rows += (int)visible_vertices[f].size();
         }
 
         int smooth_rows=0, rot_rows=0, temporal_rows=0;
         for (int f=1; f<F; ++f) { smooth_rows += (int)active_edges[f].size()*(9+3); rot_rows += Sf[f]*9; }
         for (int f=2; f<F; ++f) for (int j=0;j<G;++j) if (active_node[f-1][j] && active_node[f][j]) temporal_rows += 12;
 
-        // scale priors and (optional) temporal smooth rows
-        int scale_prior_rows   = (F>=2)? (F-1) : 0;              // delta_f for f=1..F-1
-        int scale_tempor_rows  = (F>=3 && lambda_scale_temporal>0.0)? (F-2) : 0; // (delta_f - delta_{f-1}) for f=2..F-1
-
-        const int row_photo_begin       = 0;
-        const int row_icp_begin         = row_photo_begin + photo_rows;
-        const int row_smooth_begin      = row_icp_begin   + icp_rows;
-        const int row_rot_begin         = row_smooth_begin + smooth_rows;
-        const int row_temporal_begin    = row_rot_begin    + rot_rows;
-        const int row_scale_prior_begin = row_temporal_begin + temporal_rows;
-        const int row_scale_temp_begin  = row_scale_prior_begin + scale_prior_rows;
-        const int total_rows            = row_scale_temp_begin + scale_tempor_rows;
+        const int row_photo_begin    = 0;
+        const int row_stereo_begin   = row_photo_begin + photo_rows;
+        const int row_smooth_begin   = row_stereo_begin + stereo_rows;
+        const int row_rot_begin      = row_smooth_begin + smooth_rows;
+        const int row_temporal_begin = row_rot_begin    + rot_rows;
+        const int total_rows         = row_temporal_begin + temporal_rows;
 
         int edDimCompact=0; for (int f=0; f<F; ++f) edDimCompact += 12 * Sf[f];
-        const int scaleCols = 1 + std::max(0, F-1); // global + (F-1) deltas
-        const int stateDimCompact = edDimCompact + Icount_it + scaleCols; // add scale columns
+        const int stateDimCompact = edDimCompact + Icount_it; // ED + intensity only
 
         std::cout << "[Layout it="<<it<<"] rows photo="<<photo_rows
-                  << ", icp="<<icp_rows
+                  << ", stereo="<<stereo_rows
                   << ", smooth="<<smooth_rows
                   << ", rot="<<rot_rows
                   << ", temporal="<<temporal_rows
-                  << ", scale_prior="<<scale_prior_rows
-                  << ", scale_temp="<<scale_tempor_rows
                   << ", total="<<total_rows << std::endl;
         std::cout << "[Layout it="<<it<<"] cols edCompact="<< edDimCompact
                   << ", intens="<< Icount_it
-                  << ", scale="<< scaleCols
                   << ", total="<< stateDimCompact << std::endl;
 
         // 4) Assemble J & F
         std::vector<double> Fvec(total_rows, 0.0);
-        const double sqrt_w_photo = std::sqrt(std::max(0.0, w_photo_));
-        const double sqrt_w_icp   = std::sqrt(std::max(0.0, w_icp_));
+        const double sqrt_w_photo  = std::sqrt(std::max(0.0, w_photo_));
+        const double sqrt_w_stereo = std::sqrt(std::max(0.0, w_stereo_));
         const double sqrt_ls = std::sqrt(std::max(0.0, lambda_smooth_));
         const double sqrt_lr = std::sqrt(std::max(0.0, lambda_rot_));
         const double sqrt_ltp= std::sqrt(std::max(0.0, lambda_temporal_));
-        const double sqrt_lsp= std::sqrt(std::max(0.0, lambda_scale_prior));
-        const double sqrt_lst= std::sqrt(std::max(0.0, lambda_scale_temporal));
 
         int num_threads = omp_get_max_threads();
         std::vector<std::vector<Eigen::Triplet<double>>> triplets_thr(num_threads);
 
-        // PHOTO (f=0..F-1)
+        // PHOTO (f=0..F-1) — Left camera only vs vertex intensity variable
         if (use_photo) {
             #pragma omp parallel for schedule(static)
             for (int f=0; f<F; ++f) {
                 int tid = omp_get_thread_num(); auto& T = triplets_thr[tid];
                 edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
-                const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
-                const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
-                const cv::Mat& img = imgs_gray[f];
-                const BVH& bvh = bvhs[f];
+                const Eigen::Matrix3d R = poses_left_w2c[f].block<3,3>(0,0);
+                const Eigen::Vector3d t = poses_left_w2c[f].block<3,1>(0,3);
+                const cv::Mat& img = L[f];
                 int r = row_photo_begin + photo_row_ofs[f];
                 for (int idx=0; idx<(int)visible_vertices[f].size(); ++idx) {
                     int i = visible_vertices[f][idx];
@@ -377,7 +276,8 @@ void Optimizer::optimize(
                     int ci_it     = colI_it[i];
                     if (ci_global < 0 || ci_it < 0) { ++r; continue; }
                     const double Icurr = I_var[ci_global];
-                    PhotometricError cost(mesh_vertices[i], i, mesh_triangles, K, img, bvh, sqrt_w_photo, &edGraph);
+                    PhotometricError cost(mesh_vertices[i], i, mesh_triangles, K_left, img, /*bvh*/ *(new BVH()), sqrt_w_photo, &edGraph);
+                    // NOTE: BVH not used inside PhotometricError; passing a dummy to match signature.
 
                     double residual = 0.0;
                     Eigen::VectorXd J_ed(12*G); J_ed.setZero();
@@ -403,43 +303,38 @@ void Optimizer::optimize(
             }
         }
 
-        // ICP (f>=1) — use per-iteration normals and scaled depth; scale-Jacobian from CostFunction
-        if (use_icp) {
+        // STEREO (f=0..F-1) — Left–Right photometric consistency (no intensity var)
+        if (use_stereo) {
             #pragma omp parallel for schedule(static)
-            for (int f=1; f<F; ++f) {
+            for (int f=0; f<F; ++f) {
                 int tid = omp_get_thread_num(); auto& T = triplets_thr[tid];
                 edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
-                const Eigen::Matrix3d R = camera_poses_gt[f].block<3,3>(0,0);
-                const Eigen::Vector3d t = camera_poses_gt[f].block<3,1>(0,3);
-                const cv::Mat& depth = depth_scaled[f];
-                int r = row_icp_begin + icp_row_ofs[f];
+                const Eigen::Matrix3d RL = poses_left_w2c[f].block<3,3>(0,0);
+                const Eigen::Vector3d tL = poses_left_w2c[f].block<3,1>(0,3);
+                const Eigen::Matrix3d RR = poses_right_w2c[f].block<3,3>(0,0);
+                const Eigen::Vector3d tR = poses_right_w2c[f].block<3,1>(0,3);
+                int r = row_stereo_begin + stereo_row_ofs[f];
                 for (int idx=0; idx<(int)visible_vertices[f].size(); ++idx) {
                     int i = visible_vertices[f][idx];
-                    const Eigen::Vector3d n_w = normals_w[f][i];
+                    StereoPhotometricError scost(
+                        mesh_vertices[i], i, &edGraph,
+                        K_left, K_right,
+                        L[f], R[f],
+                        /*sqrt_w*/ sqrt_w_stereo);
 
-                    ProjectiveICPError icpCost(mesh_vertices[i], i, depth, &edGraph, K, n_w, sqrt_w_icp);
                     double residual=0.0; Eigen::VectorXd J_ed(12*G); J_ed.setZero();
-                    double J_logs = 0.0; // d residual / d log(s_eff)
-                    bool ok = icpCost.Evaluate(residual, &J_ed, R, t, &J_logs);
+                    bool ok = scost.Evaluate(residual, &J_ed, RL, tL, RR, tR);
                     if (!ok) { ++r; continue; }
                     Fvec[r] = residual;
 
-                    // ==== ED Jacobians ====
-                    const auto& bnd = bindings[i];
-                    for (int nid : bnd) {
-                        const int base = 12*nid;
-                        for (int c=0;c<9;++c)  { double v=J_ed[base+c];    if (!v) continue; int col=colA_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
-                        for (int c=0;c<3;++c)  { double v=J_ed[base+9+c];  if (!v) continue; int col=colt_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
-                    }
-
-                    // ==== Scale Jacobians (global + frame): both equal to J_logs ====
-                    const int cGlob = colScaleGlob(edDimCompact, Icount_it);
-                    T.emplace_back(r, cGlob, J_logs);
                     if (f>=1) {
-                        const int cFrm = colScaleFrame(edDimCompact, Icount_it, f);
-                        T.emplace_back(r, cFrm, J_logs);
+                        const auto& bnd = bindings[i];
+                        for (int nid : bnd) {
+                            const int base = 12*nid;
+                            for (int c=0;c<9;++c)  { double v=J_ed[base+c];    if (!v) continue; int col=colA_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
+                            for (int c=0;c<3;++c)  { double v=J_ed[base+9+c];  if (!v) continue; int col=colt_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
+                        }
                     }
-
                     ++r;
                 }
             }
@@ -489,32 +384,6 @@ void Optimizer::optimize(
             }
         }
 
-        // Scale priors: sqrt_lsp * delta_f
-        int row_sp = row_scale_prior_begin;
-        if (scale_prior_rows > 0 && sqrt_lsp > 0.0) {
-            const int cGlob = colScaleGlob(edDimCompact, Icount_it);
-            (void)cGlob; // not used here, but kept for clarity
-            for (int f=1; f<F; ++f) {
-                const int cFrm = colScaleFrame(edDimCompact, Icount_it, f);
-                Fvec[row_sp] = sqrt_lsp * (delta[f]);
-                if (cFrm >= 0) triplets_thr[0].emplace_back(row_sp, cFrm, sqrt_lsp);
-                ++row_sp;
-            }
-        }
-
-        // Scale temporal smooth: sqrt_lst * (delta_f - delta_{f-1})
-        int row_st = row_scale_temp_begin;
-        if (scale_tempor_rows > 0 && sqrt_lst > 0.0) {
-            for (int f=2; f<F; ++f) {
-                const int c1 = colScaleFrame(edDimCompact, Icount_it, f);
-                const int c0 = colScaleFrame(edDimCompact, Icount_it, f-1);
-                Fvec[row_st] = sqrt_lst * (delta[f] - delta[f-1]);
-                if (c1 >= 0) triplets_thr[0].emplace_back(row_st, c1, sqrt_lst);
-                if (c0 >= 0) triplets_thr[0].emplace_back(row_st, c0, -sqrt_lst);
-                ++row_st;
-            }
-        }
-
         // Build J and solve
         std::vector<Eigen::Triplet<double>> triplets;
         size_t nnz_est = 0; for (auto& v: triplets_thr) nnz_est += v.size(); triplets.reserve(nnz_est);
@@ -558,14 +427,6 @@ void Optimizer::optimize(
             if (ci_it < 0 || ci_global < 0) continue;
             I_var[ci_global] += dx[edDimCompact + ci_it];
             // Optional clamp: I_var[ci_global] = std::min(1.0, std::max(0.0, I_var[ci_global]));
-        }
-
-        // Apply update: scales
-        const int baseScale = edDimCompact + Icount_it;
-        gamma_global += dx[baseScale + 0];
-        for (int f=1; f<F; ++f) {
-            const int cFrm = baseScale + 1 + (f-1);
-            delta[f] += dx[cFrm];
         }
 
         const double mean_cost = (total_rows>0)? (2.0*cost / (double)total_rows) : cost;

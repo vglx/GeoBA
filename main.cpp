@@ -12,32 +12,30 @@
 #include <cstdlib>
 
 // -----------------------------------------------------------------------------
-// Updated main for the combined Photometric (RGB) + Projective-ICP (Depth)
-// optimizer API. Frame 0 is the template frame (no ED variables, no data term).
-// Poses are fixed (GT). Intensities are fixed to template sampling in optimizer.
+// Updated main: Stereo Photometric (Left+Right RGB only, no depth)
 // -----------------------------------------------------------------------------
 
 struct Args {
     std::string dataset_root = "../data/halfDef/6/";
-    int sampling_interval = 1;      // sample every k frames
-    int max_frames = 0;             // 0 = use all after sampling; >0 = cap after sampling
+    int sampling_interval = 1;
+    int max_frames = 0;
 
     // EDGraph params
     EDGraph::SamplingMode mode = EDGraph::SamplingMode::FPS;
-    int    stride      = 30;        // Stride only
-    double voxel_size  = 3.0;       // Voxel only (model units)
-    int    fps_target  = 1500;      // FPS only
-    int    neighborK   = 3;         // graph smoothness neighborhood size
-    int    K_bind      = 3;         // KNN bindings per vertex
+    int    stride      = 30;
+    double voxel_size  = 3.0;
+    int    fps_target  = 1500;
+    int    neighborK   = 3;
+    int    K_bind      = 3;
 
     // Optimizer weights
-    double w_photo = 0.3;           // photometric term
-    double w_icp   = 1.0;           // depth ICP term
+    double w_photo = 0.3;           // monocular photometric
+    double w_stereo= 0.3;           // stereo photometric
     double lambda_smooth = 0.01;
     double lambda_rot    = 0.01;
-    double lambda_temp   = 0.0;     // start disabled
-    int    maxStages     = 1;       // kept for compatibility
-    int    maxIterations = 1;      // GN iterations
+    double lambda_temp   = 0.0;
+    int    maxStages     = 1;
+    int    maxIterations = 5;
 } args;
 
 static void parse_cli(int argc, char** argv) {
@@ -64,7 +62,7 @@ static void parse_cli(int argc, char** argv) {
         else if (!std::strcmp(a, "--neighborK"))   args.neighborK    = nexti(args.neighborK);
         else if (!std::strcmp(a, "--Kbind"))       args.K_bind       = nexti(args.K_bind);
         else if (!std::strcmp(a, "--wphoto"))      args.w_photo      = nextd(args.w_photo);
-        else if (!std::strcmp(a, "--wicp"))        args.w_icp        = nextd(args.w_icp);
+        else if (!std::strcmp(a, "--wstereo"))     args.w_stereo     = nextd(args.w_stereo);
         else if (!std::strcmp(a, "--lsmooth"))     args.lambda_smooth= nextd(args.lambda_smooth);
         else if (!std::strcmp(a, "--lrot"))        args.lambda_rot   = nextd(args.lambda_rot);
         else if (!std::strcmp(a, "--ltemp"))       args.lambda_temp  = nextd(args.lambda_temp);
@@ -73,10 +71,9 @@ static void parse_cli(int argc, char** argv) {
 }
 
 int main(int argc, char** argv) {
-    std::cout << "==== GeoBA (Combined Photometric RGB + Projective ICP Depth, Poses Fixed) ====\n";
+    std::cout << "==== GeoBA (Stereo Photometric Only, Poses Fixed) ====\n";
     parse_cli(argc, argv);
 
-    // ---- dataset manager
     DatasetManager dataset_manager(args.dataset_root);
 
     // ---- mesh
@@ -89,8 +86,8 @@ int main(int argc, char** argv) {
     const auto& F = mesh_model.getTriangles();
     std::cout << "[main] Mesh: " << V.size() << " vertices, " << F.size() << " triangles" << std::endl;
 
-    // ---- build affine ED graph (nodes+bindings+neighbors)
-    EDGraph edGraph(/*K=*/args.K_bind, /*neighborK=*/args.neighborK);
+    // ---- build ED graph
+    EDGraph edGraph(args.K_bind, args.neighborK);
     EDGraph::BuildParams p;
     p.mode       = args.mode;
     p.stride     = args.stride;
@@ -99,7 +96,7 @@ int main(int argc, char** argv) {
     p.K_bind     = args.K_bind;
     p.neighborK  = args.neighborK;
 
-    if (!edGraph.initializeGraph(V, p, /*build_neighbors=*/true)) {
+    if (!edGraph.initializeGraph(V, p, true)) {
         std::cerr << "[main] Failed to initialize EDGraph" << std::endl;
         return -1;
     }
@@ -107,89 +104,80 @@ int main(int argc, char** argv) {
               << ", K_bind=" << args.K_bind
               << ", neighborK=" << args.neighborK << std::endl;
 
-    // ---- RGB images (for photometric term)
-    std::vector<cv::Mat> rgb_images;
-    if (!dataset_manager.loadAllRGBImages(rgb_images)) {
-        std::cerr << "[main] Failed to load RGB images" << std::endl;
+    // ---- load left/right RGB sequences
+    std::vector<cv::Mat> rgb_left, rgb_right;
+    if (!dataset_manager.loadAllRGB(args.dataset_root + "/rgb_left", rgb_left)) {
+        std::cerr << "[main] Failed to load left RGB images" << std::endl;
         return -1;
     }
-    std::cout << "[main] Loaded " << rgb_images.size() << " RGB frames" << std::endl;
-
-    // ---- depth images (CV_32F) & intrinsics
-    std::vector<cv::Mat> depth_images;
-    if (!dataset_manager.loadAllDepthImages(depth_images)) {
-        std::cerr << "[main] Failed to load depth images" << std::endl;
+    if (!dataset_manager.loadAllRGB(args.dataset_root + "/rgb_right", rgb_right)) {
+        std::cerr << "[main] Failed to load right RGB images" << std::endl;
         return -1;
     }
-    std::cout << "[main] Loaded " << depth_images.size() << " depth frames" << std::endl;
-
-    if (rgb_images.size() != depth_images.size()) {
-        std::cerr << "[main] Mismatch: RGB frames (" << rgb_images.size()
-                  << ") vs Depth frames (" << depth_images.size() << ")" << std::endl;
+    if (rgb_left.size() != rgb_right.size()) {
+        std::cerr << "[main] Mismatch: left RGB (" << rgb_left.size()
+                  << ") vs right RGB (" << rgb_right.size() << ")" << std::endl;
         return -1;
     }
+    std::cout << "[main] Loaded " << rgb_left.size() << " stereo RGB frame pairs" << std::endl;
 
-    Eigen::Matrix3d K;
-    if (!dataset_manager.loadCameraIntrinsics(K)) {
-        std::cerr << "[main] Failed to load camera intrinsics" << std::endl;
+    // ---- intrinsics (assume separate files for left/right)
+    Eigen::Matrix3d K_left, K_right;
+    if (!dataset_manager.loadCameraIntrinsics(K_left)) { // adjust to left.json if separated
+        std::cerr << "[main] Failed to load left intrinsics" << std::endl;
         return -1;
     }
+    K_right = K_left; // TODO: load separately if available
 
-    // ---- poses: use ONLY ground‑truth (fixed during optimization)
-    std::vector<Eigen::Matrix4d> gt_camera_poses;
-    if (!dataset_manager.loadPoses(gt_camera_poses, "poses_gt")) {
-        std::cerr << "[main] Failed to load ground‑truth poses" << std::endl;
+    // ---- poses (assume only left provided, right derived via extrinsics)
+    std::vector<Eigen::Matrix4d> poses_left_w2c;
+    if (!dataset_manager.loadPoses(poses_left_w2c, "poses_left_w2c")) {
+        std::cerr << "[main] Failed to load left poses" << std::endl;
         return -1;
     }
-
-    if (rgb_images.size() != gt_camera_poses.size()) {
-        std::cerr << "[main] Mismatch: frames (" << rgb_images.size()
-                  << ") vs GT poses (" << gt_camera_poses.size() << ")" << std::endl;
+    std::vector<Eigen::Matrix4d> poses_right_w2c;
+    if (!dataset_manager.loadPoses(poses_right_w2c, "poses_right_w2c")) {
+        std::cerr << "[main] Failed to load right poses" << std::endl;
         return -1;
     }
-
-    // ---- frame sampling (apply the same indices to RGB/Depth/Poses)
-    std::vector<cv::Mat> sampled_rgbs, sampled_depths;
-    std::vector<Eigen::Matrix4d> sampled_gt_poses;
-    for (size_t i = 0; i < rgb_images.size(); i += args.sampling_interval) {
-        sampled_rgbs.push_back(rgb_images[i]);
-        sampled_depths.push_back(depth_images[i]);
-        sampled_gt_poses.push_back(gt_camera_poses[i]);
-        if (args.max_frames>0 && (int)sampled_rgbs.size() >= args.max_frames) break;
-    }
-
-    std::cout << "[main] Sampled " << sampled_rgbs.size()
-              << " frames (interval=" << args.sampling_interval
-              << (args.max_frames>0? ", limit="+std::to_string(args.max_frames):"")
-              << ")" << std::endl;
-
-    if (sampled_rgbs.size() < 2) {
-        std::cerr << "[main] Need at least 2 frames (frame 0 = template, frame 1 = optimized)." << std::endl;
+    if (poses_left_w2c.size() != poses_right_w2c.size() || poses_left_w2c.size()!=rgb_left.size()) {
+        std::cerr << "[main] Mismatch between frames and poses" << std::endl;
         return -1;
     }
 
-    // ---- optimizer (data + smooth + rotation + optional temporal)
-    Optimizer optimizer(args.w_photo, args.w_icp,
+    // ---- sampling
+    std::vector<cv::Mat> Ls, Rs;
+    std::vector<Eigen::Matrix4d> posesL, posesR;
+    for (size_t i=0;i<rgb_left.size(); i+=args.sampling_interval) {
+        Ls.push_back(rgb_left[i]);
+        Rs.push_back(rgb_right[i]);
+        posesL.push_back(poses_left_w2c[i]);
+        posesR.push_back(poses_right_w2c[i]);
+        if (args.max_frames>0 && (int)Ls.size()>=args.max_frames) break;
+    }
+    if (Ls.size()<2) {
+        std::cerr << "[main] Need at least 2 stereo frames" << std::endl;
+        return -1;
+    }
+
+    // ---- optimizer
+    Optimizer optimizer(args.w_photo, args.w_stereo,
                         args.maxStages, args.maxIterations,
                         args.lambda_smooth, args.lambda_rot, args.lambda_temp);
 
     std::cout << "[main] Start optimization...\n";
-
     optimizer.optimize(
-        V, F,                 // mesh vertices & triangles
-        K,                    // intrinsics
-        sampled_rgbs,         // RGB frames
-        sampled_depths,       // depth frames (CV_32F, mm)
-        sampled_gt_poses,     // GT poses (frame0 fixed)
+        V, F,
+        K_left, K_right,
+        Ls, Rs,
+        posesL, posesR,
         edGraph,
-        [&](int f, const EDGraph& g){
-            dataset_manager.saveDeformedMeshAsPLY(
-                args.dataset_root + "results/PLYs/deformed_mesh_f" + std::to_string(f) + ".ply",
-                mesh_model, g);
-        }
-    );
+        [&](int f,const EDGraph& g){
+            dataset_manager.saveMeshAsPLY(
+                args.dataset_root+"/results/PLYs/deformed_mesh_f"+std::to_string(f)+".ply",
+                V,F);
+        });
 
     std::cout << "[main] Optimization complete." << std::endl;
-
     return 0;
 }

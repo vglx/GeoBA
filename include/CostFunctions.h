@@ -9,10 +9,10 @@
 #include "EDGraph.h"
 
 // -----------------------------------------------------------------------------
-// PhotometricError (existing)
-// -----------------------------------------------------------------------------
+// PhotometricError (unchanged): single-view photometric residual
 // r = sqrt(w) * sqrt(w_huber) * ( I(u,v) - I_v )
 // NOTE: Uses the T_wc convention: p_c = R^T * (p_w - t)
+// -----------------------------------------------------------------------------
 class PhotometricError {
 public:
     PhotometricError(const MeshModel::Vertex& vertex,
@@ -63,50 +63,63 @@ private:
 };
 
 // -----------------------------------------------------------------------------
-// ProjectiveICPError (NEW): point-to-plane residual using depth map
+// StereoPhotometricError (NEW): Left–Right photometric consistency
+// r = sqrt(w) * sqrt(w_huber) * ( I_L(u_L,v_L) - I_R(u_R,v_R) )
+// Only ED parameters are optimized here (no per-vertex intensity variable).
+// This drops ProjectiveICPError entirely.
 // -----------------------------------------------------------------------------
-// r = sqrt(w) * sqrt(w_huber) * ((p_c - p_obs) · n_c)
-// with p_c = R^T (p_w - t),
-//      p_obs = backproject(u,v,z_obs),
-//      n_c = R^T * n_w (unit length)
-// Jacobian w.r.t. ED affine parameters mirrors PhotometricError, with Jimg replaced by
-// Jgeo = n_c^T * R^T (1x3).
-struct ProjectiveICPError {
-    ProjectiveICPError(const MeshModel::Vertex& vertex,
-                       int vertex_index,
-                       const cv::Mat& depth_float,     // CV_32F, unit already unified (m or mm)
-                       const EDGraph* edGraph,
-                       const Eigen::Matrix3d& K,
-                       const Eigen::Vector3d& normal_w, // current-iteration deformed world normal
-                       double sqrt_w)
-        : v_raw_(vertex), vidx_(vertex_index), depth_(depth_float), ed_(edGraph),
-          K_(K), n_w_(normal_w), sqrt_w_(sqrt_w) {
-        fx_ = K_(0,0); fy_ = K_(1,1); cx_ = K_(0,2); cy_ = K_(1,2);
-    }
+class StereoPhotometricError {
+public:
+    StereoPhotometricError(const MeshModel::Vertex& vertex,
+                           int vertex_index,
+                           const EDGraph* edGraph,
+                           // intrinsics
+                           const Eigen::Matrix3d& K_left,
+                           const Eigen::Matrix3d& K_right,
+                           // grayscale images (CV_32F in [0,1])
+                           const cv::Mat& img_left,
+                           const cv::Mat& img_right,
+                           // residual global weight (will be multiplied by robust sqrt weight)
+                           double sqrt_w)
+    : v_raw_(vertex), vidx_(vertex_index), ed_(edGraph),
+      K_L_(K_left), K_R_(K_right),
+      imgL_(img_left), imgR_(img_right),
+      sqrt_w_(sqrt_w) {}
 
-    // Evaluate residual and Jacobian wrt ED (pose is fixed and passed in)
+    // Evaluate residual & J wrt ED. Poses are provided per call.
+    // T_wc convention for each camera: p_c = R^T (p_w - t)
     bool Evaluate(double& residual,
-                                     Eigen::VectorXd* jacobian_ed,
-                                     const Eigen::Matrix3d& R_wc,
-                                     const Eigen::Vector3d& t_wc,
-                                     double* jacobian_logscale /*=nullptr*/) const;
-
+                  Eigen::VectorXd* jacobian_ed,   // (optional) size = 12*G
+                  const Eigen::Matrix3d& R_wcl,   // world->cam-left rotation (actually cam->world given as W? we use transpose internally)
+                  const Eigen::Vector3d& t_wcl,
+                  const Eigen::Matrix3d& R_wcr,   // world->cam-right
+                  const Eigen::Vector3d& t_wcr) const;
 
     void setHuberDelta(double d) { huber_delta_ = d; }
-    void setDepthGate(double dz) { depth_gate_ = dz; } // gate on |pc.z - z_obs|
 
-    // Expose a light bilinear sampler for depth (clamped)
-    inline float sampleDepthBilinear(float& u, float& v) const {
-        const int W = depth_.cols, H = depth_.rows;
+private:
+    // Bilinear with gradient on a provided image; clamps to [1..W-2]/[1..H-2]
+    static inline void sampleBilinearAndGradient(const cv::Mat& img,
+                                                 float& u, float& v,
+                                                 float& I, float& dIdu, float& dIdv) {
+        const int W = img.cols, H = img.rows;
         u = std::min(std::max(u, 1.0f), (float)W - 2.0f);
         v = std::min(std::max(v, 1.0f), (float)H - 2.0f);
-        const int x = (int)std::floor(u), y = (int)std::floor(v);
+        const int x = (int)std::floor(u);
+        const int y = (int)std::floor(v);
         const float a = u - x, b = v - y;
-        const float d00 = depth_.at<float>(y,   x  );
-        const float d10 = depth_.at<float>(y,   x+1);
-        const float d01 = depth_.at<float>(y+1, x  );
-        const float d11 = depth_.at<float>(y+1, x+1);
-        return (1-a)*(1-b)*d00 + a*(1-b)*d10 + (1-a)*b*d01 + a*b*d11;
+        const float I00 = img.at<float>(y,   x  );
+        const float I10 = img.at<float>(y,   x+1);
+        const float I01 = img.at<float>(y+1, x  );
+        const float I11 = img.at<float>(y+1, x+1);
+        I = (1-a)*(1-b)*I00 + a*(1-b)*I10 + (1-a)*b*I01 + a*b*I11;
+        const float Gx00 = I10 - I00;
+        const float Gx01 = I11 - I01;
+        const float Gy00 = I01 - I00;
+        const float Gy10 = I11 - I10;
+        // du, dv gradients (forward diff blended)
+        dIdu = (1-b)*Gx00 + b*Gx01;
+        dIdv = (1-a)*Gy00 + a*Gy10;
     }
 
     static inline double huberWeight(double r, double delta) {
@@ -115,21 +128,18 @@ struct ProjectiveICPError {
         return delta / (ar + 1e-12);        // outside: w = delta/|r|
     }
 
-    // public members for convenience
+private:
     MeshModel::Vertex v_raw_;
     int vidx_ = -1;
-    cv::Mat depth_;                 // CV_32F unified units
     const EDGraph* ed_ = nullptr;
-    Eigen::Matrix3d K_ = Eigen::Matrix3d::Identity();
-    Eigen::Vector3d n_w_ = Eigen::Vector3d(0,0,1);
+
+    Eigen::Matrix3d K_L_ = Eigen::Matrix3d::Identity();
+    Eigen::Matrix3d K_R_ = Eigen::Matrix3d::Identity();
+    cv::Mat imgL_;    // CV_32F [0,1]
+    cv::Mat imgR_;    // CV_32F [0,1]
+
     double sqrt_w_ = 1.0;
-
-    // intrinsics cached
-    double fx_ = 0, fy_ = 0, cx_ = 0, cy_ = 0;
-
-    // robust & gating
-    double huber_delta_ = 0.01;   // in geometry units along normal (same unit as depth)
-    double depth_gate_  = -1.0;   // if >0, drop if |pc.z - z_obs| > gate
+    double huber_delta_ = 0.05;   // intensity units
 };
 
 #endif // COSTFUNCTIONS_H

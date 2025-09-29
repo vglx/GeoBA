@@ -20,6 +20,8 @@ public:
     // 加载所有 RGB 图像
     bool loadAllRGBImages(std::vector<cv::Mat>& rgb_images);
 
+    bool loadAllRGB(const std::string& rgb_dir, std::vector<cv::Mat>& rgb_images);
+
     // 加载所有深度图像
     bool loadAllDepthImages(std::vector<cv::Mat>& depth_images);
 
