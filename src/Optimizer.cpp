@@ -7,6 +7,7 @@
 #include <numeric>
 #include <Eigen/Sparse>
 #include <Eigen/SparseCholesky>
+#include <Eigen/Geometry>
 #include <omp.h>
 
 namespace {

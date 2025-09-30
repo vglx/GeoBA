@@ -106,11 +106,11 @@ int main(int argc, char** argv) {
 
     // ---- load left/right RGB sequences
     std::vector<cv::Mat> rgb_left, rgb_right;
-    if (!dataset_manager.loadAllRGB(args.dataset_root + "/rgb_left", rgb_left)) {
+    if (!dataset_manager.loadAllRGB(args.dataset_root + "rgb_left", rgb_left)) {
         std::cerr << "[main] Failed to load left RGB images" << std::endl;
         return -1;
     }
-    if (!dataset_manager.loadAllRGB(args.dataset_root + "/rgb_right", rgb_right)) {
+    if (!dataset_manager.loadAllRGB(args.dataset_root + "rgb_right", rgb_right)) {
         std::cerr << "[main] Failed to load right RGB images" << std::endl;
         return -1;
     }
@@ -196,7 +196,7 @@ int main(int argc, char** argv) {
         edGraph,
         [&](int f,const EDGraph& g){
             dataset_manager.saveMeshAsPLY(
-                args.dataset_root+"/results/PLYs/deformed_mesh_f"+std::to_string(f)+".ply",
+                args.dataset_root+"results/PLYs/deformed_mesh_f"+std::to_string(f)+".ply",
                 V,F);
         });
 
