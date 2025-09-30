@@ -8,11 +8,10 @@ PhotometricError::PhotometricError(const MeshModel::Vertex& vertex,
                                    const std::vector<MeshModel::Triangle>& mesh_triangles,
                                    const Eigen::Matrix3d& K,
                                    const cv::Mat& image_gray_float,
-                                   const BVH& bvh,
                                    double sqrt_w,
                                    const EDGraph* edGraph)
     : v_raw_(vertex), vidx_(vertex_index), tris_(mesh_triangles),
-      K_(K), img_(image_gray_float), bvh_(bvh), sqrt_w_(sqrt_w), ed_(edGraph) {}
+      K_(K), img_(image_gray_float), sqrt_w_(sqrt_w), ed_(edGraph) {}
 
 bool PhotometricError::sampleBilinearAndGradient(float& u, float& v,
                                                  float& I,

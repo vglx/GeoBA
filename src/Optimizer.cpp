@@ -187,8 +187,6 @@ void Optimizer::optimize(
         }
 
         // 2) Active nodes/edges (f>=1) & compact index
-        const auto& edges = edGraph.getEdges();
-        const int G = edGraph.numNodes();
         std::vector<std::vector<char>> active_node(F, std::vector<char>(G,0));
         std::vector<std::vector<std::pair<int,int>>> active_edges(F);
         std::vector<std::vector<int>> compact_idx(F, std::vector<int>(G,-1));
@@ -276,7 +274,7 @@ void Optimizer::optimize(
                     int ci_it     = colI_it[i];
                     if (ci_global < 0 || ci_it < 0) { ++r; continue; }
                     const double Icurr = I_var[ci_global];
-                    PhotometricError cost(mesh_vertices[i], i, mesh_triangles, K_left, img, /*bvh*/ *(new BVH()), sqrt_w_photo, &edGraph);
+                    PhotometricError cost(mesh_vertices[i], i, mesh_triangles, K_left, img, sqrt_w_photo, &edGraph);
                     // NOTE: BVH not used inside PhotometricError; passing a dummy to match signature.
 
                     double residual = 0.0;

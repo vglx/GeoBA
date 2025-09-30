@@ -5,7 +5,6 @@
 #include <vector>
 #include <opencv2/opencv.hpp>
 #include "MeshModel.h"
-#include "BVH.h"
 #include "EDGraph.h"
 
 // -----------------------------------------------------------------------------
@@ -20,7 +19,6 @@ public:
                      const std::vector<MeshModel::Triangle>& mesh_triangles,
                      const Eigen::Matrix3d& K,
                      const cv::Mat& image_gray_float,   // CV_32F in [0,1]
-                     const BVH& bvh,                    // kept for signature compatibility
                      double sqrt_w,
                      const EDGraph* edGraph);
 
@@ -54,7 +52,6 @@ private:
     const std::vector<MeshModel::Triangle>& tris_;
     Eigen::Matrix3d K_;
     cv::Mat img_;           // CV_32F [0,1]
-    const BVH& bvh_;
     double sqrt_w_;
     const EDGraph* ed_;
 
