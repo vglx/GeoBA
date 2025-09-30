@@ -173,8 +173,8 @@ int main(int argc, char** argv) {
     for (size_t i=0;i<rgb_left.size(); i+=args.sampling_interval) {
         Ls.push_back(rgb_left[i]);
         Rs.push_back(rgb_right[i]);
-        posesL_sub.push_back(posesL[i]);
-        posesR_sub.push_back(posesR[i]);
+        posesL_sub.push_back(posesL_wc[i]);
+        posesR_sub.push_back(posesR_wc[i]);
         if (args.max_frames>0 && (int)Ls.size()>=args.max_frames) break;
     }
     if (Ls.size()<2) {
@@ -195,9 +195,9 @@ int main(int argc, char** argv) {
         posesL_sub, posesR_sub,
         edGraph,
         [&](int f,const EDGraph& g){
-            dataset_manager.saveMeshAsPLY(
+            dataset_manager.saveDeformedMeshAsPLY(
                 args.dataset_root+"results/PLYs/deformed_mesh_f"+std::to_string(f)+".ply",
-                V,F);
+                mesh_model, g);
         });
 
     std::cout << "[main] Optimization complete." << std::endl;
