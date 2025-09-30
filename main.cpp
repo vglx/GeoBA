@@ -15,9 +15,9 @@
 // Updated main: Stereo Photometric (Left+Right RGB only, no depth)
 // -----------------------------------------------------------------------------
 struct Args {
-    std::string dataset_root = ".";
-    int    sampling_interval = 1;
-    int    max_frames   = -1;
+    std::string dataset_root = "../data/halfDef/6/";
+    int sampling_interval = 1;
+    int max_frames = 0;
 
     // EDGraph sampling params
     EDGraph::SamplingMode mode = EDGraph::SamplingMode::Voxel;
@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
     std::cout << "==== GeoBA (Stereo Photometric Only, Poses Fixed) ====\n";
     parse_cli(argc, argv);
 
-    DatasetManager dataset_manager;
+    DatasetManager dataset_manager(args.dataset_root);
 
     // ---- load mesh
     std::vector<MeshModel::Vertex> V;
