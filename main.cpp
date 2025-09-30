@@ -12,11 +12,11 @@
 #include <cstdlib>
 
 // -----------------------------------------------------------------------------
-// Updated main: Stereo Photometric (Left+Right RGB only, no depth)
+// GeoBA main: Stereo Photometric (derive L/R from center poses, baseline=1.5mm)
 // -----------------------------------------------------------------------------
 
 struct Args {
-    std::string dataset_root = "../data/halfDef/6/";
+    std::string dataset_root = "../data/halfDef/9/";
     int sampling_interval = 1;
     int max_frames = 0;
 
@@ -29,8 +29,8 @@ struct Args {
     int    K_bind      = 3;
 
     // Optimizer weights
-    double w_photo = 0.3;           // monocular photometric
-    double w_stereo= 0.3;           // stereo photometric
+    double w_photo = 0.3;
+    double w_stereo= 0.3;
     double lambda_smooth = 0.01;
     double lambda_rot    = 0.01;
     double lambda_temp   = 0.0;
@@ -71,7 +71,7 @@ static void parse_cli(int argc, char** argv) {
 }
 
 int main(int argc, char** argv) {
-    std::cout << "==== GeoBA (Stereo Photometric Only, Poses Fixed) ====\n";
+    std::cout << "==== GeoBA (Stereo Photometric Only, Poses Fixed from Center) ====\n";
     parse_cli(argc, argv);
 
     DatasetManager dataset_manager(args.dataset_root);
@@ -121,38 +121,60 @@ int main(int argc, char** argv) {
     }
     std::cout << "[main] Loaded " << rgb_left.size() << " stereo RGB frame pairs" << std::endl;
 
-    // ---- intrinsics (assume separate files for left/right)
+    // ---- intrinsics
     Eigen::Matrix3d K_left, K_right;
-    if (!dataset_manager.loadCameraIntrinsics(K_left)) { // adjust to left.json if separated
-        std::cerr << "[main] Failed to load left intrinsics" << std::endl;
+    if (!dataset_manager.loadCameraIntrinsics(K_left)) {
+        std::cerr << "[main] Failed to load intrinsics" << std::endl;
         return -1;
     }
-    K_right = K_left; // TODO: load separately if available
+    K_right = K_left; // assume same for now
 
-    // ---- poses (assume only left provided, right derived via extrinsics)
-    std::vector<Eigen::Matrix4d> poses_left;
-    if (!dataset_manager.loadPoses(poses_left, "poses_left")) {
-        std::cerr << "[main] Failed to load left poses" << std::endl;
+    // ---- poses: load center poses, then derive L/R with baseline=1.5mm
+    std::vector<Eigen::Matrix4d> poses_center;
+    if (!dataset_manager.loadPoses(poses_center, "poses_gt")) {
+        std::cerr << "[main] Failed to load poses_center" << std::endl;
         return -1;
     }
-    std::vector<Eigen::Matrix4d> poses_right;
-    if (!dataset_manager.loadPoses(poses_right, "poses_right")) {
-        std::cerr << "[main] Failed to load right poses" << std::endl;
+    if (poses_center.size() != rgb_left.size()) {
+        std::cerr << "[main] Mismatch: poses_center (" << poses_center.size()
+                  << ") vs stereo RGB (" << rgb_left.size() << ")" << std::endl;
         return -1;
     }
-    if (poses_left.size() != poses_right.size() || rgb_left.size()!=rgb_right.size()) {
-        std::cerr << "[main] Mismatch between frames and poses" << std::endl;
-        return -1;
+
+    const double baseline_mm = 1.5;
+    const double half_b = baseline_mm * 0.5;
+    const Eigen::Vector3d tC_L(+half_b, 0.0, 0.0);
+    const Eigen::Vector3d tC_R(-half_b, 0.0, 0.0);
+
+    std::vector<Eigen::Matrix4d> posesL, posesR;
+    posesL.reserve(poses_center.size());
+    posesR.reserve(poses_center.size());
+
+    for (const auto& Tcw : poses_center) {
+        Eigen::Matrix4d Tlw = Eigen::Matrix4d::Identity();
+        Eigen::Matrix4d Trw = Eigen::Matrix4d::Identity();
+
+        Eigen::Matrix3d Rcw = Tcw.block<3,3>(0,0);
+        Eigen::Vector3d tcw = Tcw.block<3,1>(0,3);
+
+        Tlw.block<3,3>(0,0) = Rcw;
+        Tlw.block<3,1>(0,3) = tcw + Rcw * tC_L;
+
+        Trw.block<3,3>(0,0) = Rcw;
+        Trw.block<3,1>(0,3) = tcw + Rcw * tC_R;
+
+        posesL.push_back(Tlw);
+        posesR.push_back(Trw);
     }
 
     // ---- sampling
     std::vector<cv::Mat> Ls, Rs;
-    std::vector<Eigen::Matrix4d> posesL, posesR;
+    std::vector<Eigen::Matrix4d> posesL_sub, posesR_sub;
     for (size_t i=0;i<rgb_left.size(); i+=args.sampling_interval) {
         Ls.push_back(rgb_left[i]);
         Rs.push_back(rgb_right[i]);
-        posesL.push_back(poses_left[i]);
-        posesR.push_back(poses_right[i]);
+        posesL_sub.push_back(posesL[i]);
+        posesR_sub.push_back(posesR[i]);
         if (args.max_frames>0 && (int)Ls.size()>=args.max_frames) break;
     }
     if (Ls.size()<2) {
@@ -170,7 +192,7 @@ int main(int argc, char** argv) {
         V, F,
         K_left, K_right,
         Ls, Rs,
-        posesL, posesR,
+        posesL_sub, posesR_sub,
         edGraph,
         [&](int f,const EDGraph& g){
             dataset_manager.saveMeshAsPLY(
