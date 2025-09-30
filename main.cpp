@@ -146,25 +146,25 @@ int main(int argc, char** argv) {
     const Eigen::Vector3d tC_L(+half_b, 0.0, 0.0);
     const Eigen::Vector3d tC_R(-half_b, 0.0, 0.0);
 
-    std::vector<Eigen::Matrix4d> posesL, posesR;
-    posesL.reserve(poses_center.size());
-    posesR.reserve(poses_center.size());
+    std::vector<Eigen::Matrix4d> posesL_wc, posesR_wc;
+    posesL_wc.reserve(poses_center.size());
+    posesR_wc.reserve(poses_center.size());
 
-    for (const auto& Tcw : poses_center) {
-        Eigen::Matrix4d Tlw = Eigen::Matrix4d::Identity();
-        Eigen::Matrix4d Trw = Eigen::Matrix4d::Identity();
+    for (const auto& Twc_center : poses_center) {
+        Eigen::Matrix4d TLwc = Eigen::Matrix4d::Identity();
+        Eigen::Matrix4d TRwc = Eigen::Matrix4d::Identity();
 
-        Eigen::Matrix3d Rcw = Tcw.block<3,3>(0,0);
-        Eigen::Vector3d tcw = Tcw.block<3,1>(0,3);
+        Eigen::Matrix3d Rwc = Twc_center.block<3,3>(0,0);
+        Eigen::Vector3d twc = Twc_center.block<3,1>(0,3);
 
-        Tlw.block<3,3>(0,0) = Rcw;
-        Tlw.block<3,1>(0,3) = tcw + Rcw * tC_L;
+        TLwc.block<3,3>(0,0) = Rwc;
+        TLwc.block<3,1>(0,3) = twc + Rwc * tC_L;
 
-        Trw.block<3,3>(0,0) = Rcw;
-        Trw.block<3,1>(0,3) = tcw + Rcw * tC_R;
+        TRwc.block<3,3>(0,0) = Rwc;
+        TRwc.block<3,1>(0,3) = twc + Rwc * tC_R;
 
-        posesL.push_back(Tlw);
-        posesR.push_back(Trw);
+        posesL_wc.push_back(TLwc);
+        posesR_wc.push_back(TRwc);
     }
 
     // ---- sampling

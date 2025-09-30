@@ -32,7 +32,7 @@ public:
     // - mesh_vertices / mesh_triangles: static template mesh (model space)
     // - K_left, K_right: 3x3 intrinsics for L/R
     // - rgb_left, rgb_right: per-frame L/R RGB images (CV_8UC3 or CV_32FC1 gray)
-    // - poses_left_w2c, poses_right_w2c: per-frame world->camera for L/R
+    // - poses_left, poses_right: per-frame world->camera for L/R
     // - edGraph: ED graph (frame 0 kept fixed)
     void optimize(
         const std::vector<struct MeshModel::Vertex>& mesh_vertices,
@@ -41,8 +41,8 @@ public:
         const Eigen::Matrix3d& K_right,
         const std::vector<cv::Mat>& rgb_left,
         const std::vector<cv::Mat>& rgb_right,
-        const std::vector<Eigen::Matrix4d>& poses_left_w2c,
-        const std::vector<Eigen::Matrix4d>& poses_right_w2c,
+        const std::vector<Eigen::Matrix4d>& poses_left,
+        const std::vector<Eigen::Matrix4d>& poses_right,
         EDGraph& edGraph,
         SaveCallback on_save = nullptr);
 

@@ -10,6 +10,21 @@
 #include <Eigen/Geometry>
 #include <omp.h>
 
+// =============================================================
+// This version removes data races and adds lazy intensity creation
+//
+// Key changes vs your original file:
+// 1) Removed per-thread writes to edGraph during PHOTO/STEREO assembly.
+//    We now update edGraph state ONCE per frame (serial) and use it READ-ONLY
+//    inside the parallel loops. (No more updateFromStateVector inside omp bodies.)
+// 2) Added lazy creation of intensity variables: any vertex that first becomes
+//    visible in later frames gets an intensity slot and initialization at the
+//    moment we first see it (before layout for this iteration).
+// 3) Kept your Vdef-based visibility path; cost functors still read from edGraph,
+//    but the state is stable per frame.
+// 4) Minor hygiene: clearer comments, bounds checks, and early-continue guards.
+// =============================================================
+
 namespace {
 
 inline float bilinearSample(const cv::Mat& img, float u, float v){
@@ -69,19 +84,19 @@ void Optimizer::optimize(
     const Eigen::Matrix3d& K_right,
     const std::vector<cv::Mat>& rgb_left,
     const std::vector<cv::Mat>& rgb_right,
-    const std::vector<Eigen::Matrix4d>& poses_left_w2c,
-    const std::vector<Eigen::Matrix4d>& poses_right_w2c,
+    const std::vector<Eigen::Matrix4d>& poses_left,   // NOTE: name kept, semantics: T_wc expected
+    const std::vector<Eigen::Matrix4d>& poses_right,  // NOTE: name kept, semantics: T_wc expected
     EDGraph& edGraph,
     SaveCallback on_save) {
 
-    const int F = (int)rgb_left.size();
+    const int F  = (int)rgb_left.size();
     const int Fr = (int)rgb_right.size();
     const int N  = (int)mesh_vertices.size();
     const int G  = edGraph.numNodes();
 
     if (F <= 1 || N == 0 || G == 0 || F != Fr ||
-        (int)poses_left_w2c.size()  != F ||
-        (int)poses_right_w2c.size() != F) {
+        (int)poses_left.size()  != F ||
+        (int)poses_right.size() != F) {
         std::cout << "[Optimizer] Invalid inputs: need L/R RGB for >=2 frames, matching sizes, mesh & graph non-empty." << std::endl;
         return;
     }
@@ -121,12 +136,13 @@ void Optimizer::optimize(
     // =========================
     std::vector<double> I_tmpl(N, std::numeric_limits<double>::quiet_NaN());
     {
-        const Eigen::Matrix3d R0 = poses_left_w2c[0].block<3,3>(0,0);
-        const Eigen::Vector3d t0 = poses_left_w2c[0].block<3,1>(0,3);
+        edGraph.updateFromStateVector(Xfull[0], /*offset=*/0); // identity at init
+        const Eigen::Matrix3d R0 = poses_left[0].block<3,3>(0,0);
+        const Eigen::Vector3d t0 = poses_left[0].block<3,1>(0,3);
         const cv::Mat& img0 = L[0];
         #pragma omp parallel for schedule(static)
         for (int i = 0; i < N; ++i) {
-            Eigen::Vector3d pw = edGraph.deformVertex(mesh_vertices[i], i); // identity at init
+            Eigen::Vector3d pw = edGraph.deformVertex(mesh_vertices[i], i);
             Eigen::Vector3d pc = R0.transpose() * (pw - t0);
             if (pc.z() <= 1e-8) continue;
             float u = (float)(K_left(0,0)*(pc.x()/pc.z()) + K_left(0,2));
@@ -136,11 +152,11 @@ void Optimizer::optimize(
         }
     }
 
-    // Compact intensity storage
-    std::vector<int> colI(N, -1); int Icount_global=0;
-    for (int i=0;i<N;++i) if (std::isfinite(I_tmpl[i])) colI[i] = Icount_global++;
-    std::vector<double> I_var(Icount_global, 0.0);
-    for (int i=0;i<N;++i) if (colI[i] >= 0) I_var[colI[i]] = I_tmpl[i];
+    // Compact intensity storage (global, grows lazily)
+    std::vector<int>    colI(N, -1);
+    std::vector<double> I_var; I_var.reserve(N);
+    int Icount_global = 0;
+    for (int i=0;i<N;++i) if (std::isfinite(I_tmpl[i])) { colI[i] = Icount_global++; I_var.push_back(I_tmpl[i]); }
 
     // =========================
     // GN loop with DYNAMIC visibility/active set/row & col layout
@@ -148,14 +164,15 @@ void Optimizer::optimize(
     double prev_cost = std::numeric_limits<double>::max();
 
     for (int it=0; it<maxIterations_; ++it) {
-        // 0) write current X to graph
+        // 0) write current X to graph (for completeness; we also set per-frame below)
         for (int f=0; f<F; ++f) edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
 
         // 0.5) Build per-frame deformed vertices and normals (world)
         std::vector<std::vector<Eigen::Vector3d>> Vdef(F, std::vector<Eigen::Vector3d>(N));
         std::vector<std::vector<Eigen::Vector3d>> normals_w(F, std::vector<Eigen::Vector3d>(N));
-        #pragma omp parallel for schedule(static)
         for (int f = 0; f < F; ++f) {
+            edGraph.updateFromStateVector(Xfull[f], /*offset=*/0); // set once per frame (serial)
+            #pragma omp parallel for schedule(static)
             for (int i = 0; i < N; ++i) Vdef[f][i] = edGraph.deformVertex(mesh_vertices[i], i);
             computeVertexNormals(Vdef[f], mesh_triangles, normals_w[f]);
         }
@@ -164,8 +181,8 @@ void Optimizer::optimize(
         std::vector<std::vector<int>> visible_vertices(F);
         for (int f = 0; f < F; ++f) {
             const cv::Mat& imgL = L[f];
-            const Eigen::Matrix3d R = poses_left_w2c[f].block<3,3>(0,0);
-            const Eigen::Vector3d t = poses_left_w2c[f].block<3,1>(0,3);
+            const Eigen::Matrix3d R = poses_left[f].block<3,3>(0,0);
+            const Eigen::Vector3d t = poses_left[f].block<3,1>(0,3);
             std::vector<int> vis; vis.reserve(N/2);
 
             #pragma omp parallel
@@ -185,6 +202,26 @@ void Optimizer::optimize(
                 vis.insert(vis.end(), local.begin(), local.end());
             }
             visible_vertices[f].swap(vis);
+        }
+
+        // 1.5) Lazy intensity creation: for any newly visible vertex i with colI[i]<0,
+        //      assign a new global intensity slot initialized from its first valid appearance (left view).
+        for (int f = 0; f < F; ++f) {
+            const Eigen::Matrix3d R = poses_left[f].block<3,3>(0,0);
+            const Eigen::Vector3d t = poses_left[f].block<3,1>(0,3);
+            const cv::Mat& imgL = L[f];
+            for (int vid : visible_vertices[f]) {
+                if (colI[vid] >= 0) continue;
+                const Eigen::Vector3d& pw = Vdef[f][vid];
+                Eigen::Vector3d pc = R.transpose() * (pw - t);
+                if (pc.z() <= 1e-8) continue;
+                float u = static_cast<float>(K_left(0,0) * (pc.x()/pc.z()) + K_left(0,2));
+                float v = static_cast<float>(K_left(1,1) * (pc.y()/pc.z()) + K_left(1,2));
+                if (u < 1 || v < 1 || u > imgL.cols - 2 || v > imgL.rows - 2) continue;
+                const double I0 = (double)bilinearSample(imgL, u, v);
+                colI[vid] = Icount_global++;
+                I_var.push_back(I0);
+            }
         }
 
         // 2) Active nodes/edges (f>=1) & compact index
@@ -207,7 +244,7 @@ void Optimizer::optimize(
         auto colA_c  = [&](int f,int node,int k){ int ci=compact_idx[f][node]; if (ci<0) return -1; return offsEDc(f)+12*ci+k; };
         auto colt_c  = [&](int f,int node,int k){ int ci=compact_idx[f][node]; if (ci<0) return -1; return offsEDc(f)+12*ci+9+k; };
 
-        // 2.5) Intensity columns: per-iteration COMPACT mapping（只为可见顶点）
+        // 2.5) Intensity columns: per-iteration COMPACT mapping（只为本轮可见顶点）
         std::vector<char> I_active(N, 0);
         for (int f=0; f<F; ++f) for (int vid : visible_vertices[f]) if (colI[vid] >= 0) I_active[vid] = 1;
         std::vector<int> colI_it(N, -1); int Icount_it = 0;
@@ -261,22 +298,27 @@ void Optimizer::optimize(
 
         // PHOTO (f=0..F-1) — Left camera only vs vertex intensity variable
         if (use_photo) {
-            #pragma omp parallel for schedule(static)
             for (int f=0; f<F; ++f) {
-                int tid = omp_get_thread_num(); auto& T = triplets_thr[tid];
+                // Set frame state once (serial) — read-only in parallel body
                 edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
-                const Eigen::Matrix3d R = poses_left_w2c[f].block<3,3>(0,0);
-                const Eigen::Vector3d t = poses_left_w2c[f].block<3,1>(0,3);
+
+                const Eigen::Matrix3d R = poses_left[f].block<3,3>(0,0);
+                const Eigen::Vector3d t = poses_left[f].block<3,1>(0,3);
                 const cv::Mat& img = L[f];
-                int r = row_photo_begin + photo_row_ofs[f];
+                int row_base = row_photo_begin + photo_row_ofs[f];
+
+                #pragma omp parallel for schedule(static)
                 for (int idx=0; idx<(int)visible_vertices[f].size(); ++idx) {
+                    int tid = omp_get_thread_num(); auto& T = triplets_thr[tid];
+                    int r = row_base + idx;
                     int i = visible_vertices[f][idx];
+
                     int ci_global = colI[i];
                     int ci_it     = colI_it[i];
-                    if (ci_global < 0 || ci_it < 0) { ++r; continue; }
+                    if (ci_global < 0 || ci_it < 0) { continue; }
+
                     const double Icurr = I_var[ci_global];
                     PhotometricError cost(mesh_vertices[i], i, mesh_triangles, K_left, img, sqrt_w_photo, &edGraph);
-                    // NOTE: BVH not used inside PhotometricError; passing a dummy to match signature.
 
                     double residual = 0.0;
                     Eigen::VectorXd J_ed(12*G); J_ed.setZero();
@@ -297,24 +339,28 @@ void Optimizer::optimize(
                             for (int c=0;c<3;++c)  { double v=J_ed[base+9+c];  if (!v) continue; int col=colt_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
                         }
                     }
-                    ++r;
                 }
             }
         }
 
         // STEREO (f=0..F-1) — Left–Right photometric consistency (no intensity var)
         if (use_stereo) {
-            #pragma omp parallel for schedule(static)
             for (int f=0; f<F; ++f) {
-                int tid = omp_get_thread_num(); auto& T = triplets_thr[tid];
+                // Set frame state once (serial)
                 edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
-                const Eigen::Matrix3d RL = poses_left_w2c[f].block<3,3>(0,0);
-                const Eigen::Vector3d tL = poses_left_w2c[f].block<3,1>(0,3);
-                const Eigen::Matrix3d RR = poses_right_w2c[f].block<3,3>(0,0);
-                const Eigen::Vector3d tR = poses_right_w2c[f].block<3,1>(0,3);
-                int r = row_stereo_begin + stereo_row_ofs[f];
+
+                const Eigen::Matrix3d RL = poses_left[f].block<3,3>(0,0);
+                const Eigen::Vector3d tL = poses_left[f].block<3,1>(0,3);
+                const Eigen::Matrix3d RR = poses_right[f].block<3,3>(0,0);
+                const Eigen::Vector3d tR = poses_right[f].block<3,1>(0,3);
+                int row_base = row_stereo_begin + stereo_row_ofs[f];
+
+                #pragma omp parallel for schedule(static)
                 for (int idx=0; idx<(int)visible_vertices[f].size(); ++idx) {
+                    int tid = omp_get_thread_num(); auto& T = triplets_thr[tid];
+                    int r = row_base + idx;
                     int i = visible_vertices[f][idx];
+
                     StereoPhotometricError scost(
                         mesh_vertices[i], i, &edGraph,
                         K_left, K_right,
@@ -323,7 +369,7 @@ void Optimizer::optimize(
 
                     double residual=0.0; Eigen::VectorXd J_ed(12*G); J_ed.setZero();
                     bool ok = scost.Evaluate(residual, &J_ed, RL, tL, RR, tR);
-                    if (!ok) { ++r; continue; }
+                    if (!ok) { continue; }
                     Fvec[r] = residual;
 
                     if (f>=1) {
@@ -334,7 +380,6 @@ void Optimizer::optimize(
                             for (int c=0;c<3;++c)  { double v=J_ed[base+9+c];  if (!v) continue; int col=colt_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
                         }
                     }
-                    ++r;
                 }
             }
         }
