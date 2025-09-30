@@ -130,17 +130,17 @@ int main(int argc, char** argv) {
     K_right = K_left; // TODO: load separately if available
 
     // ---- poses (assume only left provided, right derived via extrinsics)
-    std::vector<Eigen::Matrix4d> poses_left_w2c;
-    if (!dataset_manager.loadPoses(poses_left_w2c, "poses_left_w2c")) {
+    std::vector<Eigen::Matrix4d> poses_left;
+    if (!dataset_manager.loadPoses(poses_left, "poses_left")) {
         std::cerr << "[main] Failed to load left poses" << std::endl;
         return -1;
     }
-    std::vector<Eigen::Matrix4d> poses_right_w2c;
-    if (!dataset_manager.loadPoses(poses_right_w2c, "poses_right_w2c")) {
+    std::vector<Eigen::Matrix4d> poses_right;
+    if (!dataset_manager.loadPoses(poses_right, "poses_right")) {
         std::cerr << "[main] Failed to load right poses" << std::endl;
         return -1;
     }
-    if (poses_left_w2c.size() != poses_right_w2c.size() || poses_left_w2c.size()!=rgb_left.size()) {
+    if (poses_left.size() != poses_right.size() || rgb_left.size()!=rgb_right.size()) {
         std::cerr << "[main] Mismatch between frames and poses" << std::endl;
         return -1;
     }
@@ -151,8 +151,8 @@ int main(int argc, char** argv) {
     for (size_t i=0;i<rgb_left.size(); i+=args.sampling_interval) {
         Ls.push_back(rgb_left[i]);
         Rs.push_back(rgb_right[i]);
-        posesL.push_back(poses_left_w2c[i]);
-        posesR.push_back(poses_right_w2c[i]);
+        posesL.push_back(poses_left[i]);
+        posesR.push_back(poses_right[i]);
         if (args.max_frames>0 && (int)Ls.size()>=args.max_frames) break;
     }
     if (Ls.size()<2) {
