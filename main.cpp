@@ -14,17 +14,16 @@
 // -----------------------------------------------------------------------------
 // Updated main: Stereo Photometric (Left+Right RGB only, no depth)
 // -----------------------------------------------------------------------------
-
 struct Args {
-    std::string dataset_root = "../data/halfDef/6/";
-    int sampling_interval = 1;
-    int max_frames = 0;
+    std::string dataset_root = ".";
+    int    sampling_interval = 1;
+    int    max_frames   = -1;
 
-    // EDGraph params
-    EDGraph::SamplingMode mode = EDGraph::SamplingMode::FPS;
-    int    stride      = 30;
-    double voxel_size  = 3.0;
-    int    fps_target  = 1500;
+    // EDGraph sampling params
+    EDGraph::SamplingMode mode = EDGraph::SamplingMode::Voxel;
+    double voxel_size = 2.0; // mm
+    int    fps_target = 1500;
+    int    stride     = 8;
     int    neighborK   = 3;
     int    K_bind      = 3;
 
@@ -74,29 +73,28 @@ int main(int argc, char** argv) {
     std::cout << "==== GeoBA (Stereo Photometric Only, Poses Fixed) ====\n";
     parse_cli(argc, argv);
 
-    DatasetManager dataset_manager(args.dataset_root);
+    DatasetManager dataset_manager;
 
-    // ---- mesh
-    MeshModel mesh_model;
-    if (!dataset_manager.loadMeshModel(mesh_model)) {
-        std::cerr << "[main] Failed to load mesh model from: " << args.dataset_root << std::endl;
+    // ---- load mesh
+    std::vector<MeshModel::Vertex> V;
+    std::vector<MeshModel::Triangle> F;
+    if (!dataset_manager.loadMesh(args.dataset_root+"/mesh.obj", V, F)) {
+        std::cerr << "[main] Failed to load mesh" << std::endl;
         return -1;
     }
-    const auto& V = mesh_model.getVertices();
-    const auto& F = mesh_model.getTriangles();
-    std::cout << "[main] Mesh: " << V.size() << " vertices, " << F.size() << " triangles" << std::endl;
+    std::cout << "[main] Mesh: V=" << V.size() << ", F=" << F.size() << std::endl;
 
-    // ---- build ED graph
-    EDGraph edGraph(args.K_bind, args.neighborK);
-    EDGraph::BuildParams p;
-    p.mode       = args.mode;
-    p.stride     = args.stride;
-    p.voxel_size = args.voxel_size;
-    p.fps_target = args.fps_target;
-    p.K_bind     = args.K_bind;
-    p.neighborK  = args.neighborK;
-
-    if (!edGraph.initializeGraph(V, p, true)) {
+    // ---- EDGraph build
+    EDGraph edGraph;
+    bool ok = false;
+    if (args.mode == EDGraph::SamplingMode::Voxel) {
+        ok = edGraph.initializeFromMeshVoxel(V, F, args.voxel_size, args.neighborK, args.K_bind);
+    } else if (args.mode == EDGraph::SamplingMode::FPS) {
+        ok = edGraph.initializeFromMeshFPS(V, F, args.fps_target, args.neighborK, args.K_bind);
+    } else {
+        ok = edGraph.initializeFromMeshStride(V, F, args.stride, args.neighborK, args.K_bind);
+    }
+    if (!ok) {
         std::cerr << "[main] Failed to initialize EDGraph" << std::endl;
         return -1;
     }
@@ -129,20 +127,49 @@ int main(int argc, char** argv) {
     }
     K_right = K_left; // TODO: load separately if available
 
-    // ---- poses (assume only left provided, right derived via extrinsics)
-    std::vector<Eigen::Matrix4d> poses_left;
-    if (!dataset_manager.loadPoses(poses_left, "poses_left")) {
-        std::cerr << "[main] Failed to load left poses" << std::endl;
+    // ---- poses: load once (center camera T_cw) and derive left/right using baseline
+    std::vector<Eigen::Matrix4d> poses_center;
+    bool poses_ok = dataset_manager.loadPoses(poses_center, "poses_center");
+    if (!poses_ok) {
+        // fallback: try default (no key) if your DatasetManager supports it
+        poses_ok = dataset_manager.loadPoses(poses_center);
+    }
+    if (!poses_ok) {
+        std::cerr << "[main] Failed to load center poses" << std::endl;
         return -1;
     }
-    std::vector<Eigen::Matrix4d> poses_right;
-    if (!dataset_manager.loadPoses(poses_right, "poses_right")) {
-        std::cerr << "[main] Failed to load right poses" << std::endl;
+    if (poses_center.size() != rgb_left.size()) {
+        std::cerr << "[main] Mismatch: center poses (" << poses_center.size()
+                  << ") vs stereo RGB frames (" << rgb_left.size() << ")" << std::endl;
         return -1;
     }
-    if (poses_left.size() != poses_right.size() || rgb_left.size()!=rgb_right.size()) {
-        std::cerr << "[main] Mismatch between frames and poses" << std::endl;
-        return -1;
+
+    // Baseline in mm (already unified to mm). Center-based rig: left at +b/2 on x, right at -b/2 on x in camera frame.
+    const double b_mm = 1.5;                 // full baseline
+    const double half_b = b_mm * 0.5;        // 0.75 mm
+    const Eigen::Vector3d tC_L(+half_b, 0.0, 0.0); // translation from Left to Center, in Center frame
+    const Eigen::Vector3d tC_R(-half_b, 0.0, 0.0); // translation from Right to Center, in Center frame
+
+    // Precompute left/right T_cw from center T_cw:
+    std::vector<Eigen::Matrix4d> poses_left, poses_right;
+    poses_left.resize(poses_center.size());
+    poses_right.resize(poses_center.size());
+    for (size_t i = 0; i < poses_center.size(); ++i) {
+        const Eigen::Matrix4d& Tcw = poses_center[i];
+        Eigen::Matrix3d R = Tcw.block<3,3>(0,0);
+        Eigen::Vector3d t = Tcw.block<3,1>(0,3);
+
+        // T_lw = [R | t + R * tC_L];  T_rw = [R | t + R * tC_R]
+        Eigen::Matrix4d Tlw = Eigen::Matrix4d::Identity();
+        Tlw.block<3,3>(0,0) = R;
+        Tlw.block<3,1>(0,3) = t + R * tC_L;
+
+        Eigen::Matrix4d Trw = Eigen::Matrix4d::Identity();
+        Trw.block<3,3>(0,0) = R;
+        Trw.block<3,1>(0,3) = t + R * tC_R;
+
+        poses_left[i]  = Tlw;
+        poses_right[i] = Trw;
     }
 
     // ---- sampling
@@ -173,7 +200,7 @@ int main(int argc, char** argv) {
         posesL, posesR,
         edGraph,
         [&](int f,const EDGraph& g){
-            dataset_manager.saveMeshAsPLY(
+          dataset_manager.saveMeshAsPLY(
                 args.dataset_root+"/results/PLYs/deformed_mesh_f"+std::to_string(f)+".ply",
                 V,F);
         });
