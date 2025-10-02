@@ -16,7 +16,7 @@
 // -----------------------------------------------------------------------------
 
 struct Args {
-    std::string dataset_root = "../data/halfDef/9/";
+    std::string dataset_root = "../data/halfDef/10/";
     int sampling_interval = 1;
     int max_frames = 0;
 
@@ -25,17 +25,17 @@ struct Args {
     int    stride      = 30;
     double voxel_size  = 3.0;
     int    fps_target  = 1500;
-    int    neighborK   = 3;
+    int    neighborK   = 6;
     int    K_bind      = 3;
 
     // Optimizer weights
     double w_photo = 0.3;
     double w_stereo= 0.3;
-    double lambda_smooth = 0.01;
+    double lambda_smooth = 0.4;
     double lambda_rot    = 0.01;
-    double lambda_temp   = 0.0;
+    double lambda_temp   = 0.05;
     int    maxStages     = 1;
-    int    maxIterations = 5;
+    int    maxIterations = 3;
 } args;
 
 static void parse_cli(int argc, char** argv) {
