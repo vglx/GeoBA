@@ -141,7 +141,7 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    const double baseline_mm = 4.5;
+    const double baseline_mm = 1.5;
     const double half_b = baseline_mm * 0.5;
     const Eigen::Vector3d tC_L(+half_b, 0.0, 0.0);
     const Eigen::Vector3d tC_R(-half_b, 0.0, 0.0);
