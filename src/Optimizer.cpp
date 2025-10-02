@@ -86,7 +86,7 @@ void Optimizer::optimize(
     const Eigen::Matrix3d& K_right,
     const std::vector<cv::Mat>& rgb_left,
     const std::vector<cv::Mat>& rgb_right,
-    const std::vector<Eigen::Matrix4d>& poses_left,   // T_wc (world from cam)
+    const std::vector<Eigen::Matrix4d>& poses_left,   // T_wc (world from cam) — consistent with original code
     const std::vector<Eigen::Matrix4d>& poses_right,  // T_wc
     EDGraph& edGraph,
     SaveCallback on_save) {
@@ -135,7 +135,6 @@ void Optimizer::optimize(
 
     // =========================
     // (1) Intensity init from FRAME 0 (template view, left camera)
-    //     NOTE: We now **only** initialize from f=0. No lazy creation on f>0.
     // =========================
     std::vector<double> I_tmpl(N, std::numeric_limits<double>::quiet_NaN());
     {
@@ -152,7 +151,7 @@ void Optimizer::optimize(
         }
     }
 
-    // Compact intensity storage (global). Only those visible in f=0 are created.
+    // Compact intensity storage (global, grows lazily)
     std::vector<int>    colI(N, -1);
     std::vector<double> I_var; I_var.reserve(N);
     int Icount_global = 0;
@@ -168,7 +167,7 @@ void Optimizer::optimize(
     double prev_cost = std::numeric_limits<double>::max();
 
     for (int it=0; it<maxIterations_; ++it) {
-        // 0) write current X to graph (for completeness)
+        // 0) write current X to graph (for completeness; we also set per-frame below)
         for (int f=0; f<F; ++f) edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
 
         // 0.5) Build per-frame deformed vertices and normals (world)
@@ -206,8 +205,10 @@ void Optimizer::optimize(
                 for (int i = 0; i < N; ++i) {
                     float u, v; double z;
                     if (!projectInBounds(Vdef[f][i], Rcw_L[f], tcw_L[f], K_left, imgL.cols, imgL.rows, u, v, z)) continue;
+                    // optional backface reject by angle (vs left view)
                     if (use_angle_weight) {
                         Eigen::Vector3d n = normals_w[f][i];
+                        // view dir in world: from point to camera center
                         Eigen::Vector3d vdir = (-(Rcw_L[f].transpose()*tcw_L[f]) - Vdef[f][i]).normalized();
                         if (n.dot(vdir) < cos_thr) continue;
                     }
@@ -246,6 +247,19 @@ void Optimizer::optimize(
             visible_both[f].swap(both);
         }
 
+        // 1.5) Lazy intensity creation from LEFT view
+        for (int f = 0; f < F; ++f) {
+            const cv::Mat& imgL = L[f];
+            for (int vid : visible_L[f]) {
+                if (colI[vid] >= 0) continue;
+                float u, v; double z;
+                if (!projectInBounds(Vdef[f][vid], Rcw_L[f], tcw_L[f], K_left, imgL.cols, imgL.rows, u, v, z)) continue;
+                const double I0 = (double)bilinearSample(imgL, u, v);
+                colI[vid] = Icount_global++;
+                I_var.push_back(I0);
+            }
+        }
+
         // 2) Active nodes/edges (f>=1) & compact index
         std::vector<std::vector<char>> active_node(F, std::vector<char>(G,0));
         std::vector<std::vector<std::pair<int,int>>> active_edges(F);
@@ -266,7 +280,7 @@ void Optimizer::optimize(
         auto colA_c  = [&](int f,int node,int k){ int ci=compact_idx[f][node]; if (ci<0) return -1; return offsEDc(f)+12*ci+k; };
         auto colt_c  = [&](int f,int node,int k){ int ci=compact_idx[f][node]; if (ci<0) return -1; return offsEDc(f)+12*ci+9+k; };
 
-        // 2.5) Intensity columns: per-iteration COMPACT mapping（只为本轮可见且在f=0有I_var的顶点）
+        // 2.5) Intensity columns: per-iteration COMPACT mapping（只为本轮可见顶点）
         std::vector<char> I_active(N, 0);
         for (int f=0; f<F; ++f) for (int vid : visible_L[f]) if (colI[vid] >= 0) I_active[vid] = 1;
         std::vector<int> colI_it(N, -1); int Icount_it = 0;
@@ -318,14 +332,10 @@ void Optimizer::optimize(
         int num_threads = omp_get_max_threads();
         std::vector<std::vector<Eigen::Triplet<double>>> triplets_thr(num_threads);
 
-        // --- Residual stats (debug)
-        size_t photo_kept = 0, photo_skip = 0;
-        size_t stereo_kept = 0, stereo_skip = 0;
-        double photo_abs_sum = 0.0, stereo_abs_sum = 0.0;
-
         // PHOTO (f=0..F-1) — Left camera only vs vertex intensity variable
         if (use_photo) {
             for (int f=0; f<F; ++f) {
+                // Set frame state once (serial) — read-only in parallel body
                 edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
 
                 const Eigen::Matrix3d Rcw = Rcw_L[f];
@@ -341,7 +351,7 @@ void Optimizer::optimize(
 
                     int ci_global = colI[i];
                     int ci_it     = colI_it[i];
-                    if (ci_global < 0 || ci_it < 0) { photo_skip++; continue; }
+                    if (ci_global < 0 || ci_it < 0) { continue; }
 
                     const double Icurr = I_var[ci_global];
                     PhotometricError cost(mesh_vertices[i], i, mesh_triangles, K_left, img, sqrt_w_photo, &edGraph);
@@ -350,6 +360,7 @@ void Optimizer::optimize(
                     Eigen::VectorXd J_ed(12*G); J_ed.setZero();
                     double J_I = 0.0;
 
+                    // world->cam: Rcw, tcw; functor expects (R, t) as cam-from-world
                     cost.Evaluate(Icurr, residual, &J_I, (f==0? nullptr : &J_ed), Rcw, tcw);
 
                     // Optional grazing-angle weight wrt LEFT view
@@ -359,12 +370,11 @@ void Optimizer::optimize(
                         Eigen::Vector3d Cw = -(Rcw.transpose()*tcw); // camera center in world
                         Eigen::Vector3d vdir = (Cw - Vdef[f][i]).normalized();
                         double c = std::max(0.0, n.dot(vdir));
-                        if (c < cos_thr) continue; // backface reject
+                        if (c < cos_thr) continue; // backface reject (duplicate safety)
                         w_ang = c*c; // cos^2
                     }
 
                     Fvec[r] = residual * w_ang;
-                    photo_kept++; photo_abs_sum += std::abs(Fvec[r]);
 
                     // intensity column (per-iteration compact)
                     const int colIglob = edDimCompact + ci_it;
@@ -385,6 +395,7 @@ void Optimizer::optimize(
         // STEREO (f=0..F-1) — Left–Right photometric consistency (no intensity var)
         if (use_stereo) {
             for (int f=0; f<F; ++f) {
+                // Set frame state once (serial)
                 edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
 
                 const Eigen::Matrix3d RLcw = Rcw_L[f];
@@ -399,20 +410,21 @@ void Optimizer::optimize(
                     int r = row_base + idx;
                     int i = visible_both[f][idx];
 
-                    // Defensive bounds recheck for right eye
+                    // Final strict pre-check for RIGHT bounds (defensive; already in visible_both)
                     float ur, vr; double zr;
-                    if (!projectInBounds(Vdef[f][i], RRcw, tRcw, K_right, R[f].cols, R[f].rows, ur, vr, zr)) { stereo_skip++; continue; }
+                    if (!projectInBounds(Vdef[f][i], RRcw, tRcw, K_right, R[f].cols, R[f].rows, ur, vr, zr)) continue;
 
                     StereoPhotometricError scost(
                         mesh_vertices[i], i, &edGraph,
                         K_left, K_right,
                         L[f], R[f],
-                        std::sqrt(std::max(0.0, w_stereo_)));
+                        /*sqrt_w*/ std::sqrt(std::max(0.0, w_stereo_)));
 
                     double residual=0.0; Eigen::VectorXd J_ed(12*G); J_ed.setZero();
                     bool ok = scost.Evaluate(residual, &J_ed, RLcw, tLcw, RRcw, tRcw);
-                    if (!ok) { stereo_skip++; continue; }
+                    if (!ok) { continue; }
 
+                    // Optional angle weight: use LEFT view's weight for stability
                     double w_ang = 1.0;
                     if (use_angle_weight) {
                         Eigen::Vector3d n = normals_w[f][i];
@@ -424,7 +436,6 @@ void Optimizer::optimize(
                     }
 
                     Fvec[r] = residual * w_ang;
-                    stereo_kept++; stereo_abs_sum += std::abs(Fvec[r]);
 
                     if (f>=1) {
                         const auto& bnd = bindings[i];
@@ -524,14 +535,11 @@ void Optimizer::optimize(
             int ci_global = colI[i];
             if (ci_it < 0 || ci_global < 0) continue;
             I_var[ci_global] += dx[edDimCompact + ci_it];
+            // Optional clamp: I_var[ci_global] = std::min(1.0, std::max(0.0, I_var[ci_global]));
         }
 
         const double mean_cost = (total_rows>0)? (2.0*cost / (double)total_rows) : cost;
-        const double mean_abs_photo  = (photo_kept>0)?  (photo_abs_sum  / (double)photo_kept)  : 0.0;
-        const double mean_abs_stereo = (stereo_kept>0)? (stereo_abs_sum / (double)stereo_kept) : 0.0;
         std::cout << "[GN it="<<it<<"] cost="<<cost<<" (mean "<<mean_cost<<"), |dx|="<<dx.norm() << std::endl;
-        std::cout << "          PHOTO kept="<<photo_kept<<" skip="<<photo_skip<<" mean|r|="<<mean_abs_photo
-                  << "; STEREO kept="<<stereo_kept<<" skip="<<stereo_skip<<" mean|r|="<<mean_abs_stereo << std::endl;
         if (std::abs(cost - prev_cost) < 1e-6) break; prev_cost = cost;
     }
 
