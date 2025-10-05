@@ -143,8 +143,8 @@ int main(int argc, char** argv) {
 
     const double baseline_mm = 4.5;
     const double half_b = baseline_mm * 0.5;
-    const Eigen::Vector3d tC_L(+half_b, 0.0, 0.0);
-    const Eigen::Vector3d tC_R(-half_b, 0.0, 0.0);
+    const Eigen::Vector3d tC_L(-half_b, 0.0, 0.0);
+    const Eigen::Vector3d tC_R(+half_b, 0.0, 0.0);
 
     std::vector<Eigen::Matrix4d> posesL_wc, posesR_wc;
     posesL_wc.reserve(poses_center.size());
