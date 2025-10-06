@@ -18,12 +18,13 @@ import imageio.v2 as imageio
 import open3d as o3d
 
 # ==== 用户配置区 ====
-dataset       = "6"
+dataset       = "11"
 left_png      = f"./data/halfDef/{dataset}/results/left.png"   # 左目深度（与左目相机对应）
 right_png     = f"./data/halfDef/{dataset}/results/right.png"  # 右目深度（与右目相机对应）
 pose_txt      = f"./data/halfDef/{dataset}/results/poses_gt.txt" # 中心相机位姿（3x4 或 4x4）
 pose_format   = "tcw"   # "twc" 或 "tcw"（文件里是 T_cw 就写 tcw，会自动求逆）
-mesh_path     = f"./data/halfDef/{dataset}/results/PLYs/deformed_mesh_f1.ply"  # 或模板 mesh.obj
+# mesh_path     = f"./data/halfDef/{dataset}/results/PLYs/deformed_mesh_f1.ply"  # 或模板 mesh.obj
+mesh_path     = f"./data/halfDef/{dataset}/mesh.obj"
 mesh_unit     = "mm"     # 网格单位: "m" 或 "mm"
 
 # 相机内参（像素）——左右目相同（如不同，可拆成 fxL/fyL/cxL/cyL 与 fxR/...）
@@ -52,15 +53,13 @@ def _load_sidecar_json(png_path):
 
 
 def load_depth_um_png(png_path, return_unit="m"):
-    """读取 *_depth16_um.png（uint16, 深度单位通常为 µm），并转为 m 或 mm。支持旁车 JSON。"""
+    """读取 MATLAB 导出的 *_depth16_um.png（uint16, 单位=µm），并转为 m 或 mm。"""
     depth_u16 = imageio.imread(png_path).astype(np.uint16)
     depth = depth_u16.astype(np.float32)
 
     meta = _load_sidecar_json(png_path)
     if meta:
         unit = str(meta.get("unit", "um")).lower()
-        scale = float(meta.get("scale", 1.0))
-        depth *= scale
         if unit.startswith("um"):
             depth_m = depth * 1e-6
         elif unit.startswith("mm"):
@@ -68,12 +67,14 @@ def load_depth_um_png(png_path, return_unit="m"):
         elif unit in ("m", "meter", "meters"):
             depth_m = depth
         else:
-            depth_m = depth * 1e-6
+            depth_m = depth * 1e-6  # 兜底按 µm
     else:
-        depth_m = depth * 1e-6
+        depth_m = depth * 1e-6     # 无 sidecar 默认 µm
 
+    # 无效与 NaN 处理
     mask = np.isfinite(depth_m) & (depth_m > 0)
     depth_m = np.where(mask, depth_m, np.nan).astype(np.float32)
+
     if return_unit == "mm":
         return depth_m * 1000.0, mask, meta
     return depth_m, mask, meta
