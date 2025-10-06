@@ -11,18 +11,16 @@
 #include <omp.h>
 
 // =============================================================
-// This version removes data races and adds lazy intensity creation
+// Stereo-safe Optimizer
 //
-// Key changes vs your original file:
-// 1) Removed per-thread writes to edGraph during PHOTO/STEREO assembly.
-//    We now update edGraph state ONCE per frame (serial) and use it READ-ONLY
-//    inside the parallel loops. (No more updateFromStateVector inside omp bodies.)
-// 2) Added lazy creation of intensity variables: any vertex that first becomes
-//    visible in later frames gets an intensity slot and initialization at the
-//    moment we first see it (before layout for this iteration).
-// 3) Kept your Vdef-based visibility path; cost functors still read from edGraph,
-//    but the state is stable per frame.
-// 4) Minor hygiene: clearer comments, bounds checks, and early-continue guards.
+// What changed vs your previous version:
+// 1) Stereo rows only for f >= 1 (frame-0 has no ED columns, so skip it).
+// 2) Added LEFT&RIGHT joint visibility (visible_LR[f]):
+//    stereo residuals are assembled only for vertices that are in FOV of
+//    both cameras. (Optional hooks for backface culling are left as comments.)
+// 3) Kept the data-race safe pattern: edGraph state set ONCE per frame,
+//    then READ-ONLY in parallel bodies.
+// 4) Row layout for stereo now uses visible_LR sizes to keep offsets consistent.
 // =============================================================
 
 namespace {
@@ -84,8 +82,8 @@ void Optimizer::optimize(
     const Eigen::Matrix3d& K_right,
     const std::vector<cv::Mat>& rgb_left,
     const std::vector<cv::Mat>& rgb_right,
-    const std::vector<Eigen::Matrix4d>& poses_left,   // NOTE: name kept, semantics: T_wc expected
-    const std::vector<Eigen::Matrix4d>& poses_right,  // NOTE: name kept, semantics: T_wc expected
+    const std::vector<Eigen::Matrix4d>& poses_left,   // NOTE: Twc expected
+    const std::vector<Eigen::Matrix4d>& poses_right,  // NOTE: Twc expected
     EDGraph& edGraph,
     SaveCallback on_save) {
 
@@ -177,7 +175,7 @@ void Optimizer::optimize(
             computeVertexNormals(Vdef[f], mesh_triangles, normals_w[f]);
         }
 
-        // 1) Visibility (FOV-only) for LEFT view; also used for stereo residual selection
+        // 1) Visibility (FOV-only) for LEFT view
         std::vector<std::vector<int>> visible_vertices(F);
         for (int f = 0; f < F; ++f) {
             const cv::Mat& imgL = L[f];
@@ -204,16 +202,41 @@ void Optimizer::optimize(
             visible_vertices[f].swap(vis);
         }
 
+        // 1.1) Joint L&R visibility for stereo (new): visible_LR[f]
+        std::vector<std::vector<int>> visible_LR(F);
+        for (int f = 0; f < F; ++f) {
+            const Eigen::Matrix3d RR = poses_right[f].block<3,3>(0,0);
+            const Eigen::Vector3d tR = poses_right[f].block<3,1>(0,3);
+            const cv::Mat& imgR = R[f];
+            std::vector<int> both; both.reserve(visible_vertices[f].size());
+
+            for (int i : visible_vertices[f]) {
+                const Eigen::Vector3d& pw = Vdef[f][i];
+                Eigen::Vector3d pcR = RR.transpose() * (pw - tR);
+                if (pcR.z() <= 1e-8) continue;
+                float ur = static_cast<float>(K_right(0,0) * (pcR.x() / pcR.z()) + K_right(0,2));
+                float vr = static_cast<float>(K_right(1,1) * (pcR.y() / pcR.z()) + K_right(1,2));
+                if (ur < 1 || vr < 1 || ur > imgR.cols - 2 || vr > imgR.rows - 2) continue;
+
+                // Optional backface culling (commented):
+                // Eigen::Vector3d viewDirR = -pcR.normalized();
+                // if (normals_w[f][i].dot(viewDirR) < 0.173648) continue; // ~cos(80deg)
+
+                both.push_back(i);
+            }
+            visible_LR[f].swap(both);
+        }
+
         // 1.5) Lazy intensity creation: for any newly visible vertex i with colI[i]<0,
         //      assign a new global intensity slot initialized from its first valid appearance (left view).
         for (int f = 0; f < F; ++f) {
-            const Eigen::Matrix3d R = poses_left[f].block<3,3>(0,0);
-            const Eigen::Vector3d t = poses_left[f].block<3,1>(0,3);
+            const Eigen::Matrix3d Rl = poses_left[f].block<3,3>(0,0);
+            const Eigen::Vector3d tl = poses_left[f].block<3,1>(0,3);
             const cv::Mat& imgL = L[f];
             for (int vid : visible_vertices[f]) {
                 if (colI[vid] >= 0) continue;
                 const Eigen::Vector3d& pw = Vdef[f][vid];
-                Eigen::Vector3d pc = R.transpose() * (pw - t);
+                Eigen::Vector3d pc = Rl.transpose() * (pw - tl);
                 if (pc.z() <= 1e-8) continue;
                 float u = static_cast<float>(K_left(0,0) * (pc.x()/pc.z()) + K_left(0,2));
                 float v = static_cast<float>(K_left(1,1) * (pc.y()/pc.z()) + K_left(1,2));
@@ -250,7 +273,7 @@ void Optimizer::optimize(
         std::vector<int> colI_it(N, -1); int Icount_it = 0;
         for (int i=0; i<N; ++i) if (I_active[i]) colI_it[i] = Icount_it++;
 
-        // 3) Row/col layout
+        // 3) Row/col layout (stereo rows use visible_LR)
         const bool use_photo  = (w_photo_  > 1e-12);
         const bool use_stereo = (w_stereo_ > 1e-12);
 
@@ -258,7 +281,7 @@ void Optimizer::optimize(
         int photo_rows=0, stereo_rows=0;
         for (int f=0; f<F; ++f) { // include f=0 for photo against template intensity
             photo_row_ofs[f] = photo_rows; if (use_photo)  photo_rows  += (int)visible_vertices[f].size();
-            stereo_row_ofs[f]= stereo_rows; if (use_stereo) stereo_rows += (int)visible_vertices[f].size();
+            stereo_row_ofs[f]= stereo_rows; if (use_stereo) stereo_rows += (int)visible_LR[f].size(); // <<< use joint visibility sizes
         }
 
         int smooth_rows=0, rot_rows=0, temporal_rows=0;
@@ -302,8 +325,8 @@ void Optimizer::optimize(
                 // Set frame state once (serial) — read-only in parallel body
                 edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
 
-                const Eigen::Matrix3d R = poses_left[f].block<3,3>(0,0);
-                const Eigen::Vector3d t = poses_left[f].block<3,1>(0,3);
+                const Eigen::Matrix3d Rl = poses_left[f].block<3,3>(0,0);
+                const Eigen::Vector3d tl = poses_left[f].block<3,1>(0,3);
                 const cv::Mat& img = L[f];
                 int row_base = row_photo_begin + photo_row_ofs[f];
 
@@ -324,7 +347,7 @@ void Optimizer::optimize(
                     Eigen::VectorXd J_ed(12*G); J_ed.setZero();
                     double J_I = 0.0;
 
-                    cost.Evaluate(Icurr, residual, &J_I, (f==0? nullptr : &J_ed), R, t);
+                    cost.Evaluate(Icurr, residual, &J_I, (f==0? nullptr : &J_ed), Rl, tl);
                     Fvec[r] = residual;
 
                     // intensity column (per-iteration compact)
@@ -343,9 +366,9 @@ void Optimizer::optimize(
             }
         }
 
-        // STEREO (f=0..F-1) — Left–Right photometric consistency (no intensity var)
+        // STEREO (f=1..F-1) — Left–Right photometric consistency (no intensity var)
         if (use_stereo) {
-            for (int f=0; f<F; ++f) {
+            for (int f=1; f<F; ++f) { // <<< start from 1, skip frame-0
                 // Set frame state once (serial)
                 edGraph.updateFromStateVector(Xfull[f], /*offset=*/0);
 
@@ -356,10 +379,10 @@ void Optimizer::optimize(
                 int row_base = row_stereo_begin + stereo_row_ofs[f];
 
                 #pragma omp parallel for schedule(static)
-                for (int idx=0; idx<(int)visible_vertices[f].size(); ++idx) {
+                for (int idx=0; idx<(int)visible_LR[f].size(); ++idx) {
                     int tid = omp_get_thread_num(); auto& T = triplets_thr[tid];
                     int r = row_base + idx;
-                    int i = visible_vertices[f][idx];
+                    int i = visible_LR[f][idx]; // only points visible in BOTH views
 
                     StereoPhotometricError scost(
                         mesh_vertices[i], i, &edGraph,
@@ -372,13 +395,11 @@ void Optimizer::optimize(
                     if (!ok) { continue; }
                     Fvec[r] = residual;
 
-                    if (f>=1) {
-                        const auto& bnd = bindings[i];
-                        for (int nid : bnd) {
-                            const int base = 12*nid;
-                            for (int c=0;c<9;++c)  { double v=J_ed[base+c];    if (!v) continue; int col=colA_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
-                            for (int c=0;c<3;++c)  { double v=J_ed[base+9+c];  if (!v) continue; int col=colt_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
-                        }
+                    const auto& bnd = bindings[i];
+                    for (int nid : bnd) {
+                        const int base = 12*nid;
+                        for (int c=0;c<9;++c)  { double v=J_ed[base+c];    if (!v) continue; int col=colA_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
+                        for (int c=0;c<3;++c)  { double v=J_ed[base+9+c];  if (!v) continue; int col=colt_c(f,nid,c); if (col>=0) T.emplace_back(r,col,v); }
                     }
                 }
             }
