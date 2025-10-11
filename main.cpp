@@ -12,7 +12,10 @@
 #include <cstdlib>
 
 // -----------------------------------------------------------------------------
-// GeoBA main: Stereo Photometric (derive L/R from center poses, baseline=1.5mm)
+// GeoBA main: Photometric (L/R vs per-vertex intensity), poses from center
+//  - Data term: \sum_f\sum_i (I_i - I_L^f(\pi_L(p_{w,i}^f)))^2 + (I_i - I_R^f(\pi_R(p_{w,i}^f)))^2
+//  - No IL-IR stereo-difference residuals
+//  - Frame-0 deformation fixed inside Optimizer
 // -----------------------------------------------------------------------------
 
 struct Args {
@@ -29,8 +32,7 @@ struct Args {
     int    K_bind      = 3;
 
     // Optimizer weights
-    double w_photo = 0.3;
-    double w_stereo= 0.3;
+    double w_photo = 0.3;           // used for both L and R photometric terms
     double lambda_smooth = 0.4;
     double lambda_rot    = 0.01;
     double lambda_temp   = 0.05;
@@ -62,7 +64,6 @@ static void parse_cli(int argc, char** argv) {
         else if (!std::strcmp(a, "--neighborK"))   args.neighborK    = nexti(args.neighborK);
         else if (!std::strcmp(a, "--Kbind"))       args.K_bind       = nexti(args.K_bind);
         else if (!std::strcmp(a, "--wphoto"))      args.w_photo      = nextd(args.w_photo);
-        else if (!std::strcmp(a, "--wstereo"))     args.w_stereo     = nextd(args.w_stereo);
         else if (!std::strcmp(a, "--lsmooth"))     args.lambda_smooth= nextd(args.lambda_smooth);
         else if (!std::strcmp(a, "--lrot"))        args.lambda_rot   = nextd(args.lambda_rot);
         else if (!std::strcmp(a, "--ltemp"))       args.lambda_temp  = nextd(args.lambda_temp);
@@ -71,7 +72,7 @@ static void parse_cli(int argc, char** argv) {
 }
 
 int main(int argc, char** argv) {
-    std::cout << "==== GeoBA (Stereo Photometric Only, Poses Fixed from Center) ====\n";
+    std::cout << "==== GeoBA (Photometric L/R vs Vertex Intensity; Stereo-diff removed) ====\n";
     parse_cli(argc, argv);
 
     DatasetManager dataset_manager(args.dataset_root);
@@ -129,7 +130,7 @@ int main(int argc, char** argv) {
     }
     K_right = K_left; // assume same for now
 
-    // ---- poses: load center poses, then derive L/R with baseline=1.5mm
+    // ---- poses: load center poses, then derive L/R with baseline=4.5mm
     std::vector<Eigen::Matrix4d> poses_center;
     if (!dataset_manager.loadPoses(poses_center, "poses_gt")) {
         std::cerr << "[main] Failed to load poses_center" << std::endl;
@@ -182,8 +183,8 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    // ---- optimizer
-    Optimizer optimizer(args.w_photo, args.w_stereo,
+    // ---- optimizer (stereo weight removed; pass 0.0 for API compatibility)
+    Optimizer optimizer(/*w_photo=*/args.w_photo, /*w_stereo (unused)=*/0.0,
                         args.maxStages, args.maxIterations,
                         args.lambda_smooth, args.lambda_rot, args.lambda_temp);
 
