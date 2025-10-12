@@ -32,7 +32,7 @@ struct Args {
     int    K_bind      = 3;
 
     // Optimizer weights
-    double w_photo = 0.3;           // used for both L and R photometric terms
+    double w_photo = 1.0;           // used for both L and R photometric terms
     double lambda_smooth = 0.4;
     double lambda_rot    = 0.01;
     double lambda_temp   = 0.05;

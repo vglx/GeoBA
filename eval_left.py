@@ -6,7 +6,7 @@ import imageio.v2 as imageio
 import open3d as o3d
 
 # ===================== 配置 =====================
-dataset     = "10"
+dataset     = "13"
 depth_dir   = f"./data/halfDef/{dataset}/depth_left"          # ✅ 使用左目深度
 mesh_dir    = f"./data/halfDef/{dataset}/results/PLYs"        # 变形后网格（deformed_mesh_f1.ply ...）
 poses_txt   = f"./data/halfDef/{dataset}/poses_gt.txt"        # ✅ 读入中心相机的位姿（每行 12 或 16）

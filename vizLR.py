@@ -18,13 +18,13 @@ import imageio.v2 as imageio
 import open3d as o3d
 
 # ==== 用户配置区 ====
-dataset       = "11"
-left_png      = f"./data/halfDef/{dataset}/results/left.png"   # 左目深度（与左目相机对应）
-right_png     = f"./data/halfDef/{dataset}/results/right.png"  # 右目深度（与右目相机对应）
+dataset       = "13"
+left_png      = f"./data/halfDef/{dataset}/results/1r.png"   # 左目深度（与左目相机对应）
+right_png     = f"./data/halfDef/{dataset}/results/1r.png"  # 右目深度（与右目相机对应）
 pose_txt      = f"./data/halfDef/{dataset}/results/poses_gt.txt" # 中心相机位姿（3x4 或 4x4）
 pose_format   = "tcw"   # "twc" 或 "tcw"（文件里是 T_cw 就写 tcw，会自动求逆）
-# mesh_path     = f"./data/halfDef/{dataset}/results/PLYs/deformed_mesh_f1.ply"  # 或模板 mesh.obj
-mesh_path     = f"./data/halfDef/{dataset}/mesh.obj"
+mesh_path     = f"./data/halfDef/{dataset}/results/PLYs/deformed_mesh_f1.ply"  # 或模板 mesh.obj
+# mesh_path     = f"./data/halfDef/{dataset}/mesh.obj"
 mesh_unit     = "mm"     # 网格单位: "m" 或 "mm"
 
 # 相机内参（像素）——左右目相同（如不同，可拆成 fxL/fyL/cxL/cyL 与 fxR/...）
